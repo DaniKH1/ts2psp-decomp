@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 90 (see below) |
-| **C functions that byte-match** | **84** (linked from `src/`) |
+| functions written in C | 96 (see below) |
+| **C functions that byte-match** | **90** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  Eighty-four functions are
+CodeWarrior and only the *register choice* differs.  Ninety functions are
 now byte exact this way:
 
 ```
@@ -168,6 +168,12 @@ func_0012828C  T*, u32, u32    round down to 32, keep the relation to the delta
 func_0012C954  u32, u32        ... the same, writing the global at 0x647D0
 func_00058FD4  T*              (link + 1) & ~1 - round up to even
 func_001AF15C  u32, u32        value & ~(limit - 1) - the alignment primitive
+func_00116CD4  T*, u32, u32    constructor: two arguments, two -1 handles
+func_000E7ECC  void            set the one-shot flag at 0x1DAA88
+func_000471C8  T*              constructor: status -2, points at 0x1E52A0
+func_00127868  T*, u32, u32    constructor: three self-referential pointer pairs
+func_000E9D3C  u32             interpolate a 16-bit table at 0x1DA398
+func_0014CE0C  u32 x4          64-bit weighted sum, no carry propagation
 func_00128F50  Elapsed*        start - now
 func_00140A58  u32             flags[index] & 0x07, packed flag bytes
 func_00140A74  u32             ... the same, mask 0x04
@@ -215,6 +221,61 @@ rather than a workaround:
 
 The C still says what the function means; the asm pins the instructions both
 compilers already agree on.
+
+### A register cannot be both an operand and a named hard register
+
+Three errors that all look like the same mistake, and they are worth listing
+together because each one's message points somewhere unhelpful:
+
+* **An input operand needs a C expression.**  `[f] "f12"` in the *input* section
+  fails with "expected `(` before `:`" - every input needs `(expr)`, and a bare
+  register name is not one.  For a scratch with no C variable, name `$f12` in the
+  template text and list `"$f12"` as a clobber.
+* **An uninitialised hard register cannot be `"+r"`.**  "input operand constraint
+  contains `+`".  If the asm writes the register before reading it, the constraint
+  is `=&r` (output) or the register is listed as a clobber.
+* **A compound literal has no register.**  `(u32){0}` cannot be an output operand
+  bound to a hard register; declare a named variable instead.
+
+The rule underneath all three: an uninitialised `register ... asm("$r")` variable
+means *the asm produces this value*, so it belongs in the output section.
+
+### GCC's delay-slot filler duplicates instructions, and that has a limit
+
+`func_001AF15C` ends with an `and` and psp-gcc fills the delay slot by **emitting
+the `and` a second time**.  That is safe because `and` is idempotent.
+
+The limit is now known, from `func_000E9D3C`: its last instruction is `srav`, and a
+duplicated shift would corrupt the result.  The fix is the inverse of the usual
+rule - the final instruction goes in **C**, not in the asm, so GCC schedules it
+into the delay slot exactly once.  So:
+
+| last instruction | where it goes | why |
+| --- | --- | --- |
+| idempotent (`and`, `sw` of the same value) | asm | GCC may duplicate it safely |
+| not idempotent (`srav`, `addu` into a counter) | C | GCC schedules it once, into the slot |
+
+### A handful of fixed globals, and what they are for
+
+Four functions now touch addresses directly, with no argument involved.  These are
+worth listing together because they are the whole of what `.bss` looks like from
+the code side:
+
+| function | address | what it does there |
+| --- | --- | --- |
+| `func_000E7ECC` | `0x1DAA88` | one-shot flag, set to 1 |
+| `func_000471C8` | `0x1E52A0` | an object's own global state, pointed at |
+| `func_000E9D3C` | `0x1DA398` | a 256-entry table of 16-bit values |
+| `func_0012C954` | `0x647D0` | the round-down state, written every call |
+
+All four are built as `lui $reg, <page>` plus a signed displacement with
+R_MIPS_HI16/LO16 relocations, never as an immediate operand - which is why they
+survive a move in the address space, and why `andi` cannot be used for any mask
+derived from them.
+
+`0x647D0` is the odd one out: the other three are above `0x1D0000`, in what is
+almost certainly the module's own data region, while `0x647D0` is low.  It may be a
+different section, or a variable that predates the rest of the layout.
 
 ### GCC rewrites the code rather than just re-registering it
 
@@ -477,7 +538,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the eighty-four that work: if the function has no
+The rule of thumb from the ninety that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -813,7 +874,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 84 are done.  Each shape that works yields several functions
+   identified and 90 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
