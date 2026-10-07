@@ -200,15 +200,30 @@ What is open now:
   tests in both alignments and rejects.  Of the eight bits, **bit 7 is read by nobody
   at all**, and bits 4 and 6 only by `func_0010CFC0`, which masks nearly every bit in
   turn and looks like a serialiser rather than a property test.
-* **Naming the rest of the module.**  3,754 string literals and 320 static
-  constructors are mapped; roughly 185 constructors still touch nothing but the
-  shared runtime and have no name.
+* **Naming the rest of the module.**  **The symbol table is not stripped** — 3,882 of
+  the 15,977 symbols carry a name from the original CodeWarrior link, and
+  `tools/orig_names.py` is the census.  What that bought:
+  * **The build tree.**  The literal `c:/ad_clean/sims_psp/src/elem/bent/circular.h`
+    is stored at `0x1C8F08` and `C:/ad/sims_psp/testing/luaDumps` at `0x1C95E4`, so the
+    root is `c:/ad/sims_psp/` with `src/` and `testing/` below it.
+  * **The language and the shape of the engine.**  51 of the surviving string literals
+    are C++ `Class::method` names over 46 classes — roughly thirty of them expose
+    `onUpdate` and nothing else, which is a scheduler-driven behaviour system.  There
+    is a **Lua** scripting layer (`BehaviorLuaTask`, `lua_yield`, `SCHED_LUA`) and a
+    Lua debugger (`LuaBreakPoint`, `luadump`) in the shipped build.
+  * **About a dozen function names**, which is all that survives in code: `stub` 223
+    times, then `updateNodeGraph`, `sortAndCullScene`, `syncSkeleton`,
+    `renderMeshInstances`, `collision`, `drawing`, `renderCommon`, and three `elem_`
+    ones.  The rest have to be recovered by analysis.
+  * 3,754 string literals and 320 static constructors are also mapped; roughly 185
+    constructors still touch nothing but the shared runtime and have no name.
 * **The 223 PSP imports have no names and cannot get them from here.**  Every stub
   in the 26 `.sceStub.text.*` sections is an empty `jr $ra` placeholder that the
   loader patches at load time, so the code carries nothing and `.rodata.sceNid`
   cannot be interpreted with confidence from the binary alone.
   `tools/nid_table.py` records the index/address/library/NID correspondence for
-  whoever wants to match it against a NID table.
+  whoever wants to match it against a NID table.  The original link agrees: all 223
+  are named `stub`.
 
 Two tools are worth pointing at.  `tools/setup.py` reports which of the two inputs
 this repository deliberately omits a given clone is missing.  `tools/delay_slots.py`

@@ -1666,17 +1666,143 @@ image itself and is what catches it:
 
 ## Recovering names
 
-The module ships with its symbol table stripped, so names have to come out of
-analysis.  `config/eboot.names.txt` is where recovered names accumulate;
-`tools/gen_splat_config.py` merges it over the `func_XXXXXXXX` placeholders.
+**The module's symbol table is *not* stripped.**  That is the correction, and it is
+large enough to be worth having found this late rather than not at all.  3,882 of the
+15,977 symbols in `config/eboot.symbol_addrs.txt` carry a name from the original
+CodeWarrior link; only the other 12,095 are names this project invented.  Every claim
+below that started from "names are lost" was wrong in the same direction.
 
-Three sources have proved worth reading:
+`tools/orig_names.py` counts them and classifies by section:
+
+| section | surviving names |
+| --- | --- |
+| `.rodata` | 3,532 |
+| code sections | 350 |
+| `.data` and elsewhere | the rest |
+
+**The suffixes are uniquifiers, not part of the names.**  1,295 names end in `_NNNN`
+where `NNNN` is a hex VRAM address, because two objects with the same C identifier get
+different addresses and PSPLINK disambiguated them that way.  `sortAndCullScene_1078`
+and `sortAndCullScene_1844` are one function name linked twice.
+
+**Why only some survive.**  A name is kept when something *outside the same translation
+unit* refers to the symbol.  The game was built with `-ffunction-sections`, so each TU
+became its own output section - which is where the names `collision`, `drawing`,
+`renderCommon` in `config/eboot.splat.yaml` came from in the first place.  **So the
+named functions are each TU's exported surface**, and the 7,000-odd unnamed ones are
+functions only their own file calls.  That predicts the surviving names should be the
+interesting ones, and they are.
+
+**Function names: eleven distinct, not many.**  `orig_names.py --code` collapses to
+just 11 once the suffixes go:
+
+| count | name |
+| --- | --- |
+| 223 | `stub` - every PSP import stub, so the 223 are one name and the NID table is still needed |
+| 28 | `updateNodeGraph` |
+| 21 | `sortAndCullScene` |
+| 21 | `syncSkeleton` |
+| 16 | `renderMeshInstances` |
+| 15 | `collision` |
+| 14 | `drawing` |
+| 9 | `renderCommon` |
+| 1 each | `elem_register_chunk_tag`, `elem_operator_new`, `elem_throw_bad_alloc` |
+
+So the naming work is **transcription for about a dozen functions and pattern
+recognition for the rest**, not pattern recognition throughout.  `sortAndCullScene_1078`
+at `0x1B4C94` is a real example: the shape queue has had it sitting labelled for
+several iterations.
+
+The three `elem_` names are the exception that proves the suffix rule is not
+arbitrary - they carry the source path as a prefix, which is the next item.
+
+**Some strings are the project's own source paths, and they are readable.**  Not
+guessed at from the symbol name either - stored at `0x001C8F08` is the literal
+
+```
+c:/ad_clean/sims_psp/src/elem/bent/circular.h
+```
+
+and at `0x001C95E4`
+
+```
+C:/ad/sims_psp/testing/luaDumps
+```
+
+**So the build tree's root is `c:/ad/sims_psp/`, with `src/` below it and a
+`testing/` directory beside it**; `ad_clean` is a second root, presumably a clean
+checkout used for some builds.  `src/elem/` matches the `elem_register_chunk_tag`
+constructor and the `elem_` symbols, so `elem` is a real subsystem directory and not a
+prefix someone invented.
+
+Getting this wrong twice is worth recording.  The *symbol name* flattens the path -
+`str_c_ad_clean_sims_psp_src_elem_bent_circular_h` - and reading that as a path with
+`/c/AD/clean/` in it was wrong: `AD` is lowercase, `ad_clean` is one directory, and
+the drive letter is `c:` not `/c`.  And the first version of `rodata_names.py
+--paths` matched on word count rather than on the separator, and reported **221
+"paths"** when most were ordinary error messages.  The separator is the test; a word
+count is not.
+
+**182 strings contain a path separator, and most of them are asset paths** - which is
+a naming scheme in its own right.  `characters/bodyanims/npctextures/%s/%s.tif`,
+`face/afface/afface-s%d`, `hair/afhairbald/ufhairbald-skin-s%d`,
+`body/afbodynaked/afbodynaked-nude-s%d`.  **The `af`/`am` prefix is sex** - adult
+female, adult male - applied to every gendered asset: `afbodynaked`, `amhairbald`,
+`afface`, `amface`.  `ms0:/elem_log.txt` is the only PSP-path string, and it matches
+the `elem` subsystem.
+
+That is the project's source layout and asset layout, read out of the binary - worth
+more than any number of transcribed functions, and neither could be guessed from the
+code.
+
+**And the strings themselves are readable and verifiable.**  3,532 of 3,532 names
+agree with the bytes at their address once case and punctuation are squashed - no
+exceptions, nothing unreadable.  `rodata_names.py` checks that, so the naming is a
+cross-check on the reading rather than the only way to get the text.
+
+Three sources have proved worth reading, now that the first one is confirmed as the
+original's own:
 
 **String literals.**  3,754 NUL-terminated ASCII strings survive in `.rodata`
 and every one is a relocation target, so each has a known address.  They are
 named `str_<text>` and the generated asm now reads `str_BoidBehavior_avoidWalls`
 instead of `%hi(sym_001BF8A0)`.  They are largely the game's tuning and
 behaviour parameters, so they also document the subsystems.
+
+**51 of them are C++ qualified names, over 46 classes**, and they are the single
+best description of the engine's shape that exists anywhere in this project
+(`rodata_names.py --classes`):
+
+```
+BoidBehavior::avoidWalls             nav::findIntersection
+WendToPointBehavior::onUpdate        nav::findIntersectionWithCell
+NavigateAndWendToSeat::onUpdate      nav::testLineSegmentWithPlane
+StartDecisionMaker::onUpdate         SharedResourceFile::find / request / waitForLoad
+StopDecisionMaker::onUpdate          InteractionManager::BehaviorLuaTask::updateTask
+Chase::onUpdate                      ResumeLuaTask::onImmediateUnload
+CameraBasicFollowSims2::onUpdate     NetworkMgr::updateTask
+CameraInteractionSims2::onUpdate     volatileMem::lock
+EffectWidget::setProperty %s         HeadshotTextureWidget::setProperty
+```
+
+Three things fall out of that list.  **The game is C++, not C** - every one of these
+is a `Class::method`.  **The AI is behaviour-based with a scheduler**, because roughly
+thirty separate classes expose `onUpdate` and nothing else, which is a template method
+pattern driven from one place.  **And the scripting is Lua**: `BehaviorLuaTask`,
+`ResumeLuaTask`, `NetworkMgr::updateTask`, plus a whole Lua surface elsewhere -
+`lua_yield`, `LuaBreakPoint`, `luadump`, `-ignoreluafiles`, `SCHED_LUA`.  There is a
+Lua debugger in the shipped build.
+
+Which brings the [guard](#the-guard-a-nested-re-entrant-setjmp-sandbox-with-a-four-value-error-code)
+back into the picture.  `setjmp`/`longjmp` with a small closed set of reason codes and
+a nesting stack is precisely how `lua_pcall` is implemented, and the guarded runner's
+whole purpose - running something that cannot report failure in band - is what a
+protected call is for.  **That is a hypothesis with strong evidence, not a
+conclusion**: nothing read so far has shown a Lua state object being passed to the
+guard, and the abort sites carry codes 1, 3, 4 and 5 rather than anything that could be
+matched to a Lua error value.  It is worth one more look, because if it holds then the
+guard is not an engine mechanism at all but Lua's, and the eight abort sites are eight
+`error()` calls.
 
 **The static constructor table.**  `.cplinit` is 320 function pointers in link
 order, i.e. one per translation unit - the closest thing the binary has to a
