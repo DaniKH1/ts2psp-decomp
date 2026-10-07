@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 144 (see below) |
-| **C functions that byte-match** | **138** (linked from `src/`) |
+| functions written in C | 146 (see below) |
+| **C functions that byte-match** | **140** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  One hundred and thirty-eight
+CodeWarrior and only the *register choice* differs.  One hundred and forty
 now byte exact this way:
 
 ```
@@ -220,6 +220,8 @@ syncSkeleton_2808  void        vector unit: multiply a 3x4 matrix by a vector
 func_00130830  void            a `break 768` - a trap used as a callback placeholder
 func_00103E88  void            six-word copy out of self+0xC, three registers deep
 func_000EE56C  void            the same rotation, sixteen words, out of self+0x110
+func_00197414  void            lerp: out = a + t * (b - a), three floats
+func_001AF16C  void            the same, four floats - and $f0 gets used
 func_00128F50  Elapsed*        start - now
 func_00140A58  u32             flags[index] & 0x07, packed flag bytes
 func_00140A74  u32             ... the same, mask 0x04
@@ -985,7 +987,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the one hundred and thirty-eight that work: if the function has no
+The rule of thumb from the one hundred and forty that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -1191,6 +1193,49 @@ Neither edge case is a transcription error; both are properties of the original.
 branch-likely from a plain `if`, and the empty-needle behaviour needs exactly that
 "skip the increment" shape.  So the loop is written out with `.set noreorder` scoped
 per branch, and the final `subu` is left to C so it lands in the return's delay slot.
+
+### Two lerps, and why neither of them can be written in C
+
+`func_00197414` and `func_001AF16C` are `out = a + t * (b - a)` over three and four
+floats, written out rather than called - the same reason the module has a hand-rolled
+`strstr`.  Both matched on the first attempt as whole-body asm blocks, and both are
+transcribed that way because **there is no way to produce them any other way**:
+
+* **The spills are most of the function.**  The difference goes to a stack temporary at
+  `sp+0xC`, is reloaded a component at a time, multiplied, spilled again, reloaded,
+  added.  Eight loads and eight stores where three registers would do - and the reload
+  is not a register shortage, `$f13` to `$f18` are all free at that point.
+  Written as one expression gcc emits twenty-one instructions; with `volatile` on the
+  local, twenty-nine.  **Neither produces the spills.**  `volatile` gets closer only by
+  accident, because forcing the first store out incidentally forces the rest, and that
+  is a coincidence rather than a control.
+* **The frame is not one gcc will build.**  0x20 bytes with the temporaries where the
+  original puts them; it chose 0x10 for the same local.  The
+  [frame trick](#loops-work-and-the-rule-that-makes-the-frame-possible) - not listing
+  `$sp` as clobbered so gcc emits no prologue - is only safe for a function that never
+  returns, and these do.
+
+So the body in both files is the machine code and the comment is the decompilation, the
+same bargain as `src/eboot/syncSkeleton_27D0.c` and as `func_000103AC` before it.  The
+arithmetic is three subtractions, three multiplies and three adds, and any reader can
+check it against the disassembly in one pass.
+
+**The fourth component costs a register and moves the temporary.**  With three floats
+the difference temp is at `sp+0xC`; with four it is at `sp+0x10`, because it is sixteen
+bytes and has to clear the sixteen the products occupy.  The frame is 0x20 either way
+but what lives where is not.  And `$f0` appears in the four-component version and not
+the three: six loads into `$f13` to `$f19` leave `$f20` alone and the seventh needs
+somewhere, and `$f0` is what is free - the o32 argument-save registers, which a callee
+is supposed to treat as dead.  Legal either way, and the sort of thing that only shows
+up at four components.
+
+**There are exactly two of them.**  A loose filter - three or more of each of `sub.s`,
+`mul.s` and `add.s`, and six or more `lwc1` - matches **115** functions, which is not a
+family but "float arithmetic is common".  Tightened to the actual shape, equal counts
+of all three and `5n` loads and `3n` stores, it matches **two**.  Checking the count
+before writing the word down is the lesson from
+[the copy census](#a-copy-is-a-scheduler's-answer-and-there-are-only-two-of-them),
+applied one iteration later and this time in advance.
 
 ### A copy is a scheduler's answer, and there are only two of them
 
@@ -2031,7 +2076,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 138 are done.  Each shape that works yields several functions
+   identified and 140 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all

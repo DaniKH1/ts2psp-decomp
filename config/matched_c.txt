@@ -127,6 +127,7 @@ func_00194ADC
 func_001965E8
 func_00196608
 func_00196628
+func_00197414
 func_001A69A0
 func_001A69B8
 func_001A9ABC
@@ -137,5 +138,6 @@ func_001A9D54
 func_001A9D80
 func_001A9D94
 func_001AF15C
+func_001AF16C
 syncSkeleton_27D0
 syncSkeleton_2808
