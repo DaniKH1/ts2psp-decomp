@@ -68,6 +68,16 @@ Three results from that work are worth knowing before reading the C:
   is that no caller passes an empty string.  Worth knowing before reading any loop
   here: a guard sitting above the loop's prologue is not guarding it.
 
+* **The engine has a `setjmp`-based guard for calls that cannot report failure in
+  band.**  `func_00140AC4` and `func_00140B28` are `setjmp` and `longjmp` — they save
+  and restore exactly the registers o32 says a callee must preserve, and nothing else.
+  `func_001129E0` installs a handler record on an object and runs a **function
+  pointer** under it; if anything calls `func_0011296C` the record's reason code is
+  written into that frame's own return slot and control jumps back out, so the caller
+  gets an error code where a call could not have returned one.  The codes are a closed
+  set of four — 1, 3, 4 and 5, with 5 the common one (`tools/abort_codes.py`) — and
+  handlers nest: an abort with nothing installed is forwarded to the enclosing one.
+  **Read the callers as error checks, not as ordinary calls.**
 * **The one genuinely ugly piece** is `__attribute__((noreturn))` on a function
   that does return.  It is a lie about control flow that only affects codegen, and
   it does two jobs: it stops GCC appending a return after a hand-written block, and

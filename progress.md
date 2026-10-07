@@ -1184,6 +1184,107 @@ branch-likely from a plain `if`, and the empty-needle behaviour needs exactly th
 "skip the increment" shape.  So the loop is written out with `.set noreorder` scoped
 per branch, and the final `subu` is left to C so it lands in the return's delay slot.
 
+### The guard: a nested, re-entrant `setjmp` sandbox with a four-value error code
+
+Following the `setjmp`/`longjmp` pair to its two callers closes a mechanism, and it is
+the most substantial thing the project has found about how the engine is *shaped*
+rather than about any one function.
+
+**The runner, `func_001129E0(self, fn, arg)`:**
+
+```
+addiu $sp, $sp, -0x90
+sw    $zero, 0x70($sp)          the result, zeroed up front
+sw    $a0,  0x74($sp)           self
+sw    $a2,  0x78($sp)           fn
+sw    $a1,  0x7C($sp)           arg
+lw    $a1,  0x50($a0)           the handler currently installed
+sw    $a1,  0x10($sp)           ... kept as the record's "previous" field
+addiu $a1, $sp, 0x10
+sw    $a1,  0x50($a0)           install this frame's handler record
+jal   func_140AC4               setjmp
+addiu $a0, $sp, 0x14            ... at record + 4
+bnel  $v0, $zero, restore       longjmp'd back in?  skip the call
+lw    $a0,  0x74($sp)
+lw    $a2,  0x7C($sp)
+jalr  $a2                       fn(self, arg)
+lw    $a1,  0x78($sp)
+restore:
+lw    $a0,  0x74($sp)
+lw    $a1,  0x10($sp)
+sw    $a1,  0x50($a0)           put the old handler back
+lw    $v0,  0x70($sp)           return the result
+```
+
+**Two `addiu`s four bytes apart are what crack it.**  The record installed at
+`self->f50` starts at `sp+0x10`, and `setjmp` is handed `sp+0x14` - so the jump context
+lives at offset 4 of the handler record, not at its start.  Cross-checked against
+`func_0011296C`, which jumps from `&self->f50->f4`: the same 4.
+
+**The result slot is inside the record, and that is not a coincidence.**  The record
+starts at `sp+0x10`, the context is 0x5C bytes, so the context ends at `sp+0x70` -
+which is the slot that was zeroed at entry and loaded into `$v0` on the way out.
+`func_0011296C` does `sw $a0, 0x60($a2)` with `$a2` the record, and `record + 0x60` is
+that same slot.  So:
+
+```
+record { Guard *prev;      /* +0x00 */
+         Jump    ctx;      /* +0x04 .. +0x5F, 0x5C bytes */
+         s32     result;   /* +0x60 */ }
+```
+
+The abort reason is written *into the return slot of the frame that is being
+unwound*, which is why the runner returns it without any other bookkeeping.
+
+**The abort, `func_0011296C(self, code)`:**
+
+```
+lw  $a3, 0x50($a0)             the installed handler
+beqz $a3, forward              none installed: hand it outward
+sw  <code>, 0x60($a2)          record->result = code
+lw  $a0, 0x50($a1)
+addiu $a0, $a0, 0x4            &record->ctx
+jal func_140B28                longjmp
+ori $a1, $zero, 0x1            (the longjmp value; the code is already saved)
+```
+
+and when nothing is installed it walks `self->f10->f50` and `jalr`s that handler - so
+**handlers nest**, and an abort with no handler at this level is forwarded to the
+enclosing one.  Only when there is no handler at either level does it fall through to
+`func_0011429F0(1)`, which reaches the global object at `0x1E1F8C` - the same object
+whose field 0x58 is the random-number state from *Recognised constants* above.  So the
+"abort with nowhere to go" path reports through the object that owns the RNG, which is
+what a debug or logging facility on the main game object would do.
+
+**The error code is a four-value closed set.**  `tools/abort_codes.py` lists it:
+
+| code | abort sites | who |
+| --- | --- | --- |
+| 1 | 1 | `func_00112754` |
+| 3 | 2 | `func_0011BA2C`, `func_00120F8C` |
+| 4 | 1 | `func_00116264` |
+| 5 | 4 | `func_00112754`, `func_00112CDC`, `func_00113458`, `func_0011354C` |
+
+Eight abort sites in seven functions, every reason an immediate built in the delay
+slot.  **Code 5 has four sites**, which makes it the likely catch-all; codes 3 and 4
+have two and one.  Since a normal completion returns 0, an enum over this mechanism
+would have five values.
+
+The three callers of the runner - `func_001137A8`, `func_001139C8`, `func_0011A22C` -
+all do `bnez $v0, <error label>` straight after.  That is the whole point of the code:
+**a call that cannot fail in-band gets its failure out-of-band instead.**  A function
+pointer can be anything, so the only way to report a failure from one is to jump.
+
+**Why `func_001129E0` is not transcribed.**  Its body is ordinary C - install, setjmp,
+call, restore, return - and the mechanism above *is* the decompilation.  What does not
+give is the 0x90-byte frame with spills at 0x70, 0x74, 0x78, 0x7C and `$ra` at 0x80.
+The [frame recipe](#loops-work-and-the-rule-that-makes-the-frame-possible) only works
+for a function that never returns, because its trick is to stop GCC emitting a
+prologue of its own; this one returns.  Matching those spill slots means writing the
+whole frame in asm, which is transcription.  So it is documented and left alone, which
+is the same line drawn for `func_00143A18` before it was understood - except that this
+one *is* understood, and what is missing is a byte-level detail rather than a meaning.
+
 ### Two globals regions, and a third that may be a counter
 
 `func_00097200` writes to `0xC9E4`, built as `lui 0x1` + `addiu -0x361C`.  That is
