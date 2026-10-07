@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 118 (see below) |
-| **C functions that byte-match** | **112** (linked from `src/`) |
+| functions written in C | 122 (see below) |
+| **C functions that byte-match** | **116** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  One hundred and twelve
+CodeWarrior and only the *register choice* differs.  One hundred and sixteen
 now byte exact this way:
 
 ```
@@ -194,6 +194,10 @@ func_0018DDAC  void*, Link*    unlink a node: -2 and a pointer to a global
 func_0002D630  Handle*        set the descriptor to 0x1E4988, return the object
 func_000FE624  void            zero four words at 0x28..0x3C of the global 0x61A18
 func_000FFBE8  void            ... and set two floats at 0xEC and 0xF0 of it
+func_0007E024  void*           copy one 2-float global into two slots, return self
+func_001241AC  ListHeader*     prev = next = self, count = 0, descriptor set
+func_00124658  Counter*        two zeros then a pointer to a global, return self
+func_0012C2D0  Obj*, u32, u8   constructor that also allocates an id from a global
 func_00128F50  Elapsed*        start - now
 func_00140A58  u32             flags[index] & 0x07, packed flag bytes
 func_00140A74  u32             ... the same, mask 0x04
@@ -959,7 +963,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the one hundred and twelve that work: if the function has no
+The rule of thumb from the one hundred and sixteen that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -1042,9 +1046,59 @@ Two things worth separating out of that, because both cost an attempt:
   landmine as [GCC does not count an assembler-filled delay
   slot](#the-landmine-gcc-does-not-count-an-assembler-filled-delay-slot): the
   compiler has nothing after the block to attribute the last slot to.
-* **Binding the result to a hard `$v0` after the block does not work either.**  The
-  dependency that creates is on `node`, and the block claims not to read `node`, so
-  the copy is still free to move above it.
+* **Binding the result to a hard `$v0` after the block does not work either** - if
+  the goal is to *move* it there.  The dependency that creates is on `node`, and the
+  block claims not to read `node`, so the copy is still free to move above it.
+
+### Reading `$v0` out of the block instead of putting the receiver in it
+
+`func_0012C2D0` is the case the recipe above does not cover: the `move $v0, $a0`
+is in the **middle** of the body, at instruction 10 of 14, because the return value
+does not depend on any of the stores.  So the copy cannot be left to C at all - it
+would be emitted either at the top or in the delay slot, and the original has it in
+the middle - and it has to be written into the asm.
+
+Which then leaves a second copy problem.  Once the asm writes `$v0`, returning
+`node` from C makes GCC emit a *second* `move $v0, $a0`, and the built function is
+four bytes too long with the extra copy sitting before the last two stores.  The
+fix is the "the value is already there" form:
+
+```c
+register Obj *ret asm("$v0");   /* uninitialised: the block put it there */
+return ret;
+```
+
+An uninitialised hard register used as a return value produces no instruction at
+all, which is exactly right here.  The rule already recorded - never initialise a
+hard register you did not compute - reads oddly until it is used for this, and
+then it is the only way to write "do not touch this".
+
+The same trick is what made `func_0007E024` work.  Its final store is in the delay
+slot and the value it stores has to come from `$f12`, which the block loaded.  Left
+to C the load goes to `$f0` and costs an extra register, because the compiler cannot
+see the block's four writes to `$f12`.  Loading in the block and reading an
+uninitialised `register float last asm("$f12")` in C is what pins both halves to
+the same register - two instructions, one register, and the block has to end on the
+load for the size to come out right.
+
+### A field that overlaps a word: `func_0012C2D0`
+
+Not a matching lesson but a layout finding worth recording, because it is the kind
+of thing that cannot be written as a struct:
+
+```
+sw    $a3, 0x10($a0)    the id, a full word at 0x10
+sb    $a2, 0x13($a0)    a flag, one byte at 0x13 - inside that word
+```
+
+0x13 is the **top byte of the id word**, so the two stores write the same four bytes
+twice, word first and byte second.  No layout puts a `u32` at 0x10 and a `u8` at
+0x13 side by side, so `func_0012C2D0.c` writes the flag by offset
+(`((u8 *)node)[0x13]`) and stops the struct short of it.  The order matters: the
+byte goes second, so the flag is the field that wins and the id is the word it sits
+on top of.  An earlier version of that file put a three-byte pad between them and
+GCC emitted `sb $a2, 0x17` - a reminder that `u32` at 0x10 already occupies 0x11 to
+0x13, so padding *after* it starts at 0x14, not 0x11.
 
 So: the recipe is the recipe, and it is worth reading before transcribing rather
 than after.  spimdisasm writes this instruction as `or $v0, $a0, $zero`, not as
@@ -1324,7 +1378,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 112 are done.  Each shape that works yields several functions
+   identified and 116 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
