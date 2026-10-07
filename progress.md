@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 127 (see below) |
-| **C functions that byte-match** | **121** (linked from `src/`) |
+| functions written in C | 132 (see below) |
+| **C functions that byte-match** | **126** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  One hundred and twenty-one
+CodeWarrior and only the *register choice* differs.  One hundred and twenty-six
 now byte exact this way:
 
 ```
@@ -203,6 +203,11 @@ func_000AFE00  s32             step a global object's cursor back by 4, return 0
 func_000D6AFC  void            copy a doubly-indirected global into the argument
 func_00100DC0  s32             compare two 28-bit-masked globals, via a detour
 func_00102A54  void            fill 26 constants at a cursor, then advance it 0x68
+func_00036D40  Node*, Node*    splice a node onto a global chain, return it
+func_0014C958  Node*, u8*, u32 push a tagged node; fill a 9-word block, one word set
+func_0013B2D0  s32, 4 outs     four out-parameters: two values, two addresses
+func_00097200  void            publish one value to a global and to field 0x80
+func_000D3490  void*, void*    register two globals and bump a counter
 func_00128F50  Elapsed*        start - now
 func_00140A58  u32             flags[index] & 0x07, packed flag bytes
 func_00140A74  u32             ... the same, mask 0x04
@@ -968,7 +973,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the one hundred and twenty-one that work: if the function has no
+The rule of thumb from the one hundred and twenty-six that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -1085,6 +1090,57 @@ see the block's four writes to `$f12`.  Loading in the block and reading an
 uninitialised `register float last asm("$f12")` in C is what pins both halves to
 the same register - two instructions, one register, and the block has to end on the
 load for the size to come out right.
+
+### Two globals regions, and a third that may be a counter
+
+`func_00097200` writes to `0xC9E4`, built as `lui 0x1` + `addiu -0x361C`.  That is
+below the module's data page: the other setters in this set reach `0x19Exxxx` and
+`0x1Exxxx`, and nothing found before this reached `0xC9xxx`.  So the module has at
+least **two globals regions**, and this is the only evidence so far for the lower
+one.  It is worth not over-reading: `0xC9E4` may be a variable that happens to sit
+low rather than a separate region, and a second function reaching that page is what
+would settle it.
+
+### A tag byte beside the pointer, not inside it
+
+`func_0014C958` builds a node of `{ pointer, byte 4, pointer }`.  The byte sits
+between the two pointers and is a constant, so it is a type tag stored *next to* a
+pointer rather than packed into one.  The alternative - a tagged pointer, where the
+low bits of the address carry the type - is ruled out by the arithmetic rather than
+by taste: no address here is masked, shifted or tested, so the address is used whole.
+Storing the tag beside it costs five bytes instead of four and needs no masking
+anywhere, which is a trade a codebase makes for convenience more often than for
+space.
+
+The tag being a fixed 4 rather than a parameter says this constructor makes exactly
+one kind of node.  There will be a family of these with different tags, and 4 is the
+fifth in whatever numbering the source used - which is the kind of thing that would
+be settled by counting the siblings, not by reading this one.
+
+The same function also corrected a reading: the block it fills is **not** all zeros.
+Eight of the nine words are `$zero` and the word at 0x10 is the third argument.
+Reading the run of `sw $zero` as "clear the block" misses a parameter entirely.  The
+tell was in the tooling - the shape string lists that store as `sw9` against the
+zeros' `swgt0`, and a plain store where a conditional store was expected is worth
+looking at.  Worth remembering generally: **`swgt` in a shape string is a guess by
+the classifier, and where it is wrong it is because the store is not conditional.**
+
+### When a register has to be named in the template and cannot be an operand
+
+`func_000D3490` holds the second argument in `$a1` for one instruction and then
+overwrites it with the counter.  So the two values must share a register, and GCC
+refuses: *"invalid hard register usage between earlyclobber operand and input
+operand"* - the counter needs `"=&r"`, and an earlyclobber may not overlap an input.
+
+The way out is the same one already used for `$zero` and `$f12`: **name the register
+in the template text** and keep it out of the constraint list.  The argument is then
+documented by a comment instead of by an operand, which is a fair trade for a
+register that is live for exactly one instruction.
+
+This is the second distinct case where a hard register cannot be an operand - the
+first was a `register` variable that also needed to be one - and they have different
+fixes.  Overlap needs the template; the double-role case needs two variables.  Worth
+keeping the two apart, because they look the same from the error message.
 
 ### Recognised constants, and the pseudo-ones to leave alone
 
@@ -1442,7 +1498,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 121 are done.  Each shape that works yields several functions
+   identified and 126 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
