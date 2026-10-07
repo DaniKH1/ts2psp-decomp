@@ -24,8 +24,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 BUILD = ROOT / "build"
-PSP_BIN = ROOT / "bin" / "pspdev" / "bin"
-MSYS_BIN = Path(r"C:\msys64\usr\bin")
+
+sys.path.insert(0, str(ROOT / "tools"))
+# Neither the module image nor the toolchain is in the repository; `tools/paths.py`
+# resolves where each one is.
+from paths import ELF_PATH, MSYS_BIN, PSP_BIN  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Compiler flags
@@ -293,7 +296,7 @@ def compare() -> int:
     sys.path.insert(0, str(ROOT / "tools"))
     import pspelf
 
-    want = pspelf.load(str(ROOT / "disks/pgs-si2/EBOOT.dec"))
+    want = pspelf.load(str(ELF_PATH))
     got_path = BUILD / "eboot.elf"
     if not got_path.exists():
         print("nothing built yet", file=sys.stderr)

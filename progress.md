@@ -25,6 +25,12 @@ The only remaining ELF-level differences are `e_type` and the `.rel.*` /
 `.symtab` / `.strtab` / `.shstrtab` link-time metadata, none of which are part
 of the image.
 
+This tree is the public one, and it is the second home of the project: it was
+applated from a working copy that had the disc image in its history, so the
+history here starts from a single clean commit and the package is 9.6 MB instead
+of 574 MB.  See *What the repository does not contain* below for what the two
+trees trade between them.
+
 ## What the module is
 
 * 32-bit little endian MIPS (Allegrex), `o32`/eabi32, NOREORDER.  The ELF
@@ -466,6 +472,8 @@ tools/subsystems.py           group constructors into subsystems by tag signatur
 tools/c_candidates.py         rank functions by how likely psp-gcc can match them
 tools/c_shapes.py             group the simple functions by instruction sequence
 tools/gen_copy_asm.py        emit the asm for a long interleaved load/store copy
+tools/paths.py               where the module image and the toolchain live
+tools/setup.py               report which of the two this clone is missing
 ```
 
 ```
@@ -475,10 +483,35 @@ python tools/progress.py --top 40    # what is left, largest first
 python tools/verify_c.py --adopt     # check the C, promote the winners
 python tools/tags.py --by-func       # which subsystem registers which file tag
 python tools/rodata_strings.py       # the recovered string literals
+python tools/setup.py --check        # is this clone ready to build?
 ```
 
 `tools/build.py --diff` relinks before comparing, which would undo the segment
 padding, so the pipeline compares with `--stats` after `fix_segments`.
+
+### What the repository does not contain, and how a clone supplies it
+
+Two inputs are deliberately absent: the decrypted module image (Maxis/EA
+material) and the psp-gcc toolchain (a 125 MB third-party build).  Neither can be
+committed, so `tools/paths.py` resolves both from the environment:
+
+| variable | what | default |
+| --- | --- | --- |
+| `TS2PSP_ELF` | the decrypted module image | `disks/pgs-si2/EBOOT.dec` |
+| `TS2PSP_PSPDEV` | the psp toolchain's bin directory | `bin/pspdev/bin` |
+| `TS2PSP_MSYS` | the MSYS2/Cygwin bin directory that hosts the toolchain | `C:/msys64/usr/bin` |
+
+The defaults are the in-tree paths, so a working copy that has the files in place
+needs no environment at all; only a fresh clone has to be told.  Every tool reads
+these through `paths.py` rather than hard-coding a location, which is what makes
+the repository portable rather than tied to one machine's directory layout.
+
+One thing worth recording because it nearly shipped: `config/eboot.splat.yaml` is
+a committed artifact, so it must not carry a path from the machine that generated
+it.  `gen_splat_config.py` writes the portable in-tree default and `split.py`
+substitutes the resolved path for the duration of the splat call and puts the
+default back afterwards.  Without that, a single pipeline run left one machine's
+directory layout in a tracked file.
 
 ### The build is incremental
 

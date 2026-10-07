@@ -22,6 +22,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
+from paths import ELF_PATH  # noqa: E402
 
 import pspelf  # noqa: E402
 
@@ -37,7 +38,7 @@ def image_range(elf) -> tuple[int, int]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--target", default=str(ROOT / "disks/pgs-si2/EBOOT.dec"))
+    ap.add_argument("--target", default=str(ELF_PATH))
     ap.add_argument("--built", default=str(ROOT / "build/eboot.elf"))
     ap.add_argument("--first", type=int, default=20,
                     help="how many differences to list")

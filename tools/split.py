@@ -23,6 +23,8 @@ The order matters and is not arbitrary:
 from __future__ import annotations
 
 import argparse
+import contextlib
+import re
 import subprocess
 import sys
 import time
@@ -30,6 +32,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 TOOLS = ROOT / "tools"
+sys.path.insert(0, str(TOOLS))
+from paths import ELF_PATH  # noqa: E402
 
 
 def run(step: list[str], env_extra: dict | None = None) -> None:
@@ -47,6 +51,38 @@ def run(step: list[str], env_extra: dict | None = None) -> None:
     print(f"    ({time.time() - started:.1f}s)", flush=True)
 
 
+@contextlib.contextmanager
+def point_splat_at_the_module():
+    """Point splat at the module image, then put the config back as it was.
+
+    `gen_splat_config.py` writes the portable in-tree default into
+    `config/eboot.splat.yaml`, because that file is committed and must not carry
+    a path from the machine that generated it.  splat, however, has to open the
+    real file, so the resolved path is substituted for the duration of the call
+    and removed again afterwards - otherwise a pipeline run would leave this
+    machine's directory layout in a tracked file.
+    """
+    config = ROOT / "config" / "eboot.splat.yaml"
+    text = config.read_text(encoding="utf-8")
+    patched = re.sub(
+        r"^(\s*target_path:\s*).*$",
+        lambda m: m.group(1) + str(ELF_PATH),
+        text,
+        count=1,
+        flags=re.MULTILINE,
+    )
+    if patched == text:
+        yield
+        return
+
+    config.write_text(patched, encoding="utf-8", newline="\n")
+    print(f"    (splat will read {ELF_PATH})", flush=True)
+    try:
+        yield
+    finally:
+        config.write_text(text, encoding="utf-8", newline="\n")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--build", action="store_true")
@@ -57,7 +93,8 @@ def main() -> int:
     env = {"PYTHONIOENCODING": "utf-8"}
 
     run([sys.executable, str(TOOLS / "gen_splat_config.py")], env)
-    run([sys.executable, "-m", "splat", "split", "config/eboot.splat.yaml"], env)
+    with point_splat_at_the_module():
+        run([sys.executable, "-m", "splat", "split", "config/eboot.splat.yaml"], env)
     run([sys.executable, str(TOOLS / "gen_linker_symbols.py")], env)
     run([sys.executable, str(TOOLS / "postprocess_asm.py")], env)
     run([sys.executable, str(TOOLS / "gen_linker_script.py")], env)

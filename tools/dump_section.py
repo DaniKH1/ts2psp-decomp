@@ -4,9 +4,10 @@ import struct
 import sys
 
 sys.path.insert(0, "tools")
+from paths import ELF_PATH  # noqa: E402
 import pspelf  # noqa: E402
 
-elf = pspelf.load("disks/pgs-si2/EBOOT.dec")
+elf = pspelf.load(str(ELF_PATH))
 
 
 def hexdump(sec, limit=None):

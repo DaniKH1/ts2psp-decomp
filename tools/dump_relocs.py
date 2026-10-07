@@ -4,9 +4,10 @@ import struct
 import sys
 
 sys.path.insert(0, "tools")
+from paths import ELF_PATH  # noqa: E402
 import pspelf  # noqa: E402
 
-elf = pspelf.load(sys.argv[1] if len(sys.argv) > 1 else "disks/pgs-si2/EBOOT.dec")
+elf = pspelf.load(sys.argv[1] if len(sys.argv) > 1 else str(ELF_PATH))
 
 for sec in elf.sections:
     if sec.name in (".rel.text", ".rel.rodata", ".rel.data"):

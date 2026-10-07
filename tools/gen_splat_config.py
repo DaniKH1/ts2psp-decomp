@@ -26,6 +26,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
+from paths import ELF_PATH  # noqa: E402
 
 import pspelf  # noqa: E402
 
@@ -68,10 +69,15 @@ DATA_SECTIONS = (
 # mapped over the first bytes of .text by PSPLINK.
 ELF_HEADER_SIZE = 0x74
 
+# `config/eboot.splat.yaml` is a committed artifact, so it must not carry a path
+# from whichever machine generated it.  It gets the portable in-tree default;
+# `split.py` rewrites this to the resolved location before invoking splat.
+DEFAULT_TARGET_PATH = "disks/pgs-si2/EBOOT.dec"
+
 OPTIONS = """\
 options:
   basename: eboot.elf
-  target_path: disks/pgs-si2/EBOOT.dec
+  target_path: {target_path}
   base_path: ..
   platform: psp
   compiler: GCC
@@ -252,7 +258,7 @@ def function_name(section_name: str, vaddr: int, sec_addr: int,
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--elf", default=str(ROOT / "disks/pgs-si2/EBOOT.dec"))
+    ap.add_argument("--elf", default=str(ELF_PATH))
     ns = ap.parse_args()
 
     elf_path = Path(ns.elf)
@@ -340,7 +346,7 @@ def main() -> int:
     out.write_text(
         HEADER_COMMENT.format(sha1=hashlib.sha1(elf_path.read_bytes())
                               .hexdigest())
-        + OPTIONS.format(section_order=section_order)
+        + OPTIONS.format(section_order=section_order, target_path=DEFAULT_TARGET_PATH)
         + "\nsegments:\n" + "\n".join(lines) + "\n",
         encoding="utf-8")
     print(f"wrote {out} ({n_funcs} functions)")

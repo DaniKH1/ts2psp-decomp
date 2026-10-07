@@ -14,6 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
+from paths import ELF_PATH  # noqa: E402
 
 import pspelf  # noqa: E402
 
@@ -47,7 +48,7 @@ def load_functions() -> list[tuple[int, int, str]]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--target", default=str(ROOT / "disks/pgs-si2/EBOOT.dec"))
+    ap.add_argument("--target", default=str(ELF_PATH))
     ap.add_argument("--built", default=str(ROOT / "build/eboot.elf"))
     ap.add_argument("--top", type=int, default=30)
     ap.add_argument("--section", default=None,

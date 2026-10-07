@@ -31,6 +31,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
+from paths import ELF_PATH  # noqa: E402
 
 import pspelf  # noqa: E402
 import tags as tags_mod  # noqa: E402
@@ -108,7 +109,7 @@ def main() -> int:
                     help="how many literals to show per group")
     ns = ap.parse_args()
 
-    elf = pspelf.load(str(ROOT / "disks/pgs-si2/EBOOT.dec"))
+    elf = pspelf.load(str(ELF_PATH))
     names: dict[int, str] = {}
     for line in (ROOT / "config/eboot.symbol_addrs.txt") \
             .read_text(encoding="utf-8").splitlines():

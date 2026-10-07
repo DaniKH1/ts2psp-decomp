@@ -23,7 +23,8 @@ repository grants you is everything else it can:
 
 **You need your own copy of the game.**  No disc image, no decrypted
 executable and no toolchain binary is committed to this repository; see
-`.gitignore`.  `tools/setup.py` takes a path to a disc image you supply.
+`.gitignore`.  `tools/setup.py` reports where it looked and how to supply your
+own copy.
 
 Build anything from this — a port, a mod, a reimplementation — and you need to
 own that copy.  That is the ordinary condition on reverse engineering for

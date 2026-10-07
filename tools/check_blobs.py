@@ -7,10 +7,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
+from paths import ELF_PATH  # noqa: E402
 
 import pspelf  # noqa: E402
 
-elf = pspelf.load(str(ROOT / "disks/pgs-si2/EBOOT.dec"))
+elf = pspelf.load(str(ELF_PATH))
 cfg = io.open(ROOT / "config/eboot.splat.yaml", encoding="utf-8").read()
 
 

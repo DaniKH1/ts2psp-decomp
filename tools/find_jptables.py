@@ -14,6 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
+from paths import ELF_PATH  # noqa: E402
 
 import pspelf  # noqa: E402
 import mipsdis  # noqa: E402
@@ -25,7 +26,7 @@ JR = 0x00
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--elf", default=str(ROOT / "disks/pgs-si2/EBOOT.dec"))
+    ap.add_argument("--elf", default=str(ELF_PATH))
     ns = ap.parse_args()
 
     elf = pspelf.load(ns.elf)

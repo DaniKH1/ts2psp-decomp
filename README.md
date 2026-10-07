@@ -66,8 +66,8 @@ no one but EA can license them.  What you get is the right to read them, and the
 right to use, modify and redistribute the tooling without restriction.
 
 **You need your own copy of the game to do anything else.**  No disc image, no
-decrypted executable and no toolchain binary is committed here; `tools/setup.py`
-takes a path to a disc image you supply.  That is the ordinary condition on
+decrypted executable and no toolchain binary is committed here;
+`tools/setup.py` says where it looked.  That is the ordinary condition on
 reverse engineering for study and interoperability, and it is the condition
 this work was done under.
 
@@ -84,16 +84,38 @@ repository honest about what it is, talk to someone who can advise on it.
 
 ## Reproducing
 
-Needs the psp-gcc toolchain, `splat`, and `spimdisasm`; `tools/setup.py` fetches
-the toolchain and `progress.md` records where each dependency comes from.
+Two things are needed and neither is in this repository: the decrypted module
+image and the psp-gcc toolchain.  Tell the tools where you keep them, once:
 
 ```sh
-python tools/setup.py          # toolchain, splat, spimdisasm
+export TS2PSP_ELF=/path/to/EBOOT.dec        # POSIX
+export TS2PSP_PSPDEV=/path/to/pspdev/bin
+export TS2PSP_MSYS=/path/to/msys64/usr/bin  # only if not at C:/msys64
+```
+
+```bat
+set TS2PSP_ELF=F:\path\to\EBOOT.dec          :: Windows
+set TS2PSP_PSPDEV=F:\path\to\pspdev\bin
+set TS2PSP_MSYS=C:\msys64\usr\bin
+```
+
+`TS2PSP_ELF` and `TS2PSP_PSPDEV` default to the in-tree location
+(`disks/pgs-si2/EBOOT.dec` and `bin/pspdev/bin`), so a working copy that has them
+in place needs no environment at all.  `python tools/setup.py` reports which of
+the two you have and, if one is missing, how to get it.
+
+Then:
+
+```sh
 python tools/split.py --build  # regenerate everything and compare
 ```
 
+`splat` and `spimdisasm` are only needed to regenerate the assembly, which is
+already committed; `pip install -r requirements.txt` if you want to.
+`progress.md` records where each dependency comes from.
+
 The disc image is **not** in this repository and must not be added to it — it is
-1 GB of Maxis/EA data.  `tools/setup.py` takes a path to your own copy.
+1 GB of Maxis/EA data.
 
 ## The checks
 

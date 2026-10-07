@@ -3,6 +3,7 @@
 import sys
 
 sys.path.insert(0, "tools")
+from paths import ELF_PATH  # noqa: E402
 import spimdisasm  # noqa: E402
 import spimdisasm.common  # noqa: E402
 import spimdisasm.mips  # noqa: E402
@@ -13,7 +14,7 @@ from spimdisasm.mips.sections import SectionText  # noqa: E402
 GlobalConfig.ENDIAN = "little"
 GlobalConfig.ABI = "n32"
 
-elf = pspelf.load("disks/pgs-si2/EBOOT.dec")
+elf = pspelf.load(str(ELF_PATH))
 text = elf.section(".text")
 print(f".text addr={text.addr:#x} size={text.size:#x}")
 

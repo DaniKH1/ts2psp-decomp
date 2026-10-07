@@ -14,15 +14,15 @@ __pycache__/
 .vscode/
 .idea/
 
-# Third-party tools are downloaded by tools/setup.py rather than committed:
-# the psp-gcc toolchain alone is 125 MB, and redistributing a compiler build
-# is not this repository's business.  progress.md records where each one comes
-# from.
+# The psp-gcc toolchain is not committed: it is 125 MB of someone else's build,
+# and redistributing a compiler is not this repository's business.  Point
+# $TS2PSP_PSPDEV at your own copy; `tools/setup.py` says where it looked.
+# progress.md records where the toolchain comes from.
 bin/
 
 # The decrypted executable and the source disc stay out of git: they are Maxis
 # and EA material, and are re-derived from a disc image the user supplies
-# themselves (see tools/setup.py and progress.md).
+# themselves.  Point $TS2PSP_ELF at your own copy; see tools/setup.py.
 disks/*
 !disks/.gitkeep
 
