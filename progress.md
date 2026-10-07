@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 151 (see below) |
-| **C functions that byte-match** | **145** (linked from `src/`) |
+| functions written in C | 154 (see below) |
+| **C functions that byte-match** | **148** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  One hundred and forty-five
+CodeWarrior and only the *register choice* differs.  One hundred and forty-eight
 now byte exact this way:
 
 ```
@@ -227,6 +227,9 @@ func_000E1000  void            two globals to 3 and -1, in two different regions
 func_00025594  void            the module's only empty body with a live frame
 func_00046CE4  Node*           four-word constructor: tag 5, -2, a global, an owner
 func_000F9414  void            set field 0 of a 28-byte-stride element to 2
+func_00082134  s32             write 0x2000 through argument 2, return 0
+func_000E4970  u32             clear three words at 0xC, return 0
+func_000F7D38  u32             the same twenty bytes, verbatim
 func_00128F50  Elapsed*        start - now
 func_00140A58  u32             flags[index] & 0x07, packed flag bytes
 func_00140A74  u32             ... the same, mask 0x04
@@ -992,7 +995,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the one hundred and forty-five that work: if the function has no
+The rule of thumb from the one hundred and forty-eight that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -1224,6 +1227,96 @@ inference from the shape of a list with no pair to check it against.
 void *owner }` with the tag a full word at 0x0.  `func_0014C958`'s node had a `sb` tag
 at 0x4.  Two similar-looking four-word structures, and the difference is the width of
 the tag and which offset it sits at.
+
+### 782 of 7,500 functions are byte-identical to a sibling
+
+`tools/duplicate_bodies.py` hashes every function body straight out of the
+instruction words spimdisasm recorded, groups them, and reports the groups.  The 223
+PSP import stubs are excluded because all of them are `jr $ra` and their names were
+lost in the original link, so their sameness measures the linker, not the programmer.
+
+**107 distinct bodies are shared by more than one function, covering 782 functions -
+10.4 % of the module.**
+
+| group size | groups | functions |
+| --- | --- | --- |
+| 2 | 66 | 132 |
+| 3 | 13 | 39 |
+| 4 | 7 | 28 |
+| 5 - 8 | 10 | 63 |
+| 9 - 19 | 4 | 55 |
+| 30 - 36 | 4 | 131 |
+| 64 | 1 | 64 |
+| 110 | 1 | 110 |
+| 162 | 1 | 162 |
+
+**What this changes is the amount of distinct work, not the amount of work.**  107
+groups stand between the reader and 782 functions: transcribing one member of each
+group byte-exactly settles the rest, because they are the same bytes.  That is a real
+reduction in what has to be worked out by hand, and it is also a trap - 782 functions
+that "just copy an existing one" is not the same claim as 782 functions understood,
+and only 15 of them were in C before this iteration.
+
+### 516 functions are one instruction wide, and the module has an accessor layer
+
+A body of exactly 8 bytes is `jr $ra` plus one more instruction, so that second
+instruction is the whole of the function.  **516 functions - 6.9 % of the module - are
+of that size**, and the census by what they do is more informative than the total:
+
+| | count | what it is |
+| --- | --- | --- |
+| `jr $ra; nop` | 162 | an empty body, `void` |
+| `jr $ra; or $v0,$zero,$zero` | 110 | `return 0` |
+| `jr $ra; move $v0,$a0` | 50 | returns its argument unchanged |
+| `jr $ra; ori $v0,$zero,1` | 36 | `return 1` |
+| `jr $ra; lw $v0, k($a0)` | ~60 | one-field getter, one per offset |
+| `jr $ra; sw $a1, k($a0)` | ~15 | one-field setter, one per offset |
+| `jr $ra; mtc1 $zero, $f0` | 6 | `return 0.0f` |
+| the rest | ~77 | one each |
+
+**358 of the 516 return a constant or their own argument.**  Nothing else happens.  A
+module of this size is mostly plumbing, and the plumbing is accessors: 110 functions
+whose whole content is `return 0` is what a class hierarchy of default answers looks
+like - a virtual method whose base implementation says no - and 162 empty bodies is the
+same idea for `void` methods with nothing to do.
+
+**The constants form a ladder.**  There are single-instruction functions returning 1,
+2, 3, 4, 5, 6, 7, 8, 9, 0xA, 0xB, 0xC and 0x10, one apiece, and then 0x20, 0x4000 and
+0x8000.  A run of consecutive values each returned by its own function is an
+enumeration being projected onto integers, one accessor per enumerator.  It is the
+same shape as the getter table below it, where each distinct offset also gets its own
+function.
+
+**And there is exactly one function in the module that is not a return**: 8 bytes
+reading `j func_00081DB0` with a `nop`, a tail call.  One in 7,497.
+
+### The 64 functions that return a byte they wrote to the stack
+
+The largest group after the empty ones is 64 functions sharing this 20-byte body:
+
+```
+addiu $sp, $sp, -0x10
+sb    $zero, 0x0($sp)
+lw    $v0, 0x0($sp)
+jr    $ra
+addiu $sp, $sp, 0x10
+```
+
+**It stores one zero *byte* and then loads a *word* from the same address.**  Only the
+low byte was written, so the three bytes above it are whatever was already on the stack,
+and the function returns them as part of its result.
+
+The likely reading is that the original source declared a `char` local, assigned zero to
+it, and returned it from a function whose result is consumed one byte wide - so the
+compiler was entitled to widen with a word load and let the upper bytes be don't-care,
+because nothing ever reads them.  That is written down as the most likely explanation
+rather than a conclusion, since an empty 16-byte frame with a single byte store is also
+what a lot of other things look like.
+
+**What is not in doubt is the effect**: these 64 functions return a value that is only
+fully defined if the caller reads one byte of it.  It is a latent bug that happens not
+to bite, and it is the sort of thing that only a whole-module census finds - 64
+instances of the same shape is a pattern, not an accident.
 
 ### Three singletons: one empty frame, one `break`, one `stub`
 
@@ -2171,7 +2264,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 145 are done.  Each shape that works yields several functions
+   identified and 148 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
