@@ -409,14 +409,43 @@ That also means the "one entry per object class" phrasing this section used is a
 guess with nothing behind it, and has been withdrawn.  What is established is the
 shape of the table and the regularity below; what each index means is open.
 
-Only three of the twenty functions read with a mask, and between them they ask for
-**bits 0 to 3 and nothing else**:
+**That table was wrong, and it took two mistakes to get there.**  The search that
+produced it matched only `andi $v0, $v0, mask`, so it missed `func_00143838`, which
+masks with `0x01` in `$t0`.  Widening the register pattern then found the opposite
+problem: nearly every function appeared to query all eight bits, because
+`andi $reg, $reg, 0xFF` is how a byte is widened and has nothing to do with the
+table.
 
-| function | mask | reads |
+The fix is to require the register a mask reads from to be one a byte load has
+written, and to treat `0xFF` as uninformative because it keeps every bit.  With
+that, all twenty functions are accounted for and the bit census is
+(`flag_table.py --asked`):
+
+| bit | asked by | who |
 | --- | --- | --- |
-| `func_00140A58` | `0x07` | bits 0, 1, 2 |
-| `func_00140A74` | `0x04` | bit 2 |
-| `func_001434C0`, `func_00149724` | `0x08` | bit 3 |
+| 0 | 9 | `0010C90C`, `0010CFC0`, `00121CAC`, `0012CC4C`, `00140A58`, `001434C0`, `00143838`, `00144050`, `00149724` |
+| 1 | 6 | `0010CA08`, `0010CFC0`, `00121CAC`, `00140A58`, `001434C0`, `00149724` |
+| 2 | 12 | `0010CFC0`, `0010DC0C`, `0010E1CC`, `0010E3A0`, `0010E6F4`, `00121324`, `00121824`, `00121CAC`, `00140A58`, `00140A74`, `001434C0`, `00149724` |
+| 3 | 6 | `00109040`, `0010CFC0`, `00116434`, `00121CAC`, `001434C0`, `00149724` |
+| 4 | 1 | `0010CFC0` |
+| 5 | 2 | `0010CFC0`, `00120E4C` |
+| 6 | 1 | `0010CFC0` |
+| 7 | **0** | nothing |
+
+**`func_0010CFC0` is the interesting one.**  It masks with `0x01`, `0x02`, `0x03`,
+`0x20`, `0x04`, `0x10`, `0x08`, `0x07` and `0x44` - it is the only function that
+touches bits 4 and 6, and the only one that touches six of the seven.  Nineteen
+masks in one body is not a set of property tests; that is a **serialiser or debug
+dump walking the table field by field**.
+
+Which has a consequence worth stating plainly: **bits 4, 5 and 6 are not read by
+anyone who is using the value.**  Bit 5 has one other reader, `func_00120E4C`.  Bits 4
+and 6 have none.  So they are set by the table and emitted by the dumper, and
+nothing in the shipped game consults them - which is itself a fact about the build,
+probably a set of flags reserved and then never finished.
+
+And bit 7 is the one nothing asks for at all: set on exactly one entry, index 33,
+and read by nobody.
 
 **And `flags[i] & 0x07` only ever produces 0, 1, 2 or 4.**  Not 3, not 5, 6 or 7 -
 because bits 0 and 1 are never both set anywhere in the table, and bit 2 never
@@ -436,17 +465,16 @@ six* additionally carry bit 6 - so the bit-6 set is a property of a specific gro
 six entries layered on top of a property of twenty-six.  Two independent facts about
 whatever the index describes, encoded in one byte each.
 
-And **bits 4, 5, 6 and 7 are set on 32, 32, 12 and 1 entries respectively, yet no
-accessor masks for them.**  So those four are read by whole-byte operations -
-compared against a value, or masked somewhere this search does not catch - and they
-are the ones still to identify.  Bit 7 is the extreme case: exactly one entry, index
-33, the single `0x88`, and nothing reads it.
+And **bits 4, 5, 6 and 7 are set on 32, 32, 12 and 1 entries respectively**, which
+made them look unread.  The census above now says what is actually true: bit 5 has
+one reader beyond the dumper (`func_00120E4C`), bits 4 and 6 have none, and bit 7
+has none at all - it is set on exactly one entry, index 33, and read by nobody.
 
 Two corrections to my own reading along the way.  Counting the `0x01` run by hand
 gave nineteen entries when the script says twenty, and counting the `0x20` run gave
 27 when it is 32 - because `0x28` carries bit 5 as well and I had counted the runs
 without decoding the bits.  The script exists so that this does not have to be done
-by eye.
+by eye - and the mask census needed fixing twice for the same reason.
 
 ### The PSP import table: 223 empty stubs and a table nobody can read yet
 
@@ -1318,10 +1346,12 @@ capitalised string is a control name rather than the module.
    and finds 20 readers; the three that mask ask only for bits 0-3, and
    `flags[i] & 0x07` can only ever be 0, 1, 2 or 4.  So `func_00140A58` returns a
    **four-state property**.  See *The packed flag bytes are four-state properties*.
-   What is left: bits 4, 5, 6 and 7 are set on 32, 32, 12 and 1 entries and **no
-   accessor masks for them**, so they are read whole-byte somewhere.  Finding those
-   readers - and in particular the single entry with bit 7, index 33 - is the next
-   step.  **What the index means is also open:** it is not ASCII (`--domain` tests
+   What is left: bits 4, 5, 6 and 7 are set on 32, 32, 12 and 1 entries, and the
+   `--asked` census shows **bit 7 is read by nobody at all**.  Bits 4 and 6 are read
+   only by `func_0010CFC0`, which masks nearly every bit in turn and looks like a
+   serialiser or debug dump rather than a property test.  So those bits are set by
+   the table and emitted by the dumper, and nothing in the shipped game consults
+   them.  **What the index means is also open:** it is not ASCII (`--domain` tests
    both alignments and both fail), and the "one per object class" idea this item
    started from has been withdrawn as a guess with no evidence behind it.
 6. **Use the stack census to choose what to read next.**  `tools/delay_slots.py`

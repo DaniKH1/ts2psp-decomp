@@ -48,8 +48,44 @@ TABLE_ADDR = 0x001E1B98
 TABLE_ENTRIES = 128
 SYMBOL = "sym_001E1B98"
 
-# `andi $v0, $v0, 0x7` and friends - the bits the readers ask for.
-MASK = re.compile(r"andi\s+\$v0,\s*\$v0,\s*(0x[0-9A-Fa-f]+|\d+)")
+# `andi $dst, $src, mask`.  The register is matched loosely - an earlier version
+# only looked for `$v0`, which missed func_00143838, which masks with 0x1 in `$t0`.
+# A preceding byte load into the same register is required too: `andi $reg, $reg,
+# 0xff` is the usual way to write `& 0xFF` on something that is *not* the flag
+# byte, and counting those claims every bit is queried everywhere.
+ANDI = re.compile(r"andi\s+\$(\w+),\s*\$(\w+),\s*(0x[0-9A-Fa-f]+|\d+)")
+LOAD_BYTE = re.compile(r"l[bhu]c?\s+\$(\w+),")
+
+# A mask of 0xFF keeps every bit of a byte, so it says nothing about which bit is
+# being asked for.  Reported separately rather than folded into the union.
+UNINFORMATIVE = {0xFF}
+
+
+def body_of(path: Path, name: str) -> str:
+    """The instruction lines of one glabel block."""
+    text = path.read_text(encoding="utf-8", errors="replace")
+    chunk = text.split(f"glabel {name}", 1)[-1].split("endlabel")[0]
+    return "\n".join(line for line in chunk.splitlines() if "/*" in line)
+
+
+def masks_on_loaded_byte(body: str) -> list[int]:
+    """Masks applied to a value a byte load had written.
+
+    Approximate, but far better than "every `andi` in the function": a mask counts
+    only if the register it reads was the destination of an earlier byte load in
+    the same block.  Still a heuristic - the load may be of something else - but it
+    excludes the `& 0xFF` idiom, which was most of what the naive search found.
+    """
+    loaded: set[str] = set()
+    found: list[int] = []
+    for line in body.splitlines():
+        m = LOAD_BYTE.search(line)
+        if m:
+            loaded.add(m.group(1))
+        a = ANDI.search(line)
+        if a and a.group(2) in loaded:
+            found.append(int(a.group(3), 0))
+    return found
 
 
 def runs(values: list[int]) -> list[tuple[int, int, int]]:
@@ -81,7 +117,39 @@ def main() -> int:
                     help="the values `flags[i] & 0x07` can actually take")
     ap.add_argument("--domain", action="store_true",
                     help="test whether the index is an ASCII character code")
+    ap.add_argument("--asked", action="store_true",
+                    help="for each bit, which functions ask for it")
     ns = ap.parse_args()
+
+    if ns.asked:
+        asm = ROOT / "asm" / "eboot"
+        askers: dict[int, list[str]] = {b: [] for b in range(8)}
+        users = 0
+        for path in sorted(asm.glob("*.s")):
+            if SYMBOL not in path.read_text(encoding="utf-8", errors="replace"):
+                continue
+            users += 1
+            masks = masks_on_loaded_byte(body_of(path, path.stem))
+            bits: set[int] = set()
+            for m in masks:
+                if m in UNINFORMATIVE:
+                    continue
+                bits |= {b for b in range(8) if m & (1 << b)}
+            for b in bits:
+                askers[b].append(path.stem)
+        print(f"{users} functions reference {SYMBOL}\n")
+        for b in range(8):
+            names = askers[b]
+            print(f"  bit {b}: asked by {len(names)}")
+            if not names:
+                print("          nothing asks for it")
+            else:
+                print("          " + ", ".join(n.replace("func_", "") for n in names))
+        never = [b for b in range(8) if not askers[b]]
+        print()
+        print("  bits nothing asks for: "
+              + (", ".join(str(b) for b in never) if never else "none"))
+        return 0
 
     if ns.domain:
         # `func_001434C0` walks a byte stream and looks up `flags[base + c]` for
@@ -152,26 +220,25 @@ def main() -> int:
         asm = ROOT / "asm" / "eboot"
         users = []
         for path in sorted(asm.glob("*.s")):
-            text = path.read_text(encoding="utf-8", errors="replace")
-            if SYMBOL not in text:
+            if SYMBOL not in path.read_text(encoding="utf-8", errors="replace"):
                 continue
-            name = path.stem
-            body = text.split(f"glabel {name}", 1)[-1].split("endlabel")[0]
-            masks = [int(m, 0) for m in MASK.findall(body)]
-            users.append((name, masks))
-        print(f"{len(users)} functions reference {SYMBOL}\n")
-        print(f"{'function':<20} masks asked for")
+            users.append((path.stem, masks_on_loaded_byte(body_of(path, path.stem))))
+        readers = [u for u in users if u[1]]
+        print(f"{len(users)} functions reference {SYMBOL}; "
+              f"{len(readers)} of them mask a byte they loaded\n")
+        print(f"{'function':<20} masks   bits asked for")
         for name, masks in users:
-            if masks:
-                shown = " ".join(f"0x{m:x}" for m in masks)
-                bits = set()
-                for m in masks:
+            if not masks:
+                print(f"  {name:<20} -      (no mask on a loaded byte)")
+                continue
+            bits: set[int] = set()
+            for m in masks:
+                if m not in UNINFORMATIVE:
                     bits |= {b for b in range(8) if m & (1 << b)}
-                extra = f"   -> bits {sorted(bits)}"
-            else:
-                shown = "(writes, or reads without a mask)"
-                extra = ""
-            print(f"  {name:<20} {shown}{extra}")
+            shown = " ".join(f"0x{m:x}" for m in masks)
+            note = "" if 0xFF not in masks else "   (0xFF keeps everything)"
+            print(f"  {name:<20} {shown}{note}")
+            print(f"  {'':<20} -> bits {sorted(bits)}")
         return 0
 
     print(f"{TABLE_ENTRIES} packed flag bytes at 0x{TABLE_ADDR:08X}")

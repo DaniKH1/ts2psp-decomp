@@ -187,8 +187,9 @@ What is open now:
   The property bytes are decoded and turn out not to be booleans: `flags[i] & 0x07`
   can only ever be 0, 1, 2 or 4, so `func_00140A58` returns a **four-state field**.
   What the index means is open — it is not ASCII, which `tools/flag_table.py --domain`
-  tests in both alignments and rejects. Bits 4 to 7 are set on 32, 32, 12 and 1
-  entries and nothing masks for them yet.
+  tests in both alignments and rejects.  Of the eight bits, **bit 7 is read by nobody
+  at all**, and bits 4 and 6 only by `func_0010CFC0`, which masks nearly every bit in
+  turn and looks like a serialiser rather than a property test.
 * **Naming the rest of the module.**  3,754 string literals and 320 static
   constructors are mapped; roughly 185 constructors still touch nothing but the
   shared runtime and have no name.
