@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 143 (see below) |
-| **C functions that byte-match** | **137** (linked from `src/`) |
+| functions written in C | 144 (see below) |
+| **C functions that byte-match** | **138** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  One hundred and thirty-seven
+CodeWarrior and only the *register choice* differs.  One hundred and thirty-eight
 now byte exact this way:
 
 ```
@@ -219,6 +219,7 @@ syncSkeleton_27D0  void        vector unit: scale a 3x4 matrix by three scalars
 syncSkeleton_2808  void        vector unit: multiply a 3x4 matrix by a vector
 func_00130830  void            a `break 768` - a trap used as a callback placeholder
 func_00103E88  void            six-word copy out of self+0xC, three registers deep
+func_000EE56C  void            the same rotation, sixteen words, out of self+0x110
 func_00128F50  Elapsed*        start - now
 func_00140A58  u32             flags[index] & 0x07, packed flag bytes
 func_00140A74  u32             ... the same, mask 0x04
@@ -984,7 +985,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the one hundred and thirty-seven that work: if the function has no
+The rule of thumb from the one hundred and thirty-eight that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -1191,7 +1192,7 @@ branch-likely from a plain `if`, and the empty-needle behaviour needs exactly th
 "skip the increment" shape.  So the loop is written out with `.set noreorder` scoped
 per branch, and the final `subu` is left to C so it lands in the return's delay slot.
 
-### A copy is a scheduler's answer, and the last word is loaded twice
+### A copy is a scheduler's answer, and there are only two of them
 
 `func_00103E88` copies six words and the interesting part is how, not what:
 
@@ -1204,12 +1205,23 @@ sw $a2, 0xC($a1)    sw $a3, 0x10($a1)   sw $a0, 0x14($a1)
 
 Six values through three registers, and the last one is loaded **twice** - once into
 `$a3` and again into `$a0`.  The rotation is a scheduler's answer to a twenty-four byte
-copy, not a source-level choice: the source is one assignment.  `func_000EE56C` does the
-same thing with sixteen words, so the shape is a property of copies here rather than of
-this function.
+copy, not a source-level choice: the source is one assignment.  `func_000EE56C` is the
+same thing at sixteen words, in groups of three, with five stores and no load after
+them at the tail.
 
-**The duplicated load is what makes it unwriteable in C.**  Two assignments to the same
-address, and GCC does one load into `$v0` - it is strictly better and the bytes are
+**And that is all of them.**  `tools/copy_family.py` counts every function that is
+nothing but a pointer adjustment, loads from it, stores to a second pointer and a
+return: **two out of 7,497.**  An earlier note here called it a family, on the strength
+of having seen both in the shapes queue, and two is not a family.
+
+The absence is the more useful half of the result.  **This codebase almost never copies
+a structure inline.**  It copies through pointers, field by field, or through generated
+copy constructors - which is what `-ffunction-sections` leaves lying around and what the
+`stub` and unnamed symbols in the vector census are made of.  So the recipe for these
+two is worth writing down and there is nothing to generalise from it.
+
+**The duplicated load is what makes them unwriteable in C.**  Two assignments to the
+same address, and GCC does one load into `$v0` - it is strictly better and the bytes are
 wrong.  So the last three instructions are spelled out, and `lw %[s], 0x14(%[s])` works
 because the register is its own base: a pointer being overwritten by the word just past
 what it pointed at.  That is the third distinct way a single register has had to be
@@ -1221,7 +1233,9 @@ meaning mid-function.
 0xC` makes this a getter shaped like a copy: the receiver is a larger object and the
 field's position is baked into pointer arithmetic.  Written as `src->w[0]` with the
 offset folded into the struct, GCC emits `lw $v0, 0xC($a0)` and there is no `addiu` at
-all - one instruction short, and every offset after it wrong.
+all - one instruction short, and every offset after it wrong.  `func_000EE56C` does the
+same with `0x110`, which means something occupies 0x110 bytes of its receiver before
+the field it copies does.
 
 ### The only `break` in the module, and it is a callback slot
 
@@ -2017,7 +2031,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 137 are done.  Each shape that works yields several functions
+   identified and 138 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
