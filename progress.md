@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 156 (see below) |
-| **C functions that byte-match** | **150** (linked from `src/`) |
+| functions written in C | 158 (see below) |
+| **C functions that byte-match** | **152** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  One hundred and fifty
+CodeWarrior and only the *register choice* differs.  One hundred and fifty-two
 now byte exact this way:
 
 ```
@@ -232,6 +232,8 @@ func_000E4970  u32             clear three words at 0xC, return 0
 func_000F7D38  u32             the same twenty bytes, verbatim
 func_00151240  u32             one zero byte out, four bytes back - all 155 callers read one
 func_00096F40  void            zero three floats through the second argument
+func_00005B00  s32             return 0 - one of 110
+func_000068E8  void            empty body - one of 162, the largest group
 func_00128F50  Elapsed*        start - now
 func_00140A58  u32             flags[index] & 0x07, packed flag bytes
 func_00140A74  u32             ... the same, mask 0x04
@@ -997,7 +999,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the one hundred and fifty that work: if the function has no
+The rule of thumb from the one hundred and fifty-two that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -1265,6 +1267,13 @@ A body of exactly 8 bytes is `jr $ra` plus one more instruction, so that second
 instruction is the whole of the function.  **516 functions - 6.9 % of the module - are
 of that size**, and the census by what they do is more informative than the total:
 
+**272 of the 516 - 162 empty plus 110 `return 0` - are the module's base-class
+answers.**  `jr $ra; nop` is a `void` method with nothing to do; `jr $ra; or $v0,$zero,
+$zero` is a predicate whose answer is no.  Both are the same thing: a hierarchy where the
+base implementation of almost every method does nothing or says no, and the real work
+lives in the few hundred functions that override them.  Neither number means much alone;
+together they describe the module's shape.
+
 | | count | what it is |
 | --- | --- | --- |
 | `jr $ra; nop` | 162 | an empty body, `void` |
@@ -1336,25 +1345,62 @@ widened with `lb` or `lbu`, not `lw`.  What fits is a one-byte field the compile
 in memory and widened with a word load because it had no reason to narrow.  That remains
 a reading rather than a conclusion; the measurement is not in doubt.
 
-#### The tool was wrong twice before it was right
+#### The tool was wrong three times before it was right
 
-Both failures are worth recording, because both produced a confident, plausible, false
-count - which is exactly the failure mode a census is supposed to rule out.
+Every version produced a confident, plausible, false count, which is exactly the failure
+mode a census is meant to rule out.
 
 | version | what it looked at | what it reported | why it was wrong |
 | --- | --- | --- | --- |
 | 1 | the instruction after the `jal` | 144 sites narrow to a byte | that instruction is the **branch's own delay slot**, storing an unrelated argument |
 | 2 | the instructions that read `$v0` | 142 sites discard the result | the value is not in a register: it is `sw $v0, 0x2C($sp)` then `lb $a0, 0x2C($sp)` |
 | 3 | `$v0` **and** the memory it is spilled to | **155 of 155 keep one byte** | — |
+| 4 | the same, over *every* duplicated body | five of the largest groups "discard the result" | **the callee never writes `$v0`**, so there was no return value to discard |
 
 **Version 1 manufactured the very evidence the tool existed to check.**  Taken at face
 value it would have "confirmed" the hypothesis with the wrong number for the wrong
 reason.  The fix that mattered was following the value through *memory* as well as
 through registers, which is the one place these call sites hide.
 
-The tool now prints example call sites alongside its counts for that reason: **a bare
-count looks identical whether it was measured or guessed**, and these two runs showed it
-can be both.
+**Version 4 is the worse one, because it looked like a result.**  Run over all 107
+groups, it reported that the 32-function 704-byte group and the 30-function 408-byte
+group each "discard the result" - 32 and 30 facts about callers, which read as a finding
+about call sites and were in fact a statement about `void` functions that never touch
+the return register.  A census that reports what it does not know is worse than one that
+reports less, because the number looks like an answer.
+
+The tool now says so explicitly per group:
+
+```
+704 x32   32 discards the result  [callee never writes $v0 - no return value]
+```
+
+and it no longer warns about `beqz` on a group whose callee returns a whole word.  That
+distinction is not pedantry: a `beqz` on a fully-written zero is safe, and a `beqz` on a
+value with three garbage bytes above the low one is not.  Warning about both is warning
+about neither.
+
+The tool prints example call sites alongside its counts for the same reason throughout:
+**a bare count looks identical whether it was measured or guessed**, and these four runs
+showed it can be both.
+
+### What the width census says about all 107 groups
+
+Running the question over every duplicated body at once separates the groups that return
+something from the groups that do not, and the split is stark:
+
+| group | body | what the callers do |
+| --- | --- | --- |
+| 8 x162 | `jr; nop` | no return value - the empty bodies |
+| 704 x32, 408 x30, 96 x19, 104 x11 | real code | no return value - `void` |
+| **20 x64** | `sb`/`lw` one byte | **155 of 155 reload one byte** |
+| 8 x110 | `return 0` | 17 use four bytes, 9 `beqz`, 12 ignore |
+| 8 x36 | `return 1` | 24 `beqz`, 7 ignore |
+
+**The 64-group is the only one in the module where a return value is consumed
+byte-narrowly, and it is the only one with the `sb`/`lw` shape.**  That is the thing the
+census was for: the narrow-reading convention is real but it is *local*, not a property
+of the whole module.  Read as a property of the module it would have been wrong.
 
 ### Three singletons: one empty frame, one `break`, one `stub`
 
@@ -2302,7 +2348,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 150 are done.  Each shape that works yields several functions
+   identified and 152 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
