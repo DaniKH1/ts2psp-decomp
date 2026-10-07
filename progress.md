@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 154 (see below) |
-| **C functions that byte-match** | **148** (linked from `src/`) |
+| functions written in C | 156 (see below) |
+| **C functions that byte-match** | **150** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  One hundred and forty-eight
+CodeWarrior and only the *register choice* differs.  One hundred and fifty
 now byte exact this way:
 
 ```
@@ -230,6 +230,8 @@ func_000F9414  void            set field 0 of a 28-byte-stride element to 2
 func_00082134  s32             write 0x2000 through argument 2, return 0
 func_000E4970  u32             clear three words at 0xC, return 0
 func_000F7D38  u32             the same twenty bytes, verbatim
+func_00151240  u32             one zero byte out, four bytes back - all 155 callers read one
+func_00096F40  void            zero three floats through the second argument
 func_00128F50  Elapsed*        start - now
 func_00140A58  u32             flags[index] & 0x07, packed flag bytes
 func_00140A74  u32             ... the same, mask 0x04
@@ -995,7 +997,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the one hundred and forty-eight that work: if the function has no
+The rule of thumb from the one hundred and fifty that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -1306,17 +1308,53 @@ addiu $sp, $sp, 0x10
 low byte was written, so the three bytes above it are whatever was already on the stack,
 and the function returns them as part of its result.
 
-The likely reading is that the original source declared a `char` local, assigned zero to
-it, and returned it from a function whose result is consumed one byte wide - so the
-compiler was entitled to widen with a word load and let the upper bytes be don't-care,
-because nothing ever reads them.  That is written down as the most likely explanation
-rather than a conclusion, since an empty 16-byte frame with a single byte store is also
-what a lot of other things look like.
+**How the callers use it: 155 of 155 keep one byte, and that is measured.**
+`tools/return_width.py` follows `$v0` from every in-module branch to this group - 155
+branches to the 64 functions - and reports what each caller does with it.  The answer is
+uniform: **every one stores the word to a stack slot and reloads it with `lb`.**  None
+uses all four bytes, and none ignores it.
 
-**What is not in doubt is the effect**: these 64 functions return a value that is only
-fully defined if the caller reads one byte of it.  It is a latent bug that happens not
-to bite, and it is the sort of thing that only a whole-module census finds - 64
-instances of the same shape is a pattern, not an accident.
+```
+jal   func_170654
+sb    $a1, 0x39B($sp)     the delay slot: an argument, unrelated
+move  $a0, $s0
+sw    $v0, 0x3A4($sp)     the result, stored wide
+...
+lb    $a1, 0x3A4($sp)     ... and read back one byte at a time
+```
+
+**That uniformity is what makes the wide load safe, and it changes the reading.**  The
+obvious guess - one function compiled carelessly, with a caller that happens to read a
+byte - is wrong, because the *callee* does exactly what the caller does: write one byte,
+read four.  This is **a convention of the codebase, not a defect in one function**.  A
+one-byte-wide value is stored and reloaded as a word throughout, and every reader takes
+only the byte it wants.  The three uninitialised bytes are dead by convention, which is
+why 64 copies of the shape survive in a shipped build and not one of them misbehaves.
+
+**So the source was probably not returning a `char` at all.**  A `char` would have been
+widened with `lb` or `lbu`, not `lw`.  What fits is a one-byte field the compiler kept
+in memory and widened with a word load because it had no reason to narrow.  That remains
+a reading rather than a conclusion; the measurement is not in doubt.
+
+#### The tool was wrong twice before it was right
+
+Both failures are worth recording, because both produced a confident, plausible, false
+count - which is exactly the failure mode a census is supposed to rule out.
+
+| version | what it looked at | what it reported | why it was wrong |
+| --- | --- | --- | --- |
+| 1 | the instruction after the `jal` | 144 sites narrow to a byte | that instruction is the **branch's own delay slot**, storing an unrelated argument |
+| 2 | the instructions that read `$v0` | 142 sites discard the result | the value is not in a register: it is `sw $v0, 0x2C($sp)` then `lb $a0, 0x2C($sp)` |
+| 3 | `$v0` **and** the memory it is spilled to | **155 of 155 keep one byte** | — |
+
+**Version 1 manufactured the very evidence the tool existed to check.**  Taken at face
+value it would have "confirmed" the hypothesis with the wrong number for the wrong
+reason.  The fix that mattered was following the value through *memory* as well as
+through registers, which is the one place these call sites hide.
+
+The tool now prints example call sites alongside its counts for that reason: **a bare
+count looks identical whether it was measured or guessed**, and these two runs showed it
+can be both.
 
 ### Three singletons: one empty frame, one `break`, one `stub`
 
@@ -2264,7 +2302,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 148 are done.  Each shape that works yields several functions
+   identified and 150 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
