@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 136 (see below) |
-| **C functions that byte-match** | **130** (linked from `src/`) |
+| functions written in C | 139 (see below) |
+| **C functions that byte-match** | **133** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  One hundred and thirty
+CodeWarrior and only the *register choice* differs.  One hundred and thirty-three
 now byte exact this way:
 
 ```
@@ -212,6 +212,9 @@ func_001282B4  void            bump-allocate: cursor += amount, rounded up to fo
 func_000B9CBC  Packed*         next record in a packed array, via a byte-count span
 func_00140AC4  s32             `setjmp`: save the callee-saved context
 func_00143A18  s32             `strstr`, hand-rolled (see the note below)
+func_000A9A00  s32             a field that is set gives 0, clear gives -24
+func_000BBA80  s32             a byte field on a second object, as a boolean
+func_0001270C  s32             sign-extend bit 30 with xor and subu, no branch
 func_00128F50  Elapsed*        start - now
 func_00140A58  u32             flags[index] & 0x07, packed flag bytes
 func_00140A74  u32             ... the same, mask 0x04
@@ -977,7 +980,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the one hundred and thirty that work: if the function has no
+The rule of thumb from the one hundred and thirty-three that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -1183,6 +1186,44 @@ Neither edge case is a transcription error; both are properties of the original.
 branch-likely from a plain `if`, and the empty-needle behaviour needs exactly that
 "skip the increment" shape.  So the loop is written out with `.set noreorder` scoped
 per branch, and the final `subu` is left to C so it lands in the return's delay slot.
+
+### `movz` is the answer to most conditionals, and that is the problem
+
+`func_000A9A00` is `field ? 0 : -24`, and psp-gcc will not write that as a branch:
+
+```
+addiu $v1, $zero, -0x18
+movz  $v0, $v1, $a0
+```
+
+`movz` is an Allegrex conditional move - it was added to the ISA precisely so this
+idiom would not need a branch - so the disagreement here is **one instruction shorter
+than the original**, not a different register choice.  Same family as the `ins` and
+`negu` notes above and just as fatal: a four-byte difference is four bytes.
+
+**This cannot be fixed from C.**  `__builtin_expect` only changes the *prediction*, not
+the decision to if-convert.  The branch has to be written out, with `.set noreorder`
+so the `addiu` stays in the nullified slot, and `bnel` - not `beql`, because `bnel`
+deadens the slot on the branch-taken path and that is the path the original takes.
+
+Suppressing GCC's epilogue then needs `noreturn`, which is a lie: the function does
+return, but the block already contains the `jr $ra`.  Without the attribute the
+function is eight bytes too long.  Same trick as elsewhere in this directory.
+
+**And the delay-slot rule turns out to have a second case.**  Writing the block as
+
+```
+jr $ra
+nop
+```
+
+gives **seven** instructions and a 28-byte function.  Leaving the `nop` out gives the
+right six and a 24-byte function with the slot filled by the assembler.  So the
+[landmine](#the-landmine-gcc-does-not-count-an-assembler-filled-delay-slot) - an
+assembler-filled slot not being counted - does not apply when the block is the last
+thing in the function.  It applies when the compiler has an epilogue of its own to
+attach the slot to.  Both were verified by `check_symbols.py` and `check_image.py`
+rather than reasoned about, and they give different answers.
 
 ### The guard: a nested, re-entrant `setjmp` sandbox with a four-value error code
 
@@ -1692,7 +1733,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 130 are done.  Each shape that works yields several functions
+   identified and 133 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
