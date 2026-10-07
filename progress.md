@@ -368,6 +368,71 @@ function that caused it instead of as half a million differing bytes.  Its negat
 test is in the commit: breaking `func_0009C260` on purpose makes it report
 `recorded 0x20, symbol 0x18`.
 
+### The packed flag bytes are four-state properties, not booleans
+
+The work list had this as "the one-bit accessors over them will name the individual
+booleans".  That framing was wrong.  `tools/flag_table.py` decodes the whole array,
+and **20 functions** reference `sym_001E1B98`, not the two that were known.
+
+The array is 128 bytes at `0x001E1B98`, one per object class, and it is almost
+entirely runs:
+
+```
+[0x00]      1  0x00   -
+[0x01..09]  9  0x20   bit 5
+[0x0a..0e]  5  0x28   bits 3,5
+[0x0f..20] 18  0x20   bit 5
+[0x21]      1  0x88   bits 3,7
+[0x22..30] 15  0x10   bit 4
+[0x31..3a] 10  0x04   bit 2
+[0x3b..41]  7  0x10   bit 4
+[0x42..47]  6  0x41   bits 0,6
+[0x48..5b] 20  0x01   bit 0
+[0x5c..61]  6  0x10   bit 4
+[0x62..67]  6  0x42   bits 1,6
+[0x68..7b] 20  0x02   bit 1
+[0x7c..7f]  4  0x10   bit 4
+```
+
+Only three of those functions read with a mask, and between them they ask for
+**bits 0 to 3 and nothing else**:
+
+| function | mask | reads |
+| --- | --- | --- |
+| `func_00140A58` | `0x07` | bits 0, 1, 2 |
+| `func_00140A74` | `0x04` | bit 2 |
+| `func_001434C0`, `func_00149724` | `0x08` | bit 3 |
+
+**And `flags[i] & 0x07` only ever produces 0, 1, 2 or 4.**  Not 3, not 5, 6 or 7 -
+because bits 0 and 1 are never both set anywhere in the table, and bit 2 never
+combines with either.  So `func_00140A58` returns a **four-state property**, not a
+boolean.  The distribution:
+
+| state | classes | indices |
+| --- | --- | --- |
+| 0 | 66 | the first half of the table |
+| 1 | 26 | 66..91 |
+| 2 | 26 | 98..123 |
+| 4 | 10 | 49..58 |
+
+Two things follow from the shape of that distribution.  **States 1 and 2 occupy two
+contiguous 26-entry blocks exactly 0x20 apart**, mirrored, and in each the *first
+six* additionally carry bit 6 - so the bit-6 set is a property of a specific group of
+six classes layered on top of a property of twenty-six.  Two independent facts about
+the object hierarchy, encoded in one byte each.
+
+And **bits 4, 5, 6 and 7 are set on 32, 32, 12 and 1 classes respectively, yet no
+accessor masks for them.**  So those four are read by whole-byte operations -
+compared against a value, or masked somewhere this search does not catch - and they
+are the ones still to identify.  Bit 7 is the extreme case: exactly one class, index
+33, the single `0x88`, and nothing reads it.
+
+Two corrections to my own reading along the way.  Counting the `0x01` run by hand
+gave nineteen entries when the script says twenty, and counting the `0x20` run gave
+27 when it is 32 - because `0x28` carries bit 5 as well and I had counted the runs
+without decoding the bits.  The script exists so that this does not have to be done
+by eye.
+
 ### The PSP import table: 223 empty stubs and a table nobody can read yet
 
 `.rodata.sceNid` has been on the work list as "read it for the import list and name
@@ -969,6 +1034,7 @@ tools/delay_slots.py         group functions by what sits in the return's slot
 tools/find_loops.py          find the functions with a backward branch, smallest first
 tools/check_symbols.py       every C-linked function reports the size it should
 tools/nid_table.py           the PSP import table: stubs, libraries, NID words
+tools/flag_table.py          decode the packed flag bytes and list their readers
 ```
 
 ```
@@ -1231,8 +1297,16 @@ capitalised string is a control name rather than the module.
    (`func_00101D24`, `func_00101D34`, `func_00101D44`), which confirms that
    address is a class descriptor rather than a plain vtable.  Working out what
    its fields mean is the next step towards naming the controller classes.
-5. The packed flag bytes at `0x001E1B98` are worth mapping: the one-bit
-   accessors over them will name the individual booleans.
+5. ~~The packed flag bytes at `0x001E1B98` are worth mapping: the one-bit accessors
+   over them will name the individual booleans.~~  **Done, and the framing was
+   wrong** - they are not booleans.  `tools/flag_table.py` decodes all 128 entries
+   and finds 20 readers; the three that mask ask only for bits 0-3, and
+   `flags[i] & 0x07` can only ever be 0, 1, 2 or 4.  So `func_00140A58` returns a
+   **four-state property**.  See *The packed flag bytes are four-state properties*.
+   What is left: bits 4, 5, 6 and 7 are set on 32, 32, 12 and 1 classes and **no
+   accessor masks for them**, so they are read whole-byte somewhere.  Finding those
+   readers - and in particular the single class with bit 7, index 33 - is the next
+   step.
 6. **Use the stack census to choose what to read next.**  `tools/delay_slots.py`
    says 5,788 functions have a frame; the 88 distinct sizes are a free bound on
    each one's local count.  Starting from the large frames would find the

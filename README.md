@@ -184,6 +184,10 @@ What is open now:
   are done.
 * **Recovering the controller class names** from the type descriptors at
   `0x001DB014`, and the packed flag bytes at `0x001E1B98`.
+  The flag bytes are decoded and turn out not to be booleans: `flags[i] & 0x07` can
+  only ever be 0, 1, 2 or 4, so `func_00140A58` returns a **four-state property**.
+  Bits 4 to 7 are set on 32, 32, 12 and 1 classes and nothing masks for them yet —
+  finding those readers is open.
 * **Naming the rest of the module.**  3,754 string literals and 320 static
   constructors are mapped; roughly 185 constructors still touch nothing but the
   shared runtime and have no name.
@@ -199,9 +203,13 @@ this repository deliberately omits a given clone is missing.  `tools/delay_slots
 groups all 7,503 functions by the instruction in the return's delay slot, which
 doubles as a census of how much stack 5,788 of them need — without reading a single
 instruction of their bodies.  `tools/find_loops.py` finds the 1,740 functions with
-a backward branch, smallest first.
+a backward branch, smallest first.  `tools/flag_table.py` decodes the 128 packed
+property bytes at `0x001E1B98` and lists the twenty functions that read them.
 
 One caveat about reading the generated assembly, learned the hard way: `asm/eboot/*.s`
 writes branch targets as `.Leboot_XXXXXXXX` labels, and the label's *position in the
-file* is not always the branch's target.  `tools/disasm_range.py` disassembles on the
-fly and prints the real displacement; trust it over the `.s` when a target matters.
+file* is not always the branch's target.  It also writes data references as
+`%hi(sym_001E1B98)` rather than as the literal address, so a grep for the address
+finds nothing while a grep for the symbol finds twenty uses.  `tools/disasm_range.py`
+disassembles on the fly and prints the real displacement; trust it over the `.s` when
+a target matters.
