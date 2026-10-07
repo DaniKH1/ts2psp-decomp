@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 146 (see below) |
-| **C functions that byte-match** | **140** (linked from `src/`) |
+| functions written in C | 149 (see below) |
+| **C functions that byte-match** | **143** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  One hundred and forty
+CodeWarrior and only the *register choice* differs.  One hundred and forty-three
 now byte exact this way:
 
 ```
@@ -222,6 +222,9 @@ func_00103E88  void            six-word copy out of self+0xC, three registers de
 func_000EE56C  void            the same rotation, sixteen words, out of self+0x110
 func_00197414  void            lerp: out = a + t * (b - a), three floats
 func_001AF16C  void            the same, four floats - and $f0 gets used
+func_000AD440  void            set two adjacent bytes to 1
+func_000E1000  void            two globals to 3 and -1, in two different regions
+func_00025594  void            the module's only empty body with a live frame
 func_00128F50  Elapsed*        start - now
 func_00140A58  u32             flags[index] & 0x07, packed flag bytes
 func_00140A74  u32             ... the same, mask 0x04
@@ -987,7 +990,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the one hundred and forty that work: if the function has no
+The rule of thumb from the one hundred and forty-three that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -1193,6 +1196,61 @@ Neither edge case is a transcription error; both are properties of the original.
 branch-likely from a plain `if`, and the empty-needle behaviour needs exactly that
 "skip the increment" shape.  So the loop is written out with `.set noreorder` scoped
 per branch, and the final `subu` is left to C so it lands in the return's delay slot.
+
+### Three singletons: one empty frame, one `break`, one `stub`
+
+`func_00025594` allocates a 0x30-byte frame, saves six registers into it, and returns:
+
+```
+addiu $sp, $sp, -0x30
+sw    $a2, 0x18($sp)   sw $a3, 0x1C($sp)
+sw    $t0, 0x20($sp)   sw $t1, 0x24($sp)
+sw    $t2, 0x28($sp)   sw $t3, 0x2C($sp)
+jr    $ra
+addiu $sp, $sp, 0x30
+```
+
+`tools/empty_frames.py` is the census and the answer is **one out of 7,497**.
+
+**What it says is what the function used to do.**  The saved registers are `$a2`, `$a3`
+and `$t0` to `$t3` - all caller-saved, which is exactly the set that has to survive
+*across a call*.  Saving callee-saved registers is bookkeeping; saving caller-saved ones
+is only ever done around a call.  So this function used to call something.
+
+**And it does not save `$ra`, which is the other half of the same evidence.**  A frame
+built to hold a return address across a call has to spill it, or the call's return would
+overwrite the saved `$a3`.  There is no `sw $ra`.  So the call is gone: inlined to
+nothing, with the frame kept because the compiler had already built it.
+
+That is the most likely sequence and it is written down as a sequence, not a conclusion
+- an empty body is also what a function whose every statement was a macro expanding to
+nothing would look like.  What is not a guess is the register set: these six are saved
+because of a call, and there is no call left.
+
+**So the module's three one-off shapes are all the same kind of finding**: the single
+`break` of [the previous section](#the-only-break-in-the-module-and-it-is-a-callback-slot),
+the single empty frame, and the pair of copies.  Each is one function out of 7,497, and
+in each case the singleton is more informative than the count - a shape that appears
+once is something specific, not a convention.
+
+### Two globals in two regions, from one function
+
+`func_000E1000` sets `0x1A2238` to 3 and `0x11574` to -1, and the second address is
+built as `lui $a1, 0x1` + `sw $a0, 0x1574($a1)` - 0x10000 plus an offset, far below
+every other global found so far.
+
+**That is not a mistake, it is the only cheap way there.**  There is no `lui $reg, 0x0`,
+so anything below 0x10000 has to be addressed as a `lui` of 1 plus a positive offset.
+`func_00097200` reaches `0xC9E4` the same way.  So the low region is not a second
+globals page that some other code uses differently - it is the same page, addressed the
+only way the ISA allows, which means **the two addresses in this function are more
+alike than they look**: both are ordinary globals, and the module simply has data below
+0x10000.
+
+That in turn retires something recorded earlier.  The note about "two globals regions"
+claimed the lower one was separate because nothing had reached it before; the correct
+statement is the reverse - it is reachable in one instruction from zero, so any address
+below 0x10000 is cheap and the distinction was never real.
 
 ### Two lerps, and why neither of them can be written in C
 
@@ -1545,13 +1603,22 @@ one *is* understood, and what is missing is a byte-level detail rather than a me
 
 ### Two globals regions, and a third that may be a counter
 
-`func_00097200` writes to `0xC9E4`, built as `lui 0x1` + `addiu -0x361C`.  That is
-below the module's data page: the other setters in this set reach `0x19Exxxx` and
-`0x1Exxxx`, and nothing found before this reached `0xC9xxx`.  So the module has at
-least **two globals regions**, and this is the only evidence so far for the lower
-one.  It is worth not over-reading: `0xC9E4` may be a variable that happens to sit
-low rather than a separate region, and a second function reaching that page is what
-would settle it.
+**This section was wrong and is replaced by the note on `func_000E1000` above.**
+
+`func_00097200` writes to `0xC9E4`, built as `lui 0x1` + `addiu -0x361C`.  At the time
+this was the only function found reaching below the module's data page - the others go
+to `0x19Exxxx` and `0x1Exxxx` - and the conclusion drawn was that the module has at
+least **two globals regions**.
+
+It does not.  `func_000E1000` writes to `0x11574` as `lui 0x1` + `sw 0x1574`, and
+there is no `lui $reg, 0x0` on this ISA, so anything below `0x10000` *has* to be
+addressed as a `lui` of 1 plus a positive offset.  One instruction, no penalty.  So the
+low addresses are the same page reached the only way the ISA allows, and calling them a
+second region was reading a constraint as a convention.
+
+The useful thing the original observation got right is the negative one: the module's
+globals are spread over a wide range and the tool that finds setters has to handle both
+spellings.  That much stands.
 
 ### A tag byte beside the pointer, not inside it
 
@@ -2076,7 +2143,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 140 are done.  Each shape that works yields several functions
+   identified and 143 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
