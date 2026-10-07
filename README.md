@@ -13,7 +13,7 @@ relative.
 | code | **507,673 / 507,673 instructions identical** |
 | functions recovered | 7,497 |
 | relocations recovered | 66,503 / 66,503 |
-| C functions byte-exact and hand written | 104 |
+| C functions byte-exact and hand written | 106 |
 
 The engine is Maxis' "Elem", the shared engine also used by *The Sims 3* — the
 build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
@@ -23,7 +23,7 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 | directory | |
 | --- | --- |
 | `asm/` | one `.s` per function, as splat produced them.  Assembling and linking this reproduces the original exactly.  Recovered material — see [Legal](#legal). |
-| `src/eboot/` | the hand written decompilation: what each function does, in C.  104 of these are verified to compile to the original bytes.  Recovered material — see [Legal](#legal). |
+| `src/eboot/` | the hand written decompilation: what each function does, in C.  106 of these are verified to compile to the original bytes.  Recovered material — see [Legal](#legal). |
 | `include/` | the shared types: `f32`, `Vec3f`, and the object layouts the early functions reveal. |
 | `tools/` | everything that produced the above, and the checks that keep it honest.  MIT licensed. |
 | `config/` | the recovered symbol map, the relocation map, and hand recovered names. |
@@ -35,13 +35,13 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 **The assembly is byte-exact and complete.**  `asm/` reproduces every byte of
 the module image.  That part is finished and has been for some time.
 
-**The C is the readable layer, and it is partial.**  104 of 7,497 functions.  The
+**The C is the readable layer, and it is partial.**  106 of 7,497 functions.  The
 original was built with CodeWarrior for PSP (`mwccpsp.exe`), and psp-gcc does
 not reproduce its instruction selection.  Reaching byte-exact C for *all* 7,497
-needs that proprietary compiler; 104 were reached without it, by pinning the
+needs that proprietary compiler; 106 were reached without it, by pinning the
 handful of registers and delay slots where the two compilers disagree.
 
-What those 104 have in common is that the disagreement is small enough to name.
+What those 106 have in common is that the disagreement is small enough to name.
 Both compilers emit the same *instructions* and differ over which register is the
 destination, or when a value is loaded, so pinning the registers makes them agree.
 The pinning is deliberately narrow: an inline `asm` block over the two or three
@@ -60,6 +60,14 @@ Three results from that work are worth knowing before reading the C:
   in the branch's delay slot (`func_000CD5B0`, `func_0009C9B4`) are all byte-exact.
   A conditional with two long sides, where the compiler has a real block-order
   choice, is still untested.
+* **CodeWarrior peels a loop's first test out and leaves it above the loop's own
+  setup.**  `func_0014402C` — a `strlen` — branches to its return *before* the
+  instruction that sets the register the return subtracts, so an empty string would
+  return nonsense.  The identical shape is in a second function elsewhere in the
+  binary, so it is a compiler habit rather than a one-off, and the reading that fits
+  is that no caller passes an empty string.  Worth knowing before reading any loop
+  here: a guard sitting above the loop's prologue is not guarding it.
+
 * **The one genuinely ugly piece** is `__attribute__((noreturn))` on a function
   that does return.  It is a lie about control flow that only affects codegen, and
   it does two jobs: it stops GCC appending a return after a hand-written block, and
@@ -186,3 +194,8 @@ groups all 7,503 functions by the instruction in the return's delay slot, which
 doubles as a census of how much stack 5,788 of them need — without reading a single
 instruction of their bodies.  `tools/find_loops.py` finds the 1,740 functions with
 a backward branch, smallest first.
+
+One caveat about reading the generated assembly, learned the hard way: `asm/eboot/*.s`
+writes branch targets as `.Leboot_XXXXXXXX` labels, and the label's *position in the
+file* is not always the branch's target.  `tools/disasm_range.py` disassembles on the
+fly and prints the real displacement; trust it over the `.s` when a target matters.

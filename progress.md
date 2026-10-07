@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 110 (see below) |
-| **C functions that byte-match** | **104** (linked from `src/`) |
+| functions written in C | 112 (see below) |
+| **C functions that byte-match** | **106** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  One hundred and four
+CodeWarrior and only the *register choice* differs.  One hundred and six
 now byte exact this way:
 
 ```
@@ -183,6 +183,8 @@ func_000E8EA8  u32, u32         tent weight: y + (x-128)*(128-|y-128|)/128
 func_001428E4  void             .cplinit: register(1) for ever
 func_000CD5B0  void*            for (i=0;i<1;i++) *p++ = 0; return self
 func_0009C9B4  T*               clear 12 floats after a flag, countdown loop
+func_0014402C  const char*      strlen, with the loop's first test peeled out
+func_00137A04  u32, s32         low `count` bits, then bit 0 cleared
 func_0012EB30  u32             &entry[i], 164-byte stride, array at 0x1DEE08
 func_00049C50  u32             &entry[i], 2304-byte stride, two-part base
 func_00049C7C  u32             ... the same, plus 0x808 on the result
@@ -365,6 +367,54 @@ it directly, before the image comparison, so the failure is reported as the one
 function that caused it instead of as half a million differing bytes.  Its negative
 test is in the commit: breaking `func_0009C260` on purpose makes it report
 `recorded 0x20, symbol 0x18`.
+
+### CodeWarrior hoists the first loop test above the loop's own setup
+
+`func_0014402C` is a `strlen`.  What is odd about it is the order:
+
+```
+lb   $a2, 0($a0)      the first character
+beqz $a2, done         if NUL, stop ...
+move $a1, $a0          ... otherwise remember where we started
+addiu $a0, $a0, 1
+loop: ...
+done: subu $v0, $a0, $a1
+```
+
+**The guard is before the instruction that initialises the value the return
+subtracts.**  On the empty-string path `$t1` is still whatever the caller passed in,
+so the result is not zero and `strlen("")` would return nonsense.
+
+The same shape appears identically in `func_00143A18`, which is a different function
+in a different part of the binary.  So this is a **compiler habit, not a
+coincidence**: CodeWarrior peels the first iteration out of the loop, emits its test
+before the loop's prologue, and does not notice that the prologue also sets up the
+result.  The reading that fits is that the caller never passes an empty string, so
+the broken path is dead - which is checkable, not guessable: both callers found for
+`func_00143A18` pass a non-empty literal, one of them a `.rodata` symbol.
+
+Worth recording as a hazard when reading any loop here: **the peeled test is not
+part of the loop, so a guard that appears to guard the loop's initialisation is not
+guarding it.**
+
+### Two branch targets in the `.s` files are not where they look
+
+Chasing `func_00143A18` cost an iteration, and the reason is worth writing down.
+`asm/eboot/*.s` places branch targets as `.Leboot_XXXXXXXX` labels, and reading the
+label's position in the file is not the same as reading the target.  Two of the
+five branches in that function target addresses the label placement makes look
+elsewhere:
+
+| branch | `.s` label sits at | real target |
+| --- | --- | --- |
+| `beql $a2, 0` | after the next two instructions | `addiu $a0, $a0, 1` |
+| `beqz $t0` | after the `move $t1` | `jr $ra` |
+
+With the wrong targets the trace said the cursor advanced by two per iteration,
+which is impossible for a string scan.  With the real ones it advances by one.
+`tools/disasm_range.py` disassembles on the fly and prints the displacement, and
+the label name is the address in hex, so both agree - **trust `disasm_range.py` over
+the `.s` file when a branch target matters.**
 
 ### Ending the asm block early steers the C return into the delay slot
 
@@ -742,7 +792,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the one hundred and four that work: if the function has no
+The rule of thumb from the one hundred and six that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -1080,7 +1130,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 104 are done.  Each shape that works yields several functions
+   identified and 106 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
@@ -1098,23 +1148,32 @@ capitalised string is a control name rather than the module.
    **The one function to try next is `func_00143A18`,** and it is left undone on
    purpose because my reading of it does not close.  It is a nested search over two
    byte strings, 72 bytes, four forward branches and two backward ones - exactly
-   the shape that needs block-order decisions.  Two things in it are not yet
-   explained:
+   the shape that needs block-order decisions.  What is settled now:
 
-   * `beqz $t0, done` sits **before** `or $t1, $a0, $zero`, and the return is
-     `subu $v0, $a0, $t1`.  So on the empty-input path `$t1` is still whatever the
-     caller passed.  Either the empty case never happens, or the function relies on
-     `$t1 == $a0` on entry, and I cannot tell which from this function alone.
-   * If the second string is empty the loop cannot advance: `beql` skips the only
-     `addiu $a0, $a0, 1`, and the outer `bnez` sends it straight back.  That reads
-     as an infinite loop, so `b` is presumably never empty - an API precondition
-     the binary does not check.
+   * It has **two callers**, `func_000F1E74` and `func_001165C0`.  The second passes
+     `&sym_001CEA10` - a `.rodata` symbol, so a string literal, so never empty.  That
+     answers the second bullet below for that caller at least.
+   * The `beqz $t0, done` before `or $t1, $a0, $zero` is **not a peculiarity of this
+     function**: `func_0014402C` does the identical thing.  It is a CodeWarrior
+     habit - the loop's first test peeled out above the loop's own setup - and the
+     reading that fits is that no caller passes an empty string.  See *CodeWarrior
+     hoists the first loop test above the loop's own setup*.
+   * Two of its five branch targets are not where the `.s` file's label placement
+     suggests, which is what made the first trace of this function wrong.  With the
+     real targets the cursor advances by one per outer iteration, not two.  See
+     *Two branch targets in the `.s` files are not where they look*.
 
-   Both are real observations about the code rather than puzzles in the
-   transcription, but a 72-byte function with four blocks is not something to guess
-   at.  What would settle it: every call site, which `tools/find_jptables.py` or a
-   scan of `jal func_00143A18` would give, since the callers say whether either
-   string can be empty.
+   What is still unexplained, and is the reason for not transcribing it:
+
+   * After the corrections, the outer loop advances `$a0` by two per iteration but
+     reloads the character from `$a0` *after* both increments - so it examines
+     `a[0]`, `a[2]`, `a[4]`, ... and can read past the terminator.  For a scan whose
+     result is `end - start` that is wrong by construction.  Either the function
+     scans in units of two bytes, or the source is not what the shape suggests, and
+     this function alone cannot say which.
+
+   So the remaining step is not mechanical: someone has to decide what the source
+   was before there is a C that is a decompilation rather than a transcription.
 3. **Float functions are largely cracked.**  Twelve are byte-exact; see *Floats: the
    ten that needed no `.set noreorder`* for the four rules.  What is left of the
    old float problem is only the `lui` + `mtc1` constant idiom, which still needs
