@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 122 (see below) |
-| **C functions that byte-match** | **116** (linked from `src/`) |
+| functions written in C | 127 (see below) |
+| **C functions that byte-match** | **121** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  One hundred and sixteen
+CodeWarrior and only the *register choice* differs.  One hundred and twenty-one
 now byte exact this way:
 
 ```
@@ -198,6 +198,11 @@ func_0007E024  void*           copy one 2-float global into two slots, return se
 func_001241AC  ListHeader*     prev = next = self, count = 0, descriptor set
 func_00124658  Counter*        two zeros then a pointer to a global, return self
 func_0012C2D0  Obj*, u32, u8   constructor that also allocates an id from a global
+func_00143408  u32             one step of a linear congruential generator
+func_000AFE00  s32             step a global object's cursor back by 4, return 0
+func_000D6AFC  void            copy a doubly-indirected global into the argument
+func_00100DC0  s32             compare two 28-bit-masked globals, via a detour
+func_00102A54  void            fill 26 constants at a cursor, then advance it 0x68
 func_00128F50  Elapsed*        start - now
 func_00140A58  u32             flags[index] & 0x07, packed flag bytes
 func_00140A74  u32             ... the same, mask 0x04
@@ -963,7 +968,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the one hundred and sixteen that work: if the function has no
+The rule of thumb from the one hundred and twenty-one that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -1080,6 +1085,65 @@ see the block's four writes to `$f12`.  Loading in the block and reading an
 uninitialised `register float last asm("$f12")` in C is what pins both halves to
 the same register - two instructions, one register, and the block has to end on the
 load for the size to come out right.
+
+### Recognised constants, and the pseudo-ones to leave alone
+
+`func_00143408` is `state = state * 1103515245 + 12345` in thirteen instructions,
+with the mask applied *after* the store.  0x41C64E6D and 0x3039 are the two
+constants from the C standard's own `rand()` example, so this is a linear
+congruential generator and not a hash that happens to use them.
+
+Two details in it are worth writing down because the plausible-looking alternative
+is wrong:
+
+* **Only `mflo` is taken**, so the recurrence is modulo 2^32 and the state keeps all
+  32 bits.  The mask is on the *return*, not on the stored state, so the period is
+  2^32.  The standard's version does `(state >> 16) & 0x7FFFFFFF` instead and keeps a
+  masked state; that is a different generator and would not produce these bytes.
+* **`mult`, not `multu`.**  Same low word either way, so it is the same result - but
+  it says the source treated the state as signed.  Second function in the repository
+  where a `mult` survives because the constant resists strength reduction.
+
+Getting it to match took four attempts, and two of them are worth recording because
+they look like progress:
+
+* `return (s32)(value & 0x7FFFFFFF)` became `ext $v0, %[v], 0, 31`.  Changing the
+  return type to `u32` did **not** help - GCC recognises "clear the sign bit" in
+  both forms.
+* Laundering the constant through an empty asm (`__asm__("" : "+r"(mask))`) stopped
+  the `ext` but made GCC rebuild the mask with `lui` + `ori`, four bytes too long.
+* What worked is reading the mask out of `$v0`, where the block had already built it,
+  as an uninitialised `register u32 mask asm("$v0")`.  The block's own
+  `addiu $v0, %[v], -0x1` is the mask, so the constant is free, the register is
+  right, and the `and` is the only spelling left.
+
+The general lesson is that **hiding a constant from the compiler and reusing one it
+already computed are different tools with different costs.**  The first costs two
+instructions; the second costs none, and it is available whenever the original built
+the constant in a register it still holds.
+
+Two of the same batch are the opposite case - a value that looks like an
+identification and is not.  Four of the constants in `func_00102A54` end in `3F8000`
+and read at a glance as `1.0f`, `-1.0f`, `0.25f` and `-255.0f`.  **They are not
+floats**: their exponent fields are 0xFA, 0x00, 0x06 and 0x0C, and only a value near
+0x7F800000 has a normalised exponent.  Recognising a constant by its hex shape is
+the same failure as naming a function by its address, and it took a decode to catch.
+
+### `slt` versus `sltu` is visible in the bytes
+
+`func_00100DC0` ends in `slt $v0, $v0, $a0`, and with both operands `u32` GCC emits
+`sltu`.  It is not a cosmetic difference: the left operand is a global loaded
+unchanged while the right is `limit - (second - first)`, which is negative exactly
+when the function is about to return true.  The unsigned form would answer the
+opposite question.
+
+The same function is the clearest example so far of **an arithmetic detour that has
+to be transcribed rather than simplified**.  Its last four instructions compute
+`limit - (second - first)` and ask whether `limit` is less than that, which - while
+nothing overflows - is exactly `first > second`.  Written as `first > second` in C
+the function is one instruction instead of four, correct, and nowhere near the
+original bytes.  So the C says `bound < delta`, and the identity is a note about the
+code rather than a replacement for it.
 
 ### A field that overlaps a word: `func_0012C2D0`
 
@@ -1378,7 +1442,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 116 are done.  Each shape that works yields several functions
+   identified and 121 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
