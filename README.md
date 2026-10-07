@@ -13,7 +13,7 @@ relative.
 | code | **507,673 / 507,673 instructions identical** |
 | functions recovered | 7,497 |
 | relocations recovered | 66,503 / 66,503 |
-| C functions byte-exact and hand written | 68 |
+| C functions byte-exact and hand written | 99 |
 
 The engine is Maxis' "Elem", the shared engine also used by *The Sims 3* — the
 build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
@@ -23,7 +23,7 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 | directory | |
 | --- | --- |
 | `asm/` | one `.s` per function, as splat produced them.  Assembling and linking this reproduces the original exactly.  Recovered material — see [Legal](#legal). |
-| `src/eboot/` | the hand written decompilation: what each function does, in C.  68 of these are verified to compile to the original bytes.  Recovered material — see [Legal](#legal). |
+| `src/eboot/` | the hand written decompilation: what each function does, in C.  99 of these are verified to compile to the original bytes.  Recovered material — see [Legal](#legal). |
 | `include/` | the shared types: `f32`, `Vec3f`, and the object layouts the early functions reveal. |
 | `tools/` | everything that produced the above, and the checks that keep it honest.  MIT licensed. |
 | `config/` | the recovered symbol map, the relocation map, and hand recovered names. |
@@ -35,11 +35,31 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 **The assembly is byte-exact and complete.**  `asm/` reproduces every byte of
 the module image.  That part is finished and has been for some time.
 
-**The C is the readable layer, and it is partial.**  68 of 7,497 functions.  The
+**The C is the readable layer, and it is partial.**  99 of 7,497 functions.  The
 original was built with CodeWarrior for PSP (`mwccpsp.exe`), and psp-gcc does
 not reproduce its instruction selection.  Reaching byte-exact C for *all* 7,497
-needs that proprietary compiler; 68 were reached without it, by pinning the
+needs that proprietary compiler; 99 were reached without it, by pinning the
 handful of registers and delay slots where the two compilers disagree.
+
+What those 99 have in common is that the disagreement is small enough to name.
+Both compilers emit the same *instructions* and differ over which register is the
+destination, or when a value is loaded, so pinning the registers makes them agree.
+The pinning is deliberately narrow: an inline `asm` block over the two or three
+instructions that differ, with the rest left to C, so the source still says what
+the function does.
+
+Two results from that work are worth knowing before reading the C:
+
+* **psp-gcc is not a weaker compiler, it is a differently opinionated one.**  It
+  rewrites expressions into fewer instructions than CodeWarrior does: `(link + 1)
+  & ~1` becomes a single Allegrex `ins`, and `~(limit - 1)` becomes a single
+  `negu`.  Byte-exactness is as much about stopping its optimisations as about
+  fixing its register choices.
+* **Branches work.**  Whether any conditional at all could be reproduced was open
+  for a while; `func_000E8EA8` settles it.  Twenty-four instructions, a real
+  `bgez`, a `mult` and a branch-free round-towards-zero divide, matched on the
+  first attempt.  Loops, and conditionals where one side is longer than a few
+  instructions, are still untested.
 
 A generator can emit all 7,497 function bodies as verbatim assembly inside C
 files and does verify 7,497/7,497 — but that is a transcription, not a
@@ -133,7 +153,26 @@ after the last one were shifted by four.  Both checks are in the pipeline.
 ## Status
 
 `progress.md` is the authority, and it is kept honest — including the parts that
-did not work, and why.  The open items are the floating point functions (whose
-`lui`/`mtc1` constant idiom is the hardest CodeWarrior habit to reproduce), block
-layout in functions with branches, and recovering the controller class names
-from the type descriptors at `0x001DB014`.
+did not work, and why.  It also records every rule worked out for pinning the two
+compilers together, so the `src/eboot/*.c` files can be read against the reasons
+rather than as magic.
+
+What is open now:
+
+* **Loops, and conditionals where one side is longer than a few instructions.**
+  The easy branch kind is solved; block order is not, because there is nothing
+  left to pin once the compiler has a real choice to make.
+* **The `lui`/`mtc1` float-constant idiom**, the last piece of the CodeWarrior
+  floating-point habits psp-gcc does not share.  Twelve other float functions are
+  done.
+* **Recovering the controller class names** from the type descriptors at
+  `0x001DB014`, and the packed flag bytes at `0x001E1B98`.
+* **Naming the rest of the module.**  3,754 string literals and 320 static
+  constructors are mapped; roughly 185 constructors still touch nothing but the
+  shared runtime and have no name.
+
+Two tools are worth pointing at.  `tools/setup.py` reports which of the two inputs
+this repository deliberately omits a given clone is missing.  `tools/delay_slots.py`
+groups all 7,503 functions by the instruction in the return's delay slot, which
+doubles as a census of how much stack 5,788 of them need — without reading a single
+instruction of their bodies.

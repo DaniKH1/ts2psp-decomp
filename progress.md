@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 101 (see below) |
-| **C functions that byte-match** | **95** (linked from `src/`) |
+| functions written in C | 105 (see below) |
+| **C functions that byte-match** | **99** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  Ninety-five functions are
+CodeWarrior and only the *register choice* differs.  Ninety-nine functions are
 now byte exact this way:
 
 ```
@@ -179,6 +179,10 @@ func_0009D5BC  void*, u32, f32  ... the same, two floats at +0xA0 and +0xA4
 func_00097B54  void*, u32       &items[index], 168-byte stride at offset 0x88
 func_000E9BB8  const u8*        little-endian 32-bit read, four lbu and no lw
 func_000F8F88  T*, u32          store, set a flag word, return 0
+func_000E8EA8  u32, u32         tent weight: y + (x-128)*(128-|y-128|)/128
+func_0012EB30  u32             &entry[i], 164-byte stride, array at 0x1DEE08
+func_00049C50  u32             &entry[i], 2304-byte stride, two-part base
+func_00049C7C  u32             ... the same, plus 0x808 on the result
 func_00128F50  Elapsed*        start - now
 func_00140A58  u32             flags[index] & 0x07, packed flag bytes
 func_00140A74  u32             ... the same, mask 0x04
@@ -226,6 +230,52 @@ rather than a workaround:
 
 The C still says what the function means; the asm pins the instructions both
 compilers already agree on.
+
+### Branches work: `noreturn` plus a scoped `noreorder`
+
+`func_000E8EA8` is the tent-weight routine
+`arg1 + (arg0 - 128) * (128 - abs(arg1 - 128)) / 128`, 24 instructions, and it is
+**the first function here with a branch that is not trivial**.  It matched on the
+first attempt, which settles the question the work list had open.
+
+Two things make it work:
+
+* **`__attribute__((noreturn))` on the function.**  The body is one asm block that
+  ends with `jr $ra`; without `noreturn`, GCC appends a second return after the
+  block.  It is a lie about control flow - the function does return - but it only
+  affects codegen, and `__builtin_unreachable()` at the end keeps the C
+  well-formed.  This is the one piece of machinery in the whole project that is
+  ugly on purpose, and it is what buys control of both the branch and the slot.
+* **`.set noreorder` scoped to exactly the block**, ending with `.set reorder`.
+  Any wider and GCC loses the delay slot; any narrower and the assembler inserts a
+  hazard `nop`.
+
+The branch itself is the *easy* kind, and this function is a clean illustration of
+what makes it easy: `bgez` with `sra $a2, $a2, 16` in its delay slot - which **both**
+paths need - and the three instructions it skips are only the `negu` and its
+sign-extension for the negative case.  Both paths rejoin at the `ori` one
+instruction later.  There is exactly one place they could meet and they meet there.
+
+What is still untested is the *other* kind: a loop, or a conditional where one side
+is more than a few instructions, because then the compiler has to choose block
+order and there is nothing left to pin.
+
+### `srl` as a branch-free sign test
+
+`func_000E8EA8` divides by 128 with rounding towards zero and does it in three
+instructions with no second branch:
+
+```
+sra  $a2, $a0, 7      >> 7, which rounds towards -infinity
+srl  $a2, $a2, 25     the sign, which sat in bit 31, lands in bit 6: 0 or 1
+addu $a0, $a0, $a2    adding 1 only when negative rounds the other way
+sra  $a0, $a0, 7
+```
+
+So `a / 128` and `(a + (a < 0)) / 128` are the same value, written without a
+comparison.  Worth knowing because it is the shape C compilers reach for when they
+are told to keep division by a power of two, and it means "did the source divide,
+or did it add a bias first" is not answerable from the assembly.
 
 ### Ending the asm block early steers the C return into the delay slot
 
@@ -603,7 +653,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the ninety-five that work: if the function has no
+The rule of thumb from the ninety-nine that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -939,7 +989,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 95 are done.  Each shape that works yields several functions
+   identified and 99 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
@@ -950,18 +1000,14 @@ capitalised string is a control name rather than the module.
    what it does.  `tools/gen_copy_asm.py` stays as a helper for the sixteen-word
    copies, where the pattern is long enough to be error-prone but still has to be
    understood.
-2. Branches are no longer a blocker, but only the easy kind: a branch whose
-   delay slot holds the only instruction it skips, so both paths rejoin
-   immediately.  Loops and multi-block conditionals are still untested, and
-   those are where block layout will actually matter.
-   **The next function to try is `func_000E8EA8`, and it is the right one.**  It
-   is the reflection/triangle-wave routine
-   `arg1 + (arg0 - 128) * (128 - abs(arg1 - 128)) / 128`, and its only branch is
-   `bgez` skipping three instructions - the `abs` for the negative case - so it is
-   the easy kind, inside 24 instructions that also exercise `mult`, the
-   `sll`/`sra` sign-extension idiom and a `mult`-then-round-to-zero sequence.
-   Everything it needs is already solved individually; nothing about it is new.
-   That makes it the cheapest remaining test of branch layout.
+2. **The easy branch kind is solved**, with `func_000E8EA8` as the proof: 24
+   instructions, a real `bgez`, a `mult`, the `sll`/`sra` sign-extension idiom and
+   a branch-free round-towards-zero divide, all matched on the first attempt.  See
+   *Branches work* above.  **Still untested: loops, and conditionals where one side
+   is longer than a few instructions** - those are the cases where the compiler has
+   to choose a block order and there is nothing left to pin.  A loop is now the
+   obvious next target, and `tools/c_shapes.py --done` has plenty of candidates with
+   a backward branch.
 3. **Float functions are largely cracked.**  Twelve are byte-exact; see *Floats: the
    ten that needed no `.set noreorder`* for the four rules.  What is left of the
    old float problem is only the `lui` + `mtc1` constant idiom, which still needs
