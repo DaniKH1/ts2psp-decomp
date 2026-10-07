@@ -1189,6 +1189,42 @@ branch-likely from a plain `if`, and the empty-needle behaviour needs exactly th
 "skip the increment" shape.  So the loop is written out with `.set noreorder` scoped
 per branch, and the final `subu` is left to C so it lands in the return's delay slot.
 
+### Who uses the vector unit: 32 functions, and the four TUs they live in
+
+`tools/vector_unit.py` is the census.  **32 of the 7,497 functions use the PSP's
+vector coprocessor, 542 vector instructions in all** - about 0.4 % of the module's
+127,000 instructions.  That is small enough to read, so the claim that the renderer and
+the skeleton code use it and nothing else does is checkable rather than a first
+impression.
+
+And the four translation units that own the vector code are the four that kept their
+names in the original link:
+
+| vector instructions | function |
+| --- | --- |
+| 64 | `renderMeshInstances_122C` |
+| 61 | `syncSkeleton_0FDC` |
+| 47 | `drawing_0C04` |
+| 31, 28, 22, 15 | `renderCommon_01B8`, `_0580`, `_1398`, `_1618` |
+| 26, 15, 12, 12 | `syncSkeleton_01EC`, `_21A0`, `_2120`, `_27D0` |
+
+Three of `syncSkeleton_*` and five of `renderCommon_*`, `renderMeshInstances_*`,
+`drawing_*`: **rendering and skeletons, and nothing else.**  That is the answer to the
+question the two transcribed functions raised, and it is the same answer the survivor
+names give for everything else - the parts worth naming are the parts worth naming
+because somebody outside the file used them.
+
+**The opcodes say what it is being used for, and it is not matrix multiplication
+alone.**  `vrsq.s` appears eight times - reciprocal square root, which is distance
+attenuation in a lighting calculation, four vertices at a time.  That is the reason to
+want a vector unit at all, and it is only worth having if you are shading a lot per
+frame.  `svl.q` and `svr.q`, the swapped load and store, are how the unit transposes,
+five of each, and `vmmul.q` appears six times, so matrices are being multiplied and the
+transposes are for that.  `vscl.t`, `vmul.t` and `vadd.t` together account for 55 uses:
+the `.t` suffix reads through the transpose file, which is what lets one prepared
+operand feed several separate operations, as the two transcribed `syncSkeleton`
+functions do.
+
 ### The vector unit, and the register names gas will and will not take
 
 `syncSkeleton_27D0` and `syncSkeleton_2808` are the first code in the project that

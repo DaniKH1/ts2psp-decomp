@@ -78,6 +78,16 @@ Three results from that work are worth knowing before reading the C:
   set of four — 1, 3, 4 and 5, with 5 the common one (`tools/abort_codes.py`) — and
   handlers nest: an abort with nothing installed is forwarded to the enclosing one.
   **Read the callers as error checks, not as ordinary calls.**
+* **The vector coprocessor is used by 32 functions and nothing outside rendering and
+  skeletons.**  `tools/vector_unit.py` is the census: 542 vector instructions in all,
+  the largest users being `renderMeshInstances_122C`, `syncSkeleton_0FDC`,
+  `drawing_0C04` and four functions in `renderCommon`.  Eight uses of `vrsq.s` are
+  reciprocal square roots — distance attenuation in a lighting calculation, four
+  vertices at a time — and `svl.q`/`svr.q` plus six `vmmul.q` say matrices are being
+  transposed and multiplied.  These functions have **no C spelling at all**:
+  psp-gcc has no `float4` and no operator that lowers to `lv.q`, so
+  `src/eboot/syncSkeleton_27D0.c` and `_2808.c` are the machine code with the
+  decompilation in the comment, and that departure is recorded rather than disguised.
 * **The one genuinely ugly piece** is `__attribute__((noreturn))` on a function
   that does return.  It is a lie about control flow that only affects codegen, and
   it does two jobs: it stops GCC appending a return after a hand-written block, and
