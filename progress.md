@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 84 (see below) |
-| **C functions that byte-match** | **78** (linked from `src/`) |
+| functions written in C | 90 (see below) |
+| **C functions that byte-match** | **84** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  Seventy-eight functions are
+CodeWarrior and only the *register choice* differs.  Eighty-four functions are
 now byte exact this way:
 
 ```
@@ -162,6 +162,12 @@ func_000E3C4C  T*, f32         store a float, set the "present" flag byte
 func_000E3C5C  T*, f32         ... the same, field at 0x54
 func_000A9E90  T*              clear two words, return self
 func_0012F854  T*              ... the same, adjacent words
+func_00026BB0  T*, Pair*       gather two scattered floats, subtract, store a pair
+func_000CDE98  T*, u32         items[count++] = value, count stored before the item
+func_0012828C  T*, u32, u32    round down to 32, keep the relation to the delta
+func_0012C954  u32, u32        ... the same, writing the global at 0x647D0
+func_00058FD4  T*              (link + 1) & ~1 - round up to even
+func_001AF15C  u32, u32        value & ~(limit - 1) - the alignment primitive
 func_00128F50  Elapsed*        start - now
 func_00140A58  u32             flags[index] & 0x07, packed flag bytes
 func_00140A74  u32             ... the same, mask 0x04
@@ -209,6 +215,54 @@ rather than a workaround:
 
 The C still says what the function means; the asm pins the instructions both
 compilers already agree on.
+
+### GCC rewrites the code rather than just re-registering it
+
+Six of the sixteen functions that followed the float work turned out to need
+something the existing rules did not cover: psp-gcc **optimises the expression
+away**.  Each of these produces the right value with fewer instructions, and in
+each case the original has the longer form.
+
+| function | written as | GCC emits | original |
+| --- | --- | --- | --- |
+| `func_00058FD4` | `(link + 1) & ~1u` | `ins $v0, $zero, 0, 1` | `addiu` then `and` |
+| `func_001AF15C` | `value & ~(limit - 1)` | `negu $a1, $a1` | `addiu -1` then `not` |
+| `func_0012828C` | `2*n + delta - aligned` | keeps the subtraction | three instructions |
+
+`ins` is the sharpest of these.  It is an Allegrex-only bitfield instruction and
+`addiu`+`and` is the portable two-instruction form of the same thing, so GCC is
+using a target-specific instruction to beat a compiler that predates the
+instruction set.  **psp-gcc is not a weaker compiler here; it is a differently
+opinionated one**, and byte-exactness is as much about stopping its optimisations
+as about fixing its register choices.
+
+Two consequences worth knowing:
+
+* **Operand order of `and` is not negotiable through C.**  GCC normalises it:
+  `a & b` and `b & a` both compile with the same operand on the left.  When the
+  original has `$a0` first, the `and` has to be written in asm - no rearrangement
+  of the source will do it.
+* **Putting the last instruction in asm means GCC must fill the delay slot, and
+  it duplicates the instruction.**  That is only correct because `and` is
+  idempotent - `x & y & y == x & y`.  A function whose final instruction had a
+  side effect could not be written this way at all, so this trick is narrower than
+  it looks.
+
+### A shared idiom, found three times
+
+`func_001AF15C` (limit as an argument), `func_0012828C` (the `0x1F`/`-0x20` pair
+with the limit as an immediate) and `func_00058FD4` (round up to even) are one
+operation - "align a value to a granularity" - with the granularity supplied
+three different ways.  That makes it the engine's alignment primitive, and it
+explains the `not`/`-0x20` mask idiom: `andi` takes a **zero-extended** 16-bit
+immediate, so `andi $reg, 0xFFFE` would clear the upper sixteen bits as well and
+give the wrong answer for any address above 64 KB.  `addiu` sign-extends, so it is
+the only way to build these masks.
+
+`func_0012C954` is the same round-down writing to a **global at `0x647D0`**, and
+it is why that idiom is worth naming: `lui $a3, 0x6` with a `0x47D0` displacement
+is the engine reaching for a fixed location directly, with no register holding
+anything derived from an argument.
 
 ### Floats: the ten that needed no `.set noreorder` at all
 
@@ -423,7 +477,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the seventy-eight that work: if the function has no
+The rule of thumb from the eighty-four that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -759,7 +813,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 78 are done.  Each shape that works yields several functions
+   identified and 84 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
@@ -774,7 +828,7 @@ capitalised string is a control name rather than the module.
    delay slot holds the only instruction it skips, so both paths rejoin
    immediately.  Loops and multi-block conditionals are still untested, and
    those are where block layout will actually matter.
-3. **Float functions are largely cracked.**  Ten are byte-exact; see *Floats: the
+3. **Float functions are largely cracked.**  Twelve are byte-exact; see *Floats: the
    ten that needed no `.set noreorder`* for the four rules.  What is left of the
    old float problem is only the `lui` + `mtc1` constant idiom, which still needs
    `.set noreorder`.  The next float work should be arithmetic that returns into
