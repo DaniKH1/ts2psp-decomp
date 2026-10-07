@@ -9,6 +9,11 @@ ref/
 .splache
 __pycache__/
 
+# Editor and agent session state, not part of the decompilation.
+.opencode/
+.vscode/
+.idea/
+
 # Third-party tools are downloaded by tools/setup.py rather than committed:
 # the psp-gcc toolchain alone is 125 MB, and redistributing a compiler build
 # is not this repository's business.  progress.md records where each one comes
