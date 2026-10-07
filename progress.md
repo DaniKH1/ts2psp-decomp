@@ -368,6 +368,52 @@ function that caused it instead of as half a million differing bytes.  Its negat
 test is in the commit: breaking `func_0009C260` on purpose makes it report
 `recorded 0x20, symbol 0x18`.
 
+### The PSP import table: 223 empty stubs and a table nobody can read yet
+
+`.rodata.sceNid` has been on the work list as "read it for the import list and name
+the PSP API stubs".  Read.  The finding replaces an assumption:
+
+**Every stub is empty.**  All 223 of them, across 26 `.sceStub.text.*` sections,
+are exactly:
+
+```
+0x001b0128: jr    $ra
+0x001b012c: nop
+```
+
+`tools/nid_table.py` checks all 223 rather than trusting the pattern.  That is not a
+stripped-out call and not a dead import - it is a PSPLINK module *before loading*.
+The loader matches each entry of `.rodata.sceNid` against the NIDs of the loaded
+libraries and patches the corresponding stub with the real address, so in the file
+on disc each one is a placeholder that returns immediately.
+
+So the stub **code** carries nothing, and the only thing the sections give is the
+library names, which are already in the section names.  What is genuinely new is the
+correspondence, which the tool records: stub index, address, library, and the NID
+words.  26 libraries, biggest first:
+
+| library | stubs | library | stubs |
+| --- | --- | --- | --- |
+| ThreadManForUser | 29 | UtilsForUser | 7 |
+| sceMpeg | 27 | SysMemUserForUser | 7 |
+| sceSasCore | 19 | ModuleMgrForUser | 7 |
+| sceUtility | 16 | sceNetAdhocMatching | 9 |
+| IoFileMgrForUser | 13 | sceNetAdhocctl | 9 |
+| sceAtrac3plus | 11 | sceAudio | 9 |
+| sceGe_user | 10 | sceLibFont | 9 |
+
+**The entry size of `.rodata.sceNid` is unresolved and the tool says so.**  223
+stubs, 892 bytes, 223 32-bit words - so one word per stub divides exactly, while a
+PSP NID is 64 bits and would give 111 entries plus four bytes over.  The obvious
+test does not settle it: PSP NIDs have their top bit set, and neither reading
+satisfies that (103 of 223, or 53 of 111 - about half either way, so the
+assumption about the top bit is wrong, not the layout).
+
+Naming the individual imports needs an external NID-to-name table.  This project
+does not have one, and filling in 223 names from memory is exactly the kind of
+confident guess that has no place here.  `nid_table.py --words 2` reads the table as
+64-bit NIDs for whoever wants to match one.
+
 ### CodeWarrior hoists the first loop test above the loop's own setup
 
 `func_0014402C` is a `strlen`.  What is odd about it is the order:
@@ -922,6 +968,7 @@ tools/setup.py               report which of the two this clone is missing
 tools/delay_slots.py         group functions by what sits in the return's slot
 tools/find_loops.py          find the functions with a backward branch, smallest first
 tools/check_symbols.py       every C-linked function reports the size it should
+tools/nid_table.py           the PSP import table: stubs, libraries, NID words
 ```
 
 ```
@@ -1195,6 +1242,11 @@ capitalised string is a control name rather than the module.
    three accessors at `0x001DB014`, `0x001DB050` and `0x001DB0AC` are the
    start of this, and the controllers that register `Start` and
    `ActiveController` should key off them.
-8. Read `.rodata.sceNid` for the import list and name the PSP API stubs.
+8. ~~Read `.rodata.sceNid` for the import list and name the PSP API stubs.~~
+   **Done, and the answer is that it cannot be finished from this side.**  All 223
+   stubs are empty `jr $ra` placeholders patched at load time; the tool records the
+   index/address/library/NID correspondence so far; naming the individual imports
+   needs an external NID table this project does not have.  See *The PSP import
+   table* above.
 9. Name the 185 constructors that only touch the shared runtime, using the
    functions they call.

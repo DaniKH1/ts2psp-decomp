@@ -187,6 +187,12 @@ What is open now:
 * **Naming the rest of the module.**  3,754 string literals and 320 static
   constructors are mapped; roughly 185 constructors still touch nothing but the
   shared runtime and have no name.
+* **The 223 PSP imports have no names and cannot get them from here.**  Every stub
+  in the 26 `.sceStub.text.*` sections is an empty `jr $ra` placeholder that the
+  loader patches at load time, so the code carries nothing and `.rodata.sceNid`
+  cannot be interpreted with confidence from the binary alone.
+  `tools/nid_table.py` records the index/address/library/NID correspondence for
+  whoever wants to match it against a NID table.
 
 Two tools are worth pointing at.  `tools/setup.py` reports which of the two inputs
 this repository deliberately omits a given clone is missing.  `tools/delay_slots.py`
