@@ -1,0 +1,28 @@
+# Build artefacts
+build/
+iso/
+ref/
+*.o
+*.elf
+*.dec
+.ninja_log
+.splache
+__pycache__/
+
+# Third-party tools are downloaded by tools/setup.py rather than committed:
+# the psp-gcc toolchain alone is 125 MB, and redistributing a compiler build
+# is not this repository's business.  progress.md records where each one comes
+# from.
+bin/
+
+# The decrypted executable and the source disc stay out of git: they are Maxis
+# and EA material, and are re-derived from a disc image the user supplies
+# themselves (see tools/setup.py and progress.md).
+disks/*
+!disks/.gitkeep
+
+# The source disc itself.  It is 1 GB of Maxis/EA data and must never be
+# committed - it was, once, which is why this repository's history was squashed
+# when the project moved to its public home.
+*.iso
+*.bin

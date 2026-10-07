@@ -1,0 +1,6 @@
+# The decrypted EBOOT lands here, and stays out of git.
+
+`tools/setup.py` writes `pgs-si2/EBOOT.dec` into this directory after it
+decrypts the executable out of the disc image.  Both the disc and the decrypted
+executable are Maxis/EA material, so neither is committed; see `.gitignore` and
+the *What the module is* section of `progress.md`.
