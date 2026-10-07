@@ -18,6 +18,15 @@ are resolved here and every tool asks this module instead of guessing.
 The first two fall back to their in-tree location, so a working copy that *does*
 have them in place needs no environment at all.  `tools/setup.py` reports what
 is missing.
+
+If exporting variables is inconvenient, an optional `local_paths.txt` at the
+repository root does the same job and is gitignored:
+
+    # local_paths.txt - this machine only, not committed
+    TS2PSP_ELF=D:/decomp/disks/pgs-si2/EBOOT.dec
+    TS2PSP_PSPDEV=D:/decomp/bin/pspdev/bin
+
+Blank lines and `#` comments are ignored.  The environment wins over the file.
 """
 from __future__ import annotations
 
@@ -27,14 +36,32 @@ from pathlib import Path
 # Repository root, i.e. the parent of `tools/`.
 ROOT = Path(__file__).resolve().parent.parent
 
+LOCAL_PATHS_FILE = ROOT / "local_paths.txt"
+
+
+def _from_file(name: str) -> str | None:
+    """Read one `NAME=value` line out of `local_paths.txt`, if it is there."""
+    try:
+        text = LOCAL_PATHS_FILE.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        key, sep, value = line.partition("=")
+        if sep and key.strip() == name:
+            return value.strip()
+    return None
+
 
 def _resolve(env_var: str, default: Path) -> Path:
-    """An environment override if one is set, otherwise the in-tree default.
+    """Where one input lives: environment, then `local_paths.txt`, then default.
 
     Resolved to an absolute path so the result does not depend on the working
     directory a tool happens to be invoked from.
     """
-    value = os.environ.get(env_var)
+    value = os.environ.get(env_var) or _from_file(env_var)
     return Path(value).resolve() if value else default
 
 

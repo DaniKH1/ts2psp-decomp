@@ -1,4 +1,4 @@
-# The Sims 2 PSP - decompilation
+﻿# The Sims 2 PSP - decompilation
 
 Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 `disks/pgs-si2/EBOOT.dec`.
@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 74 (see below) |
-| **C functions that byte-match** | **68** (linked from `src/`) |
+| functions written in C | 84 (see below) |
+| **C functions that byte-match** | **78** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  Sixty-eight functions are
+CodeWarrior and only the *register choice* differs.  Seventy-eight functions are
 now byte exact this way:
 
 ```
@@ -152,6 +152,16 @@ func_00123538  Node*, Node*    exchange two doubly linked list nodes
 func_00123560  Node*, Node*    ... the same exchange, second entry point
 func_001A9C40  T*, Vec3f*      install a vector, set flag bit 7
 func_001A9C6C  T*, Vec3f*      ... the same, field at a different offset
+func_0009C384  T*, f32         self->field += delta, accumulator in $f12
+func_0009C394  T*, f32         ... the same, next field
+func_000CE4DC  T*              return field 0xDC - field 0xD4
+func_000CE4EC  T*              ... the same, right operand at 0xD8
+func_000DF534  void*, V3f*, V3f*  copy a vector, $a0 unused
+func_000DF550  void*, V3f*, V3f*  ... the same, emitted twice by CodeWarrior
+func_000E3C4C  T*, f32         store a float, set the "present" flag byte
+func_000E3C5C  T*, f32         ... the same, field at 0x54
+func_000A9E90  T*              clear two words, return self
+func_0012F854  T*              ... the same, adjacent words
 func_00128F50  Elapsed*        start - now
 func_00140A58  u32             flags[index] & 0x07, packed flag bytes
 func_00140A74  u32             ... the same, mask 0x04
@@ -199,6 +209,35 @@ rather than a workaround:
 
 The C still says what the function means; the asm pins the instructions both
 compilers already agree on.
+
+### Floats: the ten that needed no `.set noreorder` at all
+
+The float functions were the open item for a long time, on the grounds that
+CodeWarrior's FP habits were the hardest to reproduce.  Ten of them are now
+byte-exact, and the useful finding is that **most needed nothing exotic** - the
+disagreement is confined to which register is the destination, and four rules
+cover it:
+
+* **Name the float register as `$f12`, not as `12`.**  `register f32 x asm("12")`
+  is accepted and silently ignored; `asm("$f12")` is honoured.  GCC's own choice
+  of `$f0` as the destination of the operation is not something a binding will
+  change either way, so the destination usually has to be named in the asm text.
+* **A binding is only binding where GCC has no choice.**  `asm("$f0")` on a
+  returned float works because `$f0` is the ABI's return register; the same
+  binding on a second operand does not, because GCC treats `$f12` as free and
+  picks `$f1` as its scratch instead.
+* **Declare the asm's scratch as an earlyclobber output to reuse its register.**
+  `register f32 c asm("$f12"); ... : [c] "=&f"(c)` tells GCC the value is already
+  there, so the C store that follows uses `$f12` instead of reloading into `$f0`.
+  Without it `func_000DF534` comes out four bytes too long.
+* **Where the arithmetic is genuinely different, say so.**  `func_0009C384` is
+  `self->field += delta`; GCC wants `add.s $f0, $f0, $f12` with the destination in
+  the load's register, and CodeWarrior wants `add.s $f12, $f13, $f12` with the
+  accumulator staying in the argument register.  No binding moves GCC off that,
+  so the two instructions go in asm and the store stays in C.
+
+The float functions where the *constant* is the problem - the `lui` + `mtc1` pair -
+are a separate problem and still need `.set noreorder`; see below.
 
 ### Floats: `.set noreorder` is the missing piece
 
@@ -384,7 +423,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the sixty-eight that work: if the function has no
+The rule of thumb from the seventy-eight that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -413,6 +452,43 @@ Two rules, both from GCC rejecting the obvious form:
 
   So the division is: registers that carry a value across the block get a
   variable, registers the asm only scratches with go in the clobber list.
+
+### An argument the function does not use
+
+`func_000DF534` never reads `$a0`: it copies from `$a2` to `$a1` and leaves the
+first argument slot alone.  Declared as the obvious `f(Vec3f *, Vec3f *)` the
+destination lands in `$a0`, and pinning it back with `register ... asm("$a1")`
+makes GCC emit two `move`s to get there - which the original does not have.
+
+The fix is to declare the argument the original had and does not use:
+
+```c
+void func_000DF534(void *unused, Vec3f *dst, Vec3f *src)
+```
+
+with both pointers as plain `"r"` inputs, no bindings at all.  This is what a
+deleted parameter looks like from the outside: registers are assigned
+positionally, so an argument the body no longer needs still consumes its slot.
+**A register the original never reads is evidence about the source, not noise** -
+it means the source had a parameter here that has since been optimised away, and
+`func_000DF534`/`func_000DF550` being byte-identical suggests whatever split
+produced them is still visible in the original.
+
+### Returning `this` needs the pointer on a `register` variable
+
+`or $v0, $a0, $zero` in a return's delay slot - 99 functions end that way, and
+the recipe was already worked out for `func_00052604` before it was needed again:
+
+* the stores go in asm, because plain C makes GCC hoist the copy above them -
+  `$v0` is not live across the stores, so nothing forces it to wait;
+* the pointer is a **separate** `register ... asm("$a0")` variable, not the
+  parameter itself, which GCC is free to re-allocate to `$a1`;
+* it is the asm's output as well as its input (`"+r"`), so the value already in
+  `$a0` counts as the result and GCC emits no second copy.
+
+Getting there by trial and error wastes a build cycle per attempt: the answer was
+sitting in `src/eboot/func_00052604.c` the whole time.  `tools/delay_slots.py`
+lists the group.
 
 ### One `ori` feeding two stores
 
@@ -474,6 +550,7 @@ tools/c_shapes.py             group the simple functions by instruction sequence
 tools/gen_copy_asm.py        emit the asm for a long interleaved load/store copy
 tools/paths.py               where the module image and the toolchain live
 tools/setup.py               report which of the two this clone is missing
+tools/delay_slots.py         group functions by what sits in the return's slot
 ```
 
 ```
@@ -488,6 +565,38 @@ python tools/setup.py --check        # is this clone ready to build?
 
 `tools/build.py --diff` relinks before comparing, which would undo the segment
 padding, so the pipeline compares with `--stats` after `fix_segments`.
+
+### Grouping by delay slot, and the stack census it turned up
+
+`tools/delay_slots.py` groups all 7,503 functions by the instruction in the return's
+delay slot.  The expectation was a work list; what it produced is mostly
+information nobody had.
+
+The delay slot is the last instruction of the function, so it is where psp-gcc and
+CodeWarrior disagree most - scheduling into a slot is a choice, not a
+requirement.  That part is a to-do list: 99 functions end in `or $v0, $a0, $zero`
+("return `this`"), 128 in `or $v0, $zero, $zero` ("return 0"), and 662 leave it as
+a `nop`.
+
+The rest is a **census of how much stack each function needs**, for 5,788 functions
+nobody has disassembled by hand.  They teardown a frame in their delay slot, the
+frame size is the key, and there are 88 distinct sizes:
+
+| delay slot | count | frame |
+| --- | --- | --- |
+| `addiu $sp, $sp, 0x20` | 2,955 | 32 bytes |
+| `addiu $sp, $sp, 0x30` | 963 | 48 bytes |
+| `addiu $sp, $sp, 0x40` | 521 | 64 bytes |
+| `addiu $sp, $sp, 0x50` | 297 | 80 bytes |
+| `addiu $sp, $sp, 0x10` | 191 | 16 bytes |
+| `addiu $sp, $sp, 0x60` | 142 | 96 bytes |
+
+In the o32 frame layout the bytes are the saved `$ra`, then any saved `$s`
+registers, then spill slots, so the size is a floor on how many values the
+compiler could not keep in registers.  It is obtained without reading a single
+instruction of the body, and it is also a way to find the functions worth reading
+first: a 0x60-byte frame means several values spilled, and spilled values are the
+ones with real logic around them.
 
 ### What the repository does not contain, and how a clone supplies it
 
@@ -650,7 +759,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 68 are done.  Each shape that works yields several functions
+   identified and 78 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
@@ -665,16 +774,27 @@ capitalised string is a control name rather than the module.
    delay slot holds the only instruction it skips, so both paths rejoin
    immediately.  Loops and multi-block conditionals are still untested, and
    those are where block layout will actually matter.
-3. Four functions now read floats out of the type descriptor at `0x001DB014`
+3. **Float functions are largely cracked.**  Ten are byte-exact; see *Floats: the
+   ten that needed no `.set noreorder`* for the four rules.  What is left of the
+   old float problem is only the `lui` + `mtc1` constant idiom, which still needs
+   `.set noreorder`.  The next float work should be arithmetic that returns into
+   `$f0` (`func_0010F7CC` does the divide; a `mul.s` or `sqrt.s` sibling would
+   test the same rules against a different instruction).
+4. Four functions now read floats out of the type descriptor at `0x001DB014`
    (`func_00101D24`, `func_00101D34`, `func_00101D44`), which confirms that
    address is a class descriptor rather than a plain vtable.  Working out what
    its fields mean is the next step towards naming the controller classes.
-4. The packed flag bytes at `0x001E1B98` are worth mapping: the one-bit
+5. The packed flag bytes at `0x001E1B98` are worth mapping: the one-bit
    accessors over them will name the individual booleans.
-3. Recover vtables in `.rodata` and give them `ClassName_methods[]` names.  The
+6. **Use the stack census to choose what to read next.**  `tools/delay_slots.py`
+   says 5,788 functions have a frame; the 88 distinct sizes are a free bound on
+   each one's local count.  Starting from the large frames would find the
+   interesting functions far faster than going by address order, which is how the
+   first 78 were found.
+7. Recover vtables in `.rodata` and give them `ClassName_methods[]` names.  The
    three accessors at `0x001DB014`, `0x001DB050` and `0x001DB0AC` are the
    start of this, and the controllers that register `Start` and
    `ActiveController` should key off them.
-4. Read `.rodata.sceNid` for the import list and name the PSP API stubs.
-5. Name the 185 constructors that only touch the shared runtime, using the
+8. Read `.rodata.sceNid` for the import list and name the PSP API stubs.
+9. Name the 185 constructors that only touch the shared runtime, using the
    functions they call.
