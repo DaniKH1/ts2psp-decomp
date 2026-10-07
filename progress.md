@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 96 (see below) |
-| **C functions that byte-match** | **90** (linked from `src/`) |
+| functions written in C | 101 (see below) |
+| **C functions that byte-match** | **95** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  Ninety functions are
+CodeWarrior and only the *register choice* differs.  Ninety-five functions are
 now byte exact this way:
 
 ```
@@ -174,6 +174,11 @@ func_000471C8  T*              constructor: status -2, points at 0x1E52A0
 func_00127868  T*, u32, u32    constructor: three self-referential pointer pairs
 func_000E9D3C  u32             interpolate a 16-bit table at 0x1DA398
 func_0014CE0C  u32 x4          64-bit weighted sum, no carry propagation
+func_0009D658  void*, u32, u32 advance a 92-byte stride, store a word at +0xB0
+func_0009D5BC  void*, u32, f32  ... the same, two floats at +0xA0 and +0xA4
+func_00097B54  void*, u32       &items[index], 168-byte stride at offset 0x88
+func_000E9BB8  const u8*        little-endian 32-bit read, four lbu and no lw
+func_000F8F88  T*, u32          store, set a flag word, return 0
 func_00128F50  Elapsed*        start - now
 func_00140A58  u32             flags[index] & 0x07, packed flag bytes
 func_00140A74  u32             ... the same, mask 0x04
@@ -222,6 +227,63 @@ rather than a workaround:
 The C still says what the function means; the asm pins the instructions both
 compilers already agree on.
 
+### Ending the asm block early steers the C return into the delay slot
+
+Every function so far ends its asm block one instruction short so GCC will schedule
+the final store into `jr $ra`'s delay slot.  `func_000F8F88` shows the same trick
+works for the *return value* rather than a store, which is the opposite case: the
+block ends before the `move $v0, $zero`, leaving it as the only candidate.
+
+```c
+__asm__ __volatile__(
+    "ori %[one], $zero, 1\n\t"      /* the flag value */
+    "sw  %[one], 0x4(%[self])\n\t"   /* the flag store */
+    "sw  %[val], 0x0(%[self])\n\t"   /* the value store */
+    : [one] "=&r"(one)
+    : [self] "r"(self), [val] "r"(value)
+    : "memory");
+
+return 0;                            /* move $v0, $zero -> the delay slot */
+```
+
+Written as plain C, GCC emits the `move $v0, $zero` *first*, because `$v0` is not
+live across either store and so there is nothing making it wait.  So the rule
+generalises to: **GCC hoists anything it can prove is not live across the block, so
+the way to keep an instruction late is to make it the block's only remaining
+candidate for the slot.**
+
+### Strength reduction: no single recipe, just the fewest shifts
+
+Three functions now carry a hand-strength-reduced multiply, and the constants are
+derived three different ways:
+
+| function | constant | derivation |
+| --- | --- | --- |
+| `func_0009D658` | 92 | `(32i - i) * 4 - 32i` = `31*4 - 32` |
+| `func_0009D5BC` | 92 | the same |
+| `func_00097B54` | 168 | `(64i - 8i) + 2*(64i - 8i)` = `3 * 56` |
+
+Both take four instructions and neither uses `mult`.  92 came out of a subtraction
+because 31 is one below a power of two; 168 came out of a doubling because 56
+divides by three.  There is no general formula to apply - the compiler simply
+picked whichever of shifts and adds was shortest for the number in front of it, so
+the multiplication has to be transcribed per function rather than generated.
+
+### A 32-bit read assembled byte by byte, and why
+
+`func_000E9BB8` reads four bytes as a little-endian `u32` with four `lbu` and three
+shifts, where one `lw` would do.  The reason is not slowness but two constraints a
+`lw` cannot satisfy: it assumes the host's byte order, and it traps on unaligned
+addresses.  A file-format engine reading data other tools wrote cannot rely on
+either.
+
+It is also four loads and three shifts **on a CPU that is itself little-endian**,
+where this sequence and a `lw` produce identical results.  So the source is
+probably not "read a u32" at all - it is assembling a value from parts, and the
+engine's file readers are byte-oriented by design.  Worth following up: if the same
+routine appears with the shifts the other way round, that is a big-endian twin and
+the pair would name the file format's byte order.
+
 ### A register cannot be both an operand and a named hard register
 
 Three errors that all look like the same mistake, and they are worth listing
@@ -234,6 +296,9 @@ together because each one's message points somewhere unhelpful:
 * **An uninitialised hard register cannot be `"+r"`.**  "input operand constraint
   contains `+`".  If the asm writes the register before reading it, the constraint
   is `=&r` (output) or the register is listed as a clobber.
+* **Two hard registers need two variables even when the value is related.**
+  `"+r"(base), "=&r"(base)` for `$a0` and `$v0` gives "invalid hard register usage
+  between output operands" - the constraint is on the *register*, not the value.
 * **A compound literal has no register.**  `(u32){0}` cannot be an output operand
   bound to a hard register; declare a named variable instead.
 
@@ -538,7 +603,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the ninety that work: if the function has no
+The rule of thumb from the ninety-five that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -874,7 +939,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 90 are done.  Each shape that works yields several functions
+   identified and 95 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
@@ -889,6 +954,14 @@ capitalised string is a control name rather than the module.
    delay slot holds the only instruction it skips, so both paths rejoin
    immediately.  Loops and multi-block conditionals are still untested, and
    those are where block layout will actually matter.
+   **The next function to try is `func_000E8EA8`, and it is the right one.**  It
+   is the reflection/triangle-wave routine
+   `arg1 + (arg0 - 128) * (128 - abs(arg1 - 128)) / 128`, and its only branch is
+   `bgez` skipping three instructions - the `abs` for the negative case - so it is
+   the easy kind, inside 24 instructions that also exercise `mult`, the
+   `sll`/`sra` sign-extension idiom and a `mult`-then-round-to-zero sequence.
+   Everything it needs is already solved individually; nothing about it is new.
+   That makes it the cheapest remaining test of branch layout.
 3. **Float functions are largely cracked.**  Twelve are byte-exact; see *Floats: the
    ten that needed no `.set noreorder`* for the four rules.  What is left of the
    old float problem is only the `lui` + `mtc1` constant idiom, which still needs
