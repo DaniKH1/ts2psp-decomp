@@ -134,3 +134,5 @@ func_001A9D54
 func_001A9D80
 func_001A9D94
 func_001AF15C
+syncSkeleton_27D0
+syncSkeleton_2808

@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 139 (see below) |
-| **C functions that byte-match** | **133** (linked from `src/`) |
+| functions written in C | 141 (see below) |
+| **C functions that byte-match** | **135** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  One hundred and thirty-three
+CodeWarrior and only the *register choice* differs.  One hundred and thirty-five
 now byte exact this way:
 
 ```
@@ -215,6 +215,8 @@ func_00143A18  s32             `strstr`, hand-rolled (see the note below)
 func_000A9A00  s32             a field that is set gives 0, clear gives -24
 func_000BBA80  s32             a byte field on a second object, as a boolean
 func_0001270C  s32             sign-extend bit 30 with xor and subu, no branch
+syncSkeleton_27D0  void        vector unit: scale a 3x4 matrix by three scalars
+syncSkeleton_2808  void        vector unit: multiply a 3x4 matrix by a vector
 func_00128F50  Elapsed*        start - now
 func_00140A58  u32             flags[index] & 0x07, packed flag bytes
 func_00140A74  u32             ... the same, mask 0x04
@@ -980,7 +982,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the one hundred and thirty-three that work: if the function has no
+The rule of thumb from the one hundred and thirty-five that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -1186,6 +1188,55 @@ Neither edge case is a transcription error; both are properties of the original.
 branch-likely from a plain `if`, and the empty-needle behaviour needs exactly that
 "skip the increment" shape.  So the loop is written out with `.set noreorder` scoped
 per branch, and the final `subu` is left to C so it lands in the return's delay slot.
+
+### The vector unit, and the register names gas will and will not take
+
+`syncSkeleton_27D0` and `syncSkeleton_2808` are the first code in the project that
+uses the PSP's vector coprocessor, and they are the first files in `src/eboot/` whose
+names came from the original link rather than from a placeholder.
+
+**What they are.**  Three quads of four floats is a 3x4 matrix, sixteen bytes per row.
+`syncSkeleton_27D0` broadcasts three scalars out of `$vfs0`-`$vfs2` with `vscl.t` and
+scales each row; one instruction does four multiplies, so a whole matrix scales in
+three.  `syncSkeleton_2808` is the same fourteen instructions with `vmul.t` against
+`$vf10`.  **That is skinning**, and it is the clearest statement available of what the
+vector unit was put in this console for.
+
+**The register names are spimdisasm's, not gcc's.**  `$vfs0`, `$vf20`, `vfs0` and
+`$vfs00` are all rejected as `invalid operands`.  `S100` and `R200` parse - and then
+fail only on *class*: `lv.s` wants a single register, `lv.q`/`sv.q`/`vscl.t` want a
+quad one.  So the rule is to use the disassembler's spelling and match the class to the
+mnemonic.  Finding that took a sweep of nine candidate spellings, which is worth
+recording because guessing at one per build cycle is how the previous two attempts
+went.
+
+**gcc cannot name the vector file at all** - `"$vfs0"` is rejected as a clobber - so
+the blocks declare no clobbers and no operands.  That is only safe because the block is
+the entire function.  A function with real code around a vector operation would have no
+way to tell the compiler what it touches, which is a structural limit and not a trick.
+
+**And the delay-slot rule inverts under `noreorder`.**  With `reorder` on, gas fills the
+return's delay slot by moving the preceding store across the branch, giving 52 bytes.
+With `noreorder` it neither fills nor inserts one, so the `nop` has to be written out
+explicitly or the symbol comes out 52 bytes the other way.  **Under `reorder` the slot
+must not be written; under `noreorder` it must be** - opposite rules, four bytes apart,
+and both were confirmed by `try_func.py` reporting `MATCH` at the wrong size before
+`check_symbols.py` caught it.
+
+That last point deserves its own note: `try_func.py` printed `MATCH: 0 differing words`
+on a function that was four bytes short.  It compares the overlapping region and says
+nothing about length.  **`verify_c.py`'s size check is the one that catches this**, and
+it must not be relaxed - the same conclusion as the delay-slot landmine, reached from a
+new direction.
+
+**Why these two are asm rather than C.**  psp-gcc has no vector types on Allegrex:
+there is no `float4` and no operator that lowers to `lv.q` or `vscl.t`, so there is no
+C spelling of the function at all.  Unlike the rest of the directory the body here *is*
+the machine code, and the comment above it is the decompilation.  That is recorded
+rather than disguised, and it is why `syncSkeleton_2808` keeps three `lv.s` loads whose
+results nothing reads - dropping them would give the same behaviour and the wrong
+bytes, and would hide the fact that the function is not self-contained: `$vf10` holds
+the operand and the caller must have left it there.
 
 ### `movz` is the answer to most conditionals, and that is the problem
 
@@ -1859,7 +1910,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 133 are done.  Each shape that works yields several functions
+   identified and 135 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
