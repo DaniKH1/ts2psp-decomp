@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 115 (see below) |
-| **C functions that byte-match** | **109** (linked from `src/`) |
+| functions written in C | 118 (see below) |
+| **C functions that byte-match** | **112** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  One hundred and nine
+CodeWarrior and only the *register choice* differs.  One hundred and twelve
 now byte exact this way:
 
 ```
@@ -191,6 +191,9 @@ func_00049C7C  u32             ... the same, plus 0x808 on the result
 func_00049BC4  u32             &entry[i], 140264-byte stride, a real `mult`
 func_00049B3C  u32             ... the same, a field 0x2000 further on
 func_0018DDAC  void*, Link*    unlink a node: -2 and a pointer to a global
+func_0002D630  Handle*        set the descriptor to 0x1E4988, return the object
+func_000FE624  void            zero four words at 0x28..0x3C of the global 0x61A18
+func_000FFBE8  void            ... and set two floats at 0xEC and 0xF0 of it
 func_00128F50  Elapsed*        start - now
 func_00140A58  u32             flags[index] & 0x07, packed flag bytes
 func_00140A74  u32             ... the same, mask 0x04
@@ -956,7 +959,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the one hundred and nine that work: if the function has no
+The rule of thumb from the one hundred and twelve that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -1022,6 +1025,31 @@ the recipe was already worked out for `func_00052604` before it was needed again
 Getting there by trial and error wastes a build cycle per attempt: the answer was
 sitting in `src/eboot/func_00052604.c` the whole time.  `tools/delay_slots.py`
 lists the group.
+
+**And then `func_0002D630` wasted three build cycles re-deriving it.**  The recipe
+was in this section and the failure mode it warns about is exactly the one it is
+about, and it happened anyway: the store was made to go through a *separate*
+operand (`[d] "=&r"(desc)` for the value, `[n] "r"(node)` for the pointer), so
+GCC had no reason to think the block wrote `$a0` at all, and the return copy
+floated to the top of the function.  Making the pointer an in-out operand -
+`"+&r"` - fixed it, and that is the same rule as `"+r"`, not a new one.
+
+Two things worth separating out of that, because both cost an attempt:
+
+* **Putting the whole body in the asm does not work.**  With `jr $ra` and the
+  delay-slot copy written out, the block ends on an instruction that is not a `nop`
+  and the symbol comes out 28 bytes against the original's 20.  This is the same
+  landmine as [GCC does not count an assembler-filled delay
+  slot](#the-landmine-gcc-does-not-count-an-assembler-filled-delay-slot): the
+  compiler has nothing after the block to attribute the last slot to.
+* **Binding the result to a hard `$v0` after the block does not work either.**  The
+  dependency that creates is on `node`, and the block claims not to read `node`, so
+  the copy is still free to move above it.
+
+So: the recipe is the recipe, and it is worth reading before transcribing rather
+than after.  spimdisasm writes this instruction as `or $v0, $a0, $zero`, not as
+`move`, so the group `delay_slots.py` reports as `or $v0, $a0, $zero` is 99 strong
+and already includes it - there is no separate `move` census to keep.
 
 ### One `ori` feeding two stores
 
@@ -1296,7 +1324,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 109 are done.  Each shape that works yields several functions
+   identified and 112 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
