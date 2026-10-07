@@ -1,0 +1,55 @@
+# `src/eboot/` — not covered by an open source licence
+
+The files in this directory are a decompilation of *The Sims 2* for PSP, a
+commercial game published by Maxis / Electronic Arts.  They were recovered by
+reverse engineering `EBOOT.BIN`, which ships with its symbol table stripped.
+
+**They are therefore a derivative work of EA's copyrighted game, and the MIT
+licence at the root of this repository does not apply to them.**  The root
+`LICENSE` covers the tooling only.
+
+Nobody can grant you rights to this material — not the author of the tooling,
+and not the author of this file.  Those rights belong to EA.  What this
+repository grants you is everything else it can:
+
+* **Permission to read it.**  You may study it, quote from it, refer to it in
+  your own writing, and use it to understand the game.
+* **Permission to read the tooling.**  The MIT licence covers `tools/` and
+  `include/` without restriction, including commercial use.
+* **Permission to contribute tooling improvements.**  Pull requests that touch
+  only `tools/`, `include/` or the pipeline are straightforward.
+
+## What you need to do anything else with it
+
+**You need your own copy of the game.**  No disc image, no decrypted
+executable and no toolchain binary is committed to this repository; see
+`.gitignore`.  `tools/setup.py` takes a path to a disc image you supply.
+
+Build anything from this — a port, a mod, a reimplementation — and you need to
+own that copy.  That is the ordinary condition on reverse engineering for
+interoperability and study, and it is the condition under which this work was
+done.
+
+## If you want to contribute
+
+Corrections, better names, and additional decompiled functions are welcome.  A
+contribution here is a contribution of reverse-engineered material, so please
+make sure you hold your own copy of the game and are comfortable with that.  It
+also helps to say so in the pull request; it is not a legal formality, it is how
+the next reader knows what they are looking at.
+
+Contributions to `tools/` carry no such condition.
+
+## A note on the licence choice
+
+The reference project this one takes its structure from,
+[tclamb/mhp2g-decomp](https://github.com/tclamb/mhp2g-decomp), uses CC0 at its
+root.  CC0 is a public domain dedication: it asserts that the licensor has the
+right to relinquish copyright entirely.  That assertion cannot honestly be made
+about reverse-engineered game code, and a licence that overclaims is worse than
+no licence, because it invites people to rely on a dedication that was never
+valid.
+
+So the tooling is MIT, which is a grant rather than a relinquishment, and the
+recovered code is left unlicensed on purpose.  See also the *Legal* section of
+the root `README.md`.

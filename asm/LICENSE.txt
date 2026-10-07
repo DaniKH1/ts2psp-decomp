@@ -1,0 +1,19 @@
+# `asm/` — not covered by an open source licence
+
+One `.s` file per function, produced by [splat](https://github.com/projectprep/splat)
+from the stripped `EBOOT.BIN` of *The Sims 2* for PSP, a commercial game
+published by Maxis / Electronic Arts.
+
+These files are recovered material: the machine code of EA's game, rendered as
+assembly so it can be built and compared.  **The MIT licence at the root of this
+repository does not apply to them.**  See `src/eboot/LICENSE.txt` for the full
+reasoning, which applies here equally — this is a derivative work of EA's
+copyrighted game, and no one but EA can grant rights to it.
+
+What this repository does grant is the right to read it, and to use the tooling
+that produced it.  To build anything from it you need your own copy of the game.
+
+These files are generated: `python tools/split.py` regenerates all of them, and
+they are committed so that a reader does not need the disc image to see what was
+recovered.  If you change the pipeline, regenerate rather than editing these by
+hand.

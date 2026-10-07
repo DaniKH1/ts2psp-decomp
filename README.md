@@ -22,11 +22,10 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 
 | directory | |
 | --- | --- |
-| `asm/` | one `.s` per function, as splat produced them.  Assembling and linking this reproduces the original exactly. |
-| `src/eboot/` | the hand written decompilation: what each function does, in C.  68 of these are verified to compile to the original bytes. |
-| `src/generated/` | not present; see *Two layers* below. |
+| `asm/` | one `.s` per function, as splat produced them.  Assembling and linking this reproduces the original exactly.  Recovered material — see [Legal](#legal). |
+| `src/eboot/` | the hand written decompilation: what each function does, in C.  68 of these are verified to compile to the original bytes.  Recovered material — see [Legal](#legal). |
 | `include/` | the shared types: `f32`, `Vec3f`, and the object layouts the early functions reveal. |
-| `tools/` | everything that produced the above, and the checks that keep it honest. |
+| `tools/` | everything that produced the above, and the checks that keep it honest.  MIT licensed. |
 | `config/` | the recovered symbol map, the relocation map, and hand recovered names. |
 | `assets/` | the data sections, byte for byte. |
 | `progress.md` | **the report**: what is known, how it was found, what is still open.  Start here. |
@@ -50,6 +49,38 @@ point is to work out what the code *does*.
 
 The image stays byte exact regardless of how far the C gets: a function is linked
 from `src/` only once it has been proven to compile to the original bytes.
+
+## Legal
+
+**The tooling is MIT licensed. The recovered game code is not, and cannot be.**
+
+| | |
+| --- | --- |
+| `tools/`, `include/`, the pipeline | MIT — see [`LICENSE`](LICENSE) |
+| `src/eboot/` (hand written C) | unlicensed, on purpose — see [`src/eboot/LICENSE.txt`](src/eboot/LICENSE.txt) |
+| `asm/` (generated assembly) | unlicensed, on purpose — see [`asm/LICENSE.txt`](asm/LICENSE.txt) |
+
+The files in `src/` and `asm/` are reverse engineered from `EBOOT.BIN`, a
+commercial game by Maxis / EA.  They are a derivative work of EA's copyright, so
+no one but EA can license them.  What you get is the right to read them, and the
+right to use, modify and redistribute the tooling without restriction.
+
+**You need your own copy of the game to do anything else.**  No disc image, no
+decrypted executable and no toolchain binary is committed here; `tools/setup.py`
+takes a path to a disc image you supply.  That is the ordinary condition on
+reverse engineering for study and interoperability, and it is the condition
+this work was done under.
+
+The reference project this takes its structure from,
+[tclamb/mhp2g-decomp](https://github.com/tclamb/mhp2g-decomp), uses CC0 at its
+root.  CC0 is a public domain *dedication* — it asserts the licensor may
+relinquish copyright entirely.  That assertion cannot honestly be made about
+reverse engineered game code, so the tooling here uses MIT, which is a grant
+rather than a relinquishment, and the recovered code is left unlicensed
+deliberately.
+
+This is not legal advice.  If the licensing matters to you beyond making the
+repository honest about what it is, talk to someone who can advise on it.
 
 ## Reproducing
 
