@@ -1,4 +1,4 @@
-﻿# The Sims 2 PSP - decompilation
+# The Sims 2 PSP - decompilation
 
 Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 `disks/pgs-si2/EBOOT.dec`.
@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 105 (see below) |
-| **C functions that byte-match** | **99** (linked from `src/`) |
+| functions written in C | 108 (see below) |
+| **C functions that byte-match** | **102** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  Ninety-nine functions are
+CodeWarrior and only the *register choice* differs.  One hundred and two
 now byte exact this way:
 
 ```
@@ -180,6 +180,9 @@ func_00097B54  void*, u32       &items[index], 168-byte stride at offset 0x88
 func_000E9BB8  const u8*        little-endian 32-bit read, four lbu and no lw
 func_000F8F88  T*, u32          store, set a flag word, return 0
 func_000E8EA8  u32, u32         tent weight: y + (x-128)*(128-|y-128|)/128
+func_001428E4  void             .cplinit: register(1) for ever
+func_000CD5B0  void*            for (i=0;i<1;i++) *p++ = 0; return self
+func_0009C9B4  T*               clear 12 floats after a flag, countdown loop
 func_0012EB30  u32             &entry[i], 164-byte stride, array at 0x1DEE08
 func_00049C50  u32             &entry[i], 2304-byte stride, two-part base
 func_00049C7C  u32             ... the same, plus 0x808 on the result
@@ -276,6 +279,40 @@ So `a / 128` and `(a + (a < 0)) / 128` are the same value, written without a
 comparison.  Worth knowing because it is the shape C compilers reach for when they
 are told to keep division by a power of two, and it means "did the source divide,
 or did it add a bias first" is not answerable from the assembly.
+
+### Loops work, and the rule that makes the frame possible
+
+Three loops are byte-exact, and together they settle the last category of control
+flow.  `tools/find_loops.py` finds them: **1,740 of the 7,497 functions contain a
+backward branch**, and it lists them smallest first, because size is the best
+predictor of which ones will fall to the same three fixes.
+
+| function | shape | kind |
+| --- | --- | --- |
+| `func_001428E4` | `for(;;) register(1);` | unconditional |
+| `func_000CD5B0` | `for (i = 0; i < 1; i++)` | runs once, not unrolled |
+| `func_0009C9B4` | `n = 12; while (--n) *p++ = 0.0f;` | float loop, countdown |
+
+**The rule that unlocks the frame: do not list `$sp` or `$ra` in the clobber
+list.**  `func_001428E4` sets up its own 0x20-byte frame in the asm.  With `$sp`
+and `$ra` declared as clobbered, GCC emitted a prologue of its own *first* - it
+allocated an 0x8 frame, saved `$fp` and `$ra`, and moved `$fp` - and the block's
+frame became the second one, with 8 words too many instructions.  Listing neither
+means GCC has nothing to preserve, emits no prologue, and the block's frame is the
+only one.  This is safe precisely because the function never returns: no code runs
+after the block that could observe `$sp`.
+
+**The pointer advance goes in the branch's delay slot in both counted loops**, so
+the cursor ends one element *past* the block - `self + 52` after twelve floats -
+rather than on the last element written.  Nothing reads it afterwards; it is there
+so the same cursor would be positioned for a following pass.  `.set noreorder` is
+what holds it there: left on, the assembler considers the slot for its own
+scheduling, declines, and inserts a `nop`.
+
+**`slti $a3, $a2, 1` against a literal 1** is why `func_000CD5B0`'s one-iteration
+loop was not unrolled.  A countdown from a variable (`bgtz`, in
+`func_0009C9B4`) needs no third register, because the condition is the value; a
+comparison needs one, and it gets `$a3`.
 
 ### Ending the asm block early steers the C return into the delay slot
 
@@ -653,7 +690,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the ninety-nine that work: if the function has no
+The rule of thumb from the one hundred and two that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -781,6 +818,7 @@ tools/gen_copy_asm.py        emit the asm for a long interleaved load/store copy
 tools/paths.py               where the module image and the toolchain live
 tools/setup.py               report which of the two this clone is missing
 tools/delay_slots.py         group functions by what sits in the return's slot
+tools/find_loops.py          find the functions with a backward branch, smallest first
 ```
 
 ```
@@ -989,7 +1027,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 99 are done.  Each shape that works yields several functions
+   identified and 102 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
@@ -1000,14 +1038,13 @@ capitalised string is a control name rather than the module.
    what it does.  `tools/gen_copy_asm.py` stays as a helper for the sixteen-word
    copies, where the pattern is long enough to be error-prone but still has to be
    understood.
-2. **The easy branch kind is solved**, with `func_000E8EA8` as the proof: 24
-   instructions, a real `bgez`, a `mult`, the `sll`/`sra` sign-extension idiom and
-   a branch-free round-towards-zero divide, all matched on the first attempt.  See
-   *Branches work* above.  **Still untested: loops, and conditionals where one side
-   is longer than a few instructions** - those are the cases where the compiler has
-   to choose a block order and there is nothing left to pin.  A loop is now the
-   obvious next target, and `tools/c_shapes.py --done` has plenty of candidates with
-   a backward branch.
+2. **All three kinds of control flow now work.**  Branches (`func_000E8EA8`),
+   unconditional loops (`func_001428E4`) and counted loops with the cursor advanced
+   in the branch's delay slot (`func_000CD5B0`, `func_0009C9B4`) are byte-exact.
+   See *Branches work* and *Loops work* above for the machinery.  What remains
+   untested is a conditional whose two sides are both long enough that the compiler
+   has to choose a block order - `tools/find_loops.py --size 120` is where to look,
+   and the ones with two backward branches are the likeliest.
 3. **Float functions are largely cracked.**  Twelve are byte-exact; see *Floats: the
    ten that needed no `.set noreorder`* for the four rules.  What is left of the
    old float problem is only the `lui` + `mtc1` constant idiom, which still needs
