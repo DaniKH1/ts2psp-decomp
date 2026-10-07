@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 141 (see below) |
-| **C functions that byte-match** | **135** (linked from `src/`) |
+| functions written in C | 143 (see below) |
+| **C functions that byte-match** | **137** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  One hundred and thirty-five
+CodeWarrior and only the *register choice* differs.  One hundred and thirty-seven
 now byte exact this way:
 
 ```
@@ -217,6 +217,8 @@ func_000BBA80  s32             a byte field on a second object, as a boolean
 func_0001270C  s32             sign-extend bit 30 with xor and subu, no branch
 syncSkeleton_27D0  void        vector unit: scale a 3x4 matrix by three scalars
 syncSkeleton_2808  void        vector unit: multiply a 3x4 matrix by a vector
+func_00130830  void            a `break 768` - a trap used as a callback placeholder
+func_00103E88  void            six-word copy out of self+0xC, three registers deep
 func_00128F50  Elapsed*        start - now
 func_00140A58  u32             flags[index] & 0x07, packed flag bytes
 func_00140A74  u32             ... the same, mask 0x04
@@ -982,7 +984,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the one hundred and thirty-five that work: if the function has no
+The rule of thumb from the one hundred and thirty-seven that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -1188,6 +1190,75 @@ Neither edge case is a transcription error; both are properties of the original.
 branch-likely from a plain `if`, and the empty-needle behaviour needs exactly that
 "skip the increment" shape.  So the loop is written out with `.set noreorder` scoped
 per branch, and the final `subu` is left to C so it lands in the return's delay slot.
+
+### A copy is a scheduler's answer, and the last word is loaded twice
+
+`func_00103E88` copies six words and the interesting part is how, not what:
+
+```
+lw $a2, 0x0($a0)    lw $a3, 0x4($a0)    lw $t0, 0x8($a0)
+sw $a2, 0x0($a1)    lw $a2, 0xC($a0)    sw $a3, 0x4($a1)
+lw $a3, 0x10($a0)   sw $t0, 0x8($a1)    lw $a0, 0x14($a0)
+sw $a2, 0xC($a1)    sw $a3, 0x10($a1)   sw $a0, 0x14($a1)
+```
+
+Six values through three registers, and the last one is loaded **twice** - once into
+`$a3` and again into `$a0`.  The rotation is a scheduler's answer to a twenty-four byte
+copy, not a source-level choice: the source is one assignment.  `func_000EE56C` does the
+same thing with sixteen words, so the shape is a property of copies here rather than of
+this function.
+
+**The duplicated load is what makes it unwriteable in C.**  Two assignments to the same
+address, and GCC does one load into `$v0` - it is strictly better and the bytes are
+wrong.  So the last three instructions are spelled out, and `lw %[s], 0x14(%[s])` works
+because the register is its own base: a pointer being overwritten by the word just past
+what it pointed at.  That is the third distinct way a single register has had to be
+described in this directory - a hard `register` variable, a register named in the
+template because it overlaps an operand, and now a variable whose *type* changes
+meaning mid-function.
+
+**And the source offset is inside the structure, not at its start.**  `addiu $a0, $a0,
+0xC` makes this a getter shaped like a copy: the receiver is a larger object and the
+field's position is baked into pointer arithmetic.  Written as `src->w[0]` with the
+offset folded into the struct, GCC emits `lw $v0, 0xC($a0)` and there is no `addiu` at
+all - one instruction short, and every offset after it wrong.
+
+### The only `break` in the module, and it is a callback slot
+
+`func_00130830` is four instructions:
+
+```
+break 768
+nop
+jr    $ra
+nop
+```
+
+**It is the only function in the module that starts with a `break`** - one of 7,497.
+A `break` with a code is how a compiler marks a path it proved unreachable, and 768 is
+0x300, inside the software-break range rather than a hardware one.  So the body was
+never written.
+
+What makes it more than a curiosity is the single caller, and it does not call it:
+
+```
+lui   $a0, %hi(func_00130830)
+jal   func_00142910
+addiu $a0, $a0, %lo(func_00130830)
+```
+
+`func_00130AE8` takes **its address** and hands it to `func_00142910`, and a few
+instructions later does the same with `str_exit_FE94` and `func_00130810`.  So
+`func_00142910` takes a function pointer and is being fed a sequence of them, and this
+trap is one of the values in the sequence: **a placeholder in a callback table**, a slot
+that had to exist at a fixed address because something registers a pointer to it, whose
+body was never filled in.
+
+`func_00142910` is also four hundred bytes below `func_001429F0`, which is where an
+abort falls through when it has no handler at either nesting level.  A registration
+function and a last-resort error path as neighbours in the link order is what would be
+expected if both belong to the same shutdown machinery - which is a guess, but the
+alternative is that they are unrelated functions that happen to link together.
 
 ### Who uses the vector unit: 32 functions, and the four TUs they live in
 
@@ -1946,7 +2017,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 135 are done.  Each shape that works yields several functions
+   identified and 137 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
