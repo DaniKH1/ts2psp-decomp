@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 132 (see below) |
-| **C functions that byte-match** | **126** (linked from `src/`) |
+| functions written in C | 136 (see below) |
+| **C functions that byte-match** | **130** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  One hundred and twenty-six
+CodeWarrior and only the *register choice* differs.  One hundred and thirty
 now byte exact this way:
 
 ```
@@ -208,6 +208,10 @@ func_0014C958  Node*, u8*, u32 push a tagged node; fill a 9-word block, one word
 func_0013B2D0  s32, 4 outs     four out-parameters: two values, two addresses
 func_00097200  void            publish one value to a global and to field 0x80
 func_000D3490  void*, void*    register two globals and bump a counter
+func_001282B4  void            bump-allocate: cursor += amount, rounded up to four
+func_000B9CBC  Packed*         next record in a packed array, via a byte-count span
+func_00140AC4  s32             `setjmp`: save the callee-saved context
+func_00143A18  s32             `strstr`, hand-rolled (see the note below)
 func_00128F50  Elapsed*        start - now
 func_00140A58  u32             flags[index] & 0x07, packed flag bytes
 func_00140A74  u32             ... the same, mask 0x04
@@ -973,7 +977,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the one hundred and twenty-six that work: if the function has no
+The rule of thumb from the one hundred and thirty that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -1090,6 +1094,95 @@ see the block's four writes to `$f12`.  Loading in the block and reading an
 uninitialised `register float last asm("$f12")` in C is what pins both halves to
 the same register - two instructions, one register, and the block has to end on the
 load for the size to come out right.
+
+### `setjmp` and `longjmp`, found by asking which registers are callee-saved
+
+`func_00140AC4` stores twenty-three values into a structure and returns 0:
+
+```
+sw  $s0 .. $s7        0x00 .. 0x1C
+sw  $sp, $fp, $ra     0x20, 0x24, 0x28
+swc1 $f20 .. $f31     0x2C .. 0x58
+```
+
+That is exactly the set of registers the o32 ABI says a **callee** must preserve, and
+nothing else - no `$a0`-`$a3`, no `$t0`-`$t9`, no `$v0`/`$v1`, no `$f0`-`$f19`, which
+are precisely the ones it may clobber.  A function that saves a list of registers is
+usually saving registers it happens to need; one that saves *that* list is saving a
+machine context.  `func_00140B28` restores the same 0x5C bytes and is the other half:
+it ends with `bnez $a1` then `addiu $a1, $zero, 1`, so it substitutes 1 for a zero
+argument - the rule that `longjmp` never returns 0.
+
+**So the module uses `setjmp`/`longjmp` for non-local exit.**  That is worth more than
+the two functions, because it tells us what to expect elsewhere: functions with
+unusual exit paths may not have unusual control flow at all, they may be setting up a
+jump.  `find_loops.py --size 120` is the place to look for the callers.
+
+`$gp` is not saved, which most MIPS `setjmp` implementations also skip: under o32 it
+is a fixed module-wide register rather than something a call can change.
+
+The two functions have one caller each - `func_001129E0` for the save and
+`func_0011296C` for the restore - so there is exactly one save site in the module.
+That bounds it: this is a single guarded operation somewhere, not a pervasive
+mechanism.
+
+### Only three of 7,500 labels are not function entry points
+
+`tools/entry_points.py` asks one question of every `glabel`: **does the first
+instruction read a register the caller need not have preserved?**  In o32 `$t0`-`$t9`
+are caller-saved, so a function that reads one before writing it is reading whatever
+was left over - which means either the label is not an entry point or it is one half
+of a tail call.
+
+The answer is **3 out of 7,500**, which is the reassuring result: spimdisasm's
+function splitting is sound almost everywhere, and an o32 signature can be assumed
+for the rest.  The three are `func_00101260`, `func_00140AC4` and `func_0014EAAC`, and
+each turned out to be a real `jal` target - so they are genuine functions that take
+their real argument in `$a0` and merely *also* touch a register the ABI leaves
+undefined.  `func_00140AC4` is `setjmp`: it has to save `$s0`-`$s7` because those are
+the caller's values, so it reads them without ever having written them.  That is not
+an ABI violation, it is the one legitimate case.
+
+The tool is worth keeping for the opposite reason: it is the cheap test for "this label
+is not what its name says", and the first version of it was wrong - it only read the
+second comma-separated operand, so it saw no register inside `0x8($t0)` at all and
+reported zero for everything.  The addressing-mode registers are the ones it is
+looking for.
+
+### `func_00143A18` is `strstr`, and the open question about it is closed
+
+This one was left undone for several iterations on the grounds that nobody could say
+what the source was, and writing C would have been transcription rather than
+decompilation.  With the branch targets recomputed it reads as an ordinary
+hand-rolled substring search, and it is now transcribed byte-exactly.
+
+The thing that made it look wrong was a misread of where the outer loop begins.
+`move $a3, $a1` appears **once before the loop and once inside the back edge's delay
+slot**, and the `bnez` targets the instruction *after* that `move`.  Reading the `.s`
+file's labels puts the loop head one instruction earlier than it is, which makes the
+haystack cursor appear to advance twice per iteration and land on every second byte.
+It advances once.  That is the same failure as
+[the branch targets in the `.s` files](#two-branch-targets-in-the-s-files-are-not-where-they-look),
+seen from the other end.
+
+What the function actually is, and why it is worth having:
+
+* **It is `strstr` written out.**  The compiler would emit a call to a library routine,
+  so this is the source having been written by hand - which is why it needs two loops
+  instead of one.
+* **An empty needle loops forever.**  `beql $a2, $zero, check` nullifies its delay
+  slot, so the increment is skipped; `check` reloads the same character and branches
+  back, finds the same empty needle, and repeats.  A real `strstr` returns the
+  haystack.
+* **A failed search returns `strlen(haystack)`, not -1.**  The outer loop stops with
+  the cursor on the terminator, and the return is that offset.  So a caller
+  distinguishes "found at n" from "not found" against a length it already has.
+
+Neither edge case is a transcription error; both are properties of the original.  The
+`beql` is also why the loop cannot be written in C at all: GCC will not produce a
+branch-likely from a plain `if`, and the empty-needle behaviour needs exactly that
+"skip the increment" shape.  So the loop is written out with `.set noreorder` scoped
+per branch, and the final `subu` is left to C so it lands in the return's delay slot.
 
 ### Two globals regions, and a third that may be a counter
 
@@ -1498,7 +1591,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 126 are done.  Each shape that works yields several functions
+   identified and 130 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
@@ -1513,35 +1606,11 @@ capitalised string is a control name rather than the module.
    unconditional loops (`func_001428E4`) and counted loops with the cursor advanced
    in the branch's delay slot (`func_000CD5B0`, `func_0009C9B4`) are byte-exact.
    See *Branches work* and *Loops work* above for the machinery.
-   **The one function to try next is `func_00143A18`,** and it is left undone on
-   purpose because my reading of it does not close.  It is a nested search over two
-   byte strings, 72 bytes, four forward branches and two backward ones - exactly
-   the shape that needs block-order decisions.  What is settled now:
-
-   * It has **two callers**, `func_000F1E74` and `func_001165C0`.  The second passes
-     `&sym_001CEA10` - a `.rodata` symbol, so a string literal, so never empty.  That
-     answers the second bullet below for that caller at least.
-   * The `beqz $t0, done` before `or $t1, $a0, $zero` is **not a peculiarity of this
-     function**: `func_0014402C` does the identical thing.  It is a CodeWarrior
-     habit - the loop's first test peeled out above the loop's own setup - and the
-     reading that fits is that no caller passes an empty string.  See *CodeWarrior
-     hoists the first loop test above the loop's own setup*.
-   * Two of its five branch targets are not where the `.s` file's label placement
-     suggests, which is what made the first trace of this function wrong.  With the
-     real targets the cursor advances by one per outer iteration, not two.  See
-     *Two branch targets in the `.s` files are not where they look*.
-
-   What is still unexplained, and is the reason for not transcribing it:
-
-   * After the corrections, the outer loop advances `$a0` by two per iteration but
-     reloads the character from `$a0` *after* both increments - so it examines
-     `a[0]`, `a[2]`, `a[4]`, ... and can read past the terminator.  For a scan whose
-     result is `end - start` that is wrong by construction.  Either the function
-     scans in units of two bytes, or the source is not what the shape suggests, and
-     this function alone cannot say which.
-
-   So the remaining step is not mechanical: someone has to decide what the source
-   was before there is a C that is a decompilation rather than a transcription.
+   **`func_00143A18` is now byte-exact too**, which retires the last function that
+   was left undone on the grounds that nobody could say what its source was.  It is
+   a hand-rolled `strstr`: two loops, four forward branches and two backward ones.
+   See *`func_00143A18` is `strstr`, and the open question about it is closed* above
+   for what it turned out to be and why the earlier reading of it was wrong.
 3. **Float functions are largely cracked.**  Twelve are byte-exact; see *Floats: the
    ten that needed no `.set noreorder`* for the four rules.  What is left of the
    old float problem is only the `lui` + `mtc1` constant idiom, which still needs
