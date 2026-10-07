@@ -374,8 +374,9 @@ The work list had this as "the one-bit accessors over them will name the individ
 booleans".  That framing was wrong.  `tools/flag_table.py` decodes the whole array,
 and **20 functions** reference `sym_001E1B98`, not the two that were known.
 
-The array is 128 bytes at `0x001E1B98`, one per object class, and it is almost
-entirely runs:
+The array is 128 bytes at `0x001E1B98`, each entry packing several independent
+properties into one byte, **indexed by a value in a 128-wide domain taken from a
+data stream**.  It is almost entirely runs:
 
 ```
 [0x00]      1  0x00   -
@@ -394,7 +395,21 @@ entirely runs:
 [0x7c..7f]  4  0x10   bit 4
 ```
 
-Only three of those functions read with a mask, and between them they ask for
+**What the index is remains open, and one plausible reading has been tested and
+rejected.**  `func_001434C0` walks a byte stream, looks up `flags[base + c]` for each
+byte and continues while bit 3 is set - and it separately compares that same byte
+against `0x2B` and `0x2D`.  That looks exactly like a character-class table driving a
+number parser, with `0x2B` and `0x2D` being `+` and `-`.
+
+It is not.  `flag_table.py --domain` checks it in both possible alignments and both
+fail: **no digit has bit 3 set.**  So `0x2B` and `0x2D` are values in the index
+domain rather than `+` and `-`, and the domain is a 128-value token or enum space.
+
+That also means the "one entry per object class" phrasing this section used is a
+guess with nothing behind it, and has been withdrawn.  What is established is the
+shape of the table and the regularity below; what each index means is open.
+
+Only three of the twenty functions read with a mask, and between them they ask for
 **bits 0 to 3 and nothing else**:
 
 | function | mask | reads |
@@ -418,13 +433,13 @@ boolean.  The distribution:
 Two things follow from the shape of that distribution.  **States 1 and 2 occupy two
 contiguous 26-entry blocks exactly 0x20 apart**, mirrored, and in each the *first
 six* additionally carry bit 6 - so the bit-6 set is a property of a specific group of
-six classes layered on top of a property of twenty-six.  Two independent facts about
-the object hierarchy, encoded in one byte each.
+six entries layered on top of a property of twenty-six.  Two independent facts about
+whatever the index describes, encoded in one byte each.
 
-And **bits 4, 5, 6 and 7 are set on 32, 32, 12 and 1 classes respectively, yet no
+And **bits 4, 5, 6 and 7 are set on 32, 32, 12 and 1 entries respectively, yet no
 accessor masks for them.**  So those four are read by whole-byte operations -
 compared against a value, or masked somewhere this search does not catch - and they
-are the ones still to identify.  Bit 7 is the extreme case: exactly one class, index
+are the ones still to identify.  Bit 7 is the extreme case: exactly one entry, index
 33, the single `0x88`, and nothing reads it.
 
 Two corrections to my own reading along the way.  Counting the `0x01` run by hand
@@ -1303,10 +1318,12 @@ capitalised string is a control name rather than the module.
    and finds 20 readers; the three that mask ask only for bits 0-3, and
    `flags[i] & 0x07` can only ever be 0, 1, 2 or 4.  So `func_00140A58` returns a
    **four-state property**.  See *The packed flag bytes are four-state properties*.
-   What is left: bits 4, 5, 6 and 7 are set on 32, 32, 12 and 1 classes and **no
+   What is left: bits 4, 5, 6 and 7 are set on 32, 32, 12 and 1 entries and **no
    accessor masks for them**, so they are read whole-byte somewhere.  Finding those
-   readers - and in particular the single class with bit 7, index 33 - is the next
-   step.
+   readers - and in particular the single entry with bit 7, index 33 - is the next
+   step.  **What the index means is also open:** it is not ASCII (`--domain` tests
+   both alignments and both fail), and the "one per object class" idea this item
+   started from has been withdrawn as a guess with no evidence behind it.
 6. **Use the stack census to choose what to read next.**  `tools/delay_slots.py`
    says 5,788 functions have a frame; the 88 distinct sizes are a free bound on
    each one's local count.  Starting from the large frames would find the

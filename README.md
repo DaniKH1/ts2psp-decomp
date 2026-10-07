@@ -183,11 +183,12 @@ What is open now:
   floating-point habits psp-gcc does not share.  Thirteen other float functions
   are done.
 * **Recovering the controller class names** from the type descriptors at
-  `0x001DB014`, and the packed flag bytes at `0x001E1B98`.
-  The flag bytes are decoded and turn out not to be booleans: `flags[i] & 0x07` can
-  only ever be 0, 1, 2 or 4, so `func_00140A58` returns a **four-state property**.
-  Bits 4 to 7 are set on 32, 32, 12 and 1 classes and nothing masks for them yet —
-  finding those readers is open.
+  `0x001DB014`, and the packed property bytes at `0x001E1B98`.
+  The property bytes are decoded and turn out not to be booleans: `flags[i] & 0x07`
+  can only ever be 0, 1, 2 or 4, so `func_00140A58` returns a **four-state field**.
+  What the index means is open — it is not ASCII, which `tools/flag_table.py --domain`
+  tests in both alignments and rejects. Bits 4 to 7 are set on 32, 32, 12 and 1
+  entries and nothing masks for them yet.
 * **Naming the rest of the module.**  3,754 string literals and 320 static
   constructors are mapped; roughly 185 constructors still touch nothing but the
   shared runtime and have no name.

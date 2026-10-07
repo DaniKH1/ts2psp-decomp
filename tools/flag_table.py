@@ -1,28 +1,33 @@
 #!/usr/bin/env python3
 """Decode the packed flag bytes at 0x001E1B98, and list the code that reads them.
 
-The array is 128 bytes, one per object class, each packing several independent
-booleans into one byte.  Two accessors were already known - `func_00140A58` masks
-with 0x07 and `func_00140A74` with 0x04 - and a grep for `sym_001E1B98` finds
-**twenty** functions touching it, so the full set of queried bits is worth
-extracting rather than guessing at.
+The array is 128 bytes, each packing several independent properties into one
+byte, indexed by a value in a 128-wide domain taken from a data stream.  **What
+that domain is remains open** - it is not ASCII (`--domain` tests that and shows
+it is not), and an earlier version of this docstring claimed one entry per object
+class, which had no evidence behind it.
+
+Two accessors were known before this tool - `func_00140A58` masks with 0x07 and
+`func_00140A74` with 0x04 - and a grep for `sym_001E1B98` finds **twenty**
+functions touching it, so the full set of queried bits is worth extracting rather
+than guessing at.
 
 The table is strikingly regular, which is the real finding.  Grouping the runs:
 
     [0x42..0x47]  0x41  x6     0x40 | 0x01
-    [0x48..0x5A]  0x01  x19
-    [0x61..0x66]  0x42  x6     0x40 | 0x02
-    [0x67..0x79]  0x02  x19
+    [0x48..0x5b]  0x01  x20
+    [0x62..0x67]  0x42  x6     0x40 | 0x02
+    [0x68..0x7b]  0x02  x20
 
-Nineteen classes with bit 0 set, nineteen with bit 1 set, and the **first six of
-each run additionally carry bit 6**.  Six and six, and the pairing is exact.  That
-is two properties of the engine's object hierarchy being encoded: a property shared
-by a specific group of six, on top of one shared by a group of nineteen.
+Twenty entries with bit 0 set, twenty with bit 1 set, and the **first six of each
+run additionally carry bit 6**.  Six and six, and the pairing is exact.  Two
+properties of whatever this index space describes, encoded one byte each.
 
     python tools/flag_table.py            # the runs, and what each value means
     python tools/flag_table.py --states    # the four values & 0x07 can actually take
+    python tools/flag_table.py --domain    # test the "indexed by ASCII" idea
     python tools/flag_table.py --accessors  # the 20 readers and the bits they ask for
-    python tools/flag_table.py --bits      # every bit, and how many classes have it
+    python tools/flag_table.py --bits      # every bit, and how many entries have it
     python tools/flag_table.py --raw       # every entry, one per line
 """
 from __future__ import annotations
@@ -74,7 +79,32 @@ def main() -> int:
     ap.add_argument("--raw", action="store_true", help="every entry, one per line")
     ap.add_argument("--states", action="store_true",
                     help="the values `flags[i] & 0x07` can actually take")
+    ap.add_argument("--domain", action="store_true",
+                    help="test whether the index is an ASCII character code")
     ns = ap.parse_args()
+
+    if ns.domain:
+        # `func_001434C0` walks a byte stream and looks up `flags[base + c]` for
+        # each byte, which reads like a character-class table.  It is not.  Both
+        # alignments are tested here and both fail: no digit has bit 3 set.
+        #
+        # The same function compares the byte against 0x2B and 0x2D, so those are
+        # values in the index domain rather than '+' and '-'.  The index is a
+        # 128-value token or enum space; what the tokens mean is not established,
+        # and "one entry per object class" - which this tool's docstring used to
+        # claim - has no evidence behind it either.
+        elf = pspelf.load(str(ELF_PATH))
+        for base, label in ((TABLE_ADDR + 1, "0x1E1B99, as the code computes it"),
+                            (TABLE_ADDR, "0x1E1B98, as this table is indexed")):
+            digits = all(elf.read(base + ord(ch), 1)[0] & 8 for ch in "0123456789")
+            signs = any(elf.read(base + ord(ch), 1)[0] & 8 for ch in "+-")
+            print(f"{label}: flags[0x{base:08X} + c]")
+            print(f"  every digit has bit 3 set : {digits}")
+            print(f"  a sign has bit 3 set      : {signs}")
+            print(f"  -> character-class table  : "
+                  f"{'yes' if digits and not signs else 'NO'}")
+            print()
+        return 0
 
     elf = pspelf.load(str(ELF_PATH))
     raw = elf.read(TABLE_ADDR, TABLE_ENTRIES)
