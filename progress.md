@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 159 (see below) |
-| **C functions that byte-match** | **153** (linked from `src/`) |
+| functions written in C | 162 (see below) |
+| **C functions that byte-match** | **156** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  One hundred and fifty-three
+CodeWarrior and only the *register choice* differs.  One hundred and fifty-six
 now byte exact this way:
 
 ```
@@ -235,6 +235,9 @@ func_00096F40  void            zero three floats through the second argument
 func_00005B00  s32             return 0 - one of 110
 func_000068E8  void            empty body - one of 162, the largest group
 func_001342D8  void            big-endian append of a 16-bit value to a byte buffer
+func_000FCC78  void            flag + two floats from $f12/$f13
+func_000D2A34  void            flag + word + three floats in unusual order
+func_0012E9D4  void            word=1 then byte=1 (with redundant ori)
 func_00128F50  Elapsed*        start - now
 func_00140A58  u32             flags[index] & 0x07, packed flag bytes
 func_00140A74  u32             ... the same, mask 0x04
@@ -1000,7 +1003,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the one hundred and fifty-three that work: if the function has no
+The rule of thumb from the one hundred and fifty-six that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -2349,7 +2352,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 153 are done.  Each shape that works yields several functions
+   identified and 156 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
