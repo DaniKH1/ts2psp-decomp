@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 108 (see below) |
-| **C functions that byte-match** | **102** (linked from `src/`) |
+| functions written in C | 110 (see below) |
+| **C functions that byte-match** | **104** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  One hundred and two
+CodeWarrior and only the *register choice* differs.  One hundred and four
 now byte exact this way:
 
 ```
@@ -313,6 +313,58 @@ scheduling, declines, and inserts a `nop`.
 loop was not unrolled.  A countdown from a variable (`bgtz`, in
 `func_0009C9B4`) needs no third register, because the condition is the value; a
 comparison needs one, and it gets `$a3`.
+
+### The landmine: GCC does not count an assembler-filled delay slot
+
+This cost an iteration and nearly shipped, so it is recorded in full.
+
+Left to emit its own return, GCC writes `jr $ra`; the assembler then appends a
+`nop` to fill the delay slot **after the function's symbol size has been fixed**.
+The object measures 0x20 and the symbol says 0x1c:
+
+```
+$ psp-nm -S build/eboot.elf | grep func_0009C260
+0009c260 0000001c A func_0009C260      <- symbol: 28
+$ psp-objdump -h build/.../func_0009C260.o
+  0 .text         00000020              <- code: 32
+```
+
+**One such function is harmless.**  The linker pads to the next symbol's address
+and the bytes come out right, which is why adding `func_0009C260` alone still gave
+a byte-identical image.  **Two of them cost eight bytes of `.text`**, and every
+section after them shifts: the module image went from 100 % to 55 % identical, with
+no error anywhere in the build output.
+
+The fix is to write the return inside the asm block so GCC counts the `nop`:
+
+```c
+__attribute__((noreturn))
+f32 func_0009C260(Node *self) {
+    ...
+    __asm__ __volatile__(
+        ".set noreorder\n\t"
+        ... 
+        "2:\n\t"
+        "jr    $ra\n\t"      /* GCC must see these two to size the symbol */
+        "nop\n\t"
+        ".set reorder\n\t"
+        : ...);
+    __builtin_unreachable();
+}
+```
+
+`noreturn` is doing double duty here: it stops GCC appending a return *and* it is
+what lets the `nop` be counted.
+
+**The mistake was weakening `verify_c.py` first.**  It had reported `size 28 != 32`
+for these two, correctly, and I read that as a measurement convention and relaxed
+it to accept a shortfall when the missing bytes were all `nop`s.  That relaxation
+is wrong, and the guard it duplicated is not a convention at all - it is the thing
+standing between this bug and a broken image.  `tools/check_symbols.py` now checks
+it directly, before the image comparison, so the failure is reported as the one
+function that caused it instead of as half a million differing bytes.  Its negative
+test is in the commit: breaking `func_0009C260` on purpose makes it report
+`recorded 0x20, symbol 0x18`.
 
 ### Ending the asm block early steers the C return into the delay slot
 
@@ -690,7 +742,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the one hundred and two that work: if the function has no
+The rule of thumb from the one hundred and four that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -819,6 +871,7 @@ tools/paths.py               where the module image and the toolchain live
 tools/setup.py               report which of the two this clone is missing
 tools/delay_slots.py         group functions by what sits in the return's slot
 tools/find_loops.py          find the functions with a backward branch, smallest first
+tools/check_symbols.py       every C-linked function reports the size it should
 ```
 
 ```
@@ -1027,7 +1080,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 102 are done.  Each shape that works yields several functions
+   identified and 104 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
@@ -1041,10 +1094,27 @@ capitalised string is a control name rather than the module.
 2. **All three kinds of control flow now work.**  Branches (`func_000E8EA8`),
    unconditional loops (`func_001428E4`) and counted loops with the cursor advanced
    in the branch's delay slot (`func_000CD5B0`, `func_0009C9B4`) are byte-exact.
-   See *Branches work* and *Loops work* above for the machinery.  What remains
-   untested is a conditional whose two sides are both long enough that the compiler
-   has to choose a block order - `tools/find_loops.py --size 120` is where to look,
-   and the ones with two backward branches are the likeliest.
+   See *Branches work* and *Loops work* above for the machinery.
+   **The one function to try next is `func_00143A18`,** and it is left undone on
+   purpose because my reading of it does not close.  It is a nested search over two
+   byte strings, 72 bytes, four forward branches and two backward ones - exactly
+   the shape that needs block-order decisions.  Two things in it are not yet
+   explained:
+
+   * `beqz $t0, done` sits **before** `or $t1, $a0, $zero`, and the return is
+     `subu $v0, $a0, $t1`.  So on the empty-input path `$t1` is still whatever the
+     caller passed.  Either the empty case never happens, or the function relies on
+     `$t1 == $a0` on entry, and I cannot tell which from this function alone.
+   * If the second string is empty the loop cannot advance: `beql` skips the only
+     `addiu $a0, $a0, 1`, and the outer `bnez` sends it straight back.  That reads
+     as an infinite loop, so `b` is presumably never empty - an API precondition
+     the binary does not check.
+
+   Both are real observations about the code rather than puzzles in the
+   transcription, but a 72-byte function with four blocks is not something to guess
+   at.  What would settle it: every call site, which `tools/find_jptables.py` or a
+   scan of `jal func_00143A18` would give, since the callers say whether either
+   string can be empty.
 3. **Float functions are largely cracked.**  Twelve are byte-exact; see *Floats: the
    ten that needed no `.set noreorder`* for the four rules.  What is left of the
    old float problem is only the `lui` + `mtc1` constant idiom, which still needs

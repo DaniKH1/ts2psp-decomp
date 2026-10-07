@@ -106,6 +106,10 @@ def main() -> int:
         # come after it - and `--stats` compares without relinking, which
         # `--diff` would do, undoing the padding again.
         run([sys.executable, str(TOOLS / "fix_segments.py")], env)
+        # Before the image comparison: a function whose symbol size is short shifts
+        # every section after it, and would otherwise be reported as a mass of
+        # differing bytes rather than as the one function that caused it.
+        run([sys.executable, str(TOOLS / "check_symbols.py")], env)
         run([sys.executable, str(TOOLS / "build.py"), "--stats"], env)
         run([sys.executable, str(TOOLS / "check_image.py")], env)
     return 0

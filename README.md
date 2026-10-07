@@ -13,7 +13,7 @@ relative.
 | code | **507,673 / 507,673 instructions identical** |
 | functions recovered | 7,497 |
 | relocations recovered | 66,503 / 66,503 |
-| C functions byte-exact and hand written | 102 |
+| C functions byte-exact and hand written | 104 |
 
 The engine is Maxis' "Elem", the shared engine also used by *The Sims 3* — the
 build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
@@ -23,7 +23,7 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 | directory | |
 | --- | --- |
 | `asm/` | one `.s` per function, as splat produced them.  Assembling and linking this reproduces the original exactly.  Recovered material — see [Legal](#legal). |
-| `src/eboot/` | the hand written decompilation: what each function does, in C.  102 of these are verified to compile to the original bytes.  Recovered material — see [Legal](#legal). |
+| `src/eboot/` | the hand written decompilation: what each function does, in C.  104 of these are verified to compile to the original bytes.  Recovered material — see [Legal](#legal). |
 | `include/` | the shared types: `f32`, `Vec3f`, and the object layouts the early functions reveal. |
 | `tools/` | everything that produced the above, and the checks that keep it honest.  MIT licensed. |
 | `config/` | the recovered symbol map, the relocation map, and hand recovered names. |
@@ -35,13 +35,13 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 **The assembly is byte-exact and complete.**  `asm/` reproduces every byte of
 the module image.  That part is finished and has been for some time.
 
-**The C is the readable layer, and it is partial.**  102 of 7,497 functions.  The
+**The C is the readable layer, and it is partial.**  104 of 7,497 functions.  The
 original was built with CodeWarrior for PSP (`mwccpsp.exe`), and psp-gcc does
 not reproduce its instruction selection.  Reaching byte-exact C for *all* 7,497
-needs that proprietary compiler; 102 were reached without it, by pinning the
+needs that proprietary compiler; 104 were reached without it, by pinning the
 handful of registers and delay slots where the two compilers disagree.
 
-What those 102 have in common is that the disagreement is small enough to name.
+What those 104 have in common is that the disagreement is small enough to name.
 Both compilers emit the same *instructions* and differ over which register is the
 destination, or when a value is loaded, so pinning the registers makes them agree.
 The pinning is deliberately narrow: an inline `asm` block over the two or three
@@ -62,8 +62,9 @@ Three results from that work are worth knowing before reading the C:
   choice, is still untested.
 * **The one genuinely ugly piece** is `__attribute__((noreturn))` on a function
   that does return.  It is a lie about control flow that only affects codegen, and
-  it is what stops GCC appending a second return after a hand-written block.  It
-  appears in three files and is flagged as such in each.
+  it does two jobs: it stops GCC appending a return after a hand-written block, and
+  it lets the block's own `nop` be counted in the symbol size — which matters more
+  than it looks, and is written up in `progress.md`.
 
 A generator can emit all 7,497 function bodies as verbatim assembly inside C
 files and does verify 7,497/7,497 — but that is a transcription, not a
@@ -145,6 +146,7 @@ The disc image is **not** in this repository and must not be added to it — it 
 
 ```sh
 python tools/check_image.py     # byte-for-byte, the module image itself
+python tools/check_symbols.py   # does every function report the size it should?
 python tools/progress.py        # per-function matching report
 python tools/verify_c.py        # does this C compile to the original bytes?
 python tools/subsystems.py      # which translation unit belongs to which module
@@ -152,7 +154,10 @@ python tools/subsystems.py      # which translation unit belongs to which module
 
 `check_image.py` exists because `build.py --diff` compares section *contents*,
 which cannot see a layout error: every section was correct while the file bytes
-after the last one were shifted by four.  Both checks are in the pipeline.
+after the last one were shifted by four.  Both checks are in the pipeline, and
+`check_symbols.py` runs first — it catches the other way an image goes wrong, a
+function whose symbol size is short, and names the function instead of reporting
+half a million differing bytes.
 
 ## Status
 
