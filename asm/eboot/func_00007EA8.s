@@ -174,7 +174,7 @@ glabel func_00007EA8
     /* 8174 00008100 25280000 */   or        $a1, $zero, $zero
     /* 8178 00008104 2000A48F */  lw         $a0, 0x20($sp)
     /* 817C 00008108 04008010 */  beqz       $a0, .Leboot_0000811C
-    /* 8180 0000810C 1C00053C */   lui       $a1, %hi(str_collisionTweaks)
+    /* 8180 0000810C 1C00053C */   lui       $a1, 0x001C
     /* 8184 00008110 DDC6040C */  jal        func_00131B74
     /* 8188 00008114 00000000 */   nop
     /* 818C 00008118 1C00053C */  lui        $a1, %hi(str_popButtonMap)
@@ -265,7 +265,7 @@ glabel func_00007EA8
     /* 82C4 00008250 25280000 */   or        $a1, $zero, $zero
     /* 82C8 00008254 4C00A48F */  lw         $a0, 0x4C($sp)
     /* 82CC 00008258 04008010 */  beqz       $a0, .Leboot_0000826C
-    /* 82D0 0000825C 1C00053C */   lui       $a1, %hi(str_collisionTweaks)
+    /* 82D0 0000825C 1C00053C */   lui       $a1, 0x001C
     /* 82D4 00008260 DDC6040C */  jal        func_00131B74
     /* 82D8 00008264 00000000 */   nop
     /* 82DC 00008268 1C00053C */  lui        $a1, %hi(str_removeButtonMap)
@@ -356,7 +356,7 @@ glabel func_00007EA8
     /* 8414 000083A0 25280000 */   or        $a1, $zero, $zero
     /* 8418 000083A4 7800A48F */  lw         $a0, 0x78($sp)
     /* 841C 000083A8 04008010 */  beqz       $a0, .Leboot_000083BC
-    /* 8420 000083AC 1C00053C */   lui       $a1, %hi(str_collisionTweaks)
+    /* 8420 000083AC 1C00053C */   lui       $a1, 0x001C
     /* 8424 000083B0 DDC6040C */  jal        func_00131B74
     /* 8428 000083B4 00000000 */   nop
     /* 842C 000083B8 1C00053C */  lui        $a1, %hi(str_getTopButtonMap)
@@ -447,7 +447,7 @@ glabel func_00007EA8
     /* 8564 000084F0 25280000 */   or        $a1, $zero, $zero
     /* 8568 000084F4 A400A48F */  lw         $a0, 0xA4($sp)
     /* 856C 000084F8 04008010 */  beqz       $a0, .Leboot_0000850C
-    /* 8570 000084FC 1C00053C */   lui       $a1, %hi(str_collisionTweaks)
+    /* 8570 000084FC 1C00053C */   lui       $a1, 0x001C
     /* 8574 00008500 DDC6040C */  jal        func_00131B74
     /* 8578 00008504 00000000 */   nop
     /* 857C 00008508 1C00053C */  lui        $a1, %hi(str_getTopButtonMapTriangleFunc)
@@ -538,7 +538,7 @@ glabel func_00007EA8
     /* 86B4 00008640 25280000 */   or        $a1, $zero, $zero
     /* 86B8 00008644 D000A48F */  lw         $a0, 0xD0($sp)
     /* 86BC 00008648 04008010 */  beqz       $a0, .Leboot_0000865C
-    /* 86C0 0000864C 0700053C */   lui       $a1, %hi(sym_00073318)
+    /* 86C0 0000864C 0700053C */   lui       $a1, 0x0007
     /* 86C4 00008650 DDC6040C */  jal        func_00131B74
     /* 86C8 00008654 00000000 */   nop
     /* 86CC 00008658 0700053C */  lui        $a1, %hi(sym_00073DF4)

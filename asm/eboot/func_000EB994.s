@@ -158,6 +158,7 @@ glabel func_000EB994
     /* EBC38 000EBBC4 08006FC6 */  lwc1       $f15, 0x8($s3)
     /* EBC3C 000EBBC8 040090C6 */  lwc1       $f16, 0x4($s4)
     /* EBC40 000EBBCC 426C0E46 */  mul.s      $f17, $f13, $f14
+  .globl sym_000EBBD0
   sym_000EBBD0:
     /* EBC44 000EBBD0 000092C6 */  lwc1       $f18, 0x0($s4)
     /* EBC48 000EBBD4 C27C1046 */  mul.s      $f19, $f15, $f16

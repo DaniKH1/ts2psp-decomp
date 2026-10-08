@@ -13,6 +13,7 @@ glabel func_00000B28
     /* B9C 00000B28 54008CE4 */  swc1       $f12, 0x54($a0)
     /* BA0 00000B2C 60008524 */  addiu      $a1, $a0, 0x60
     /* BA4 00000B30 0000ADC4 */  lwc1       $f13, 0x0($a1)
+  .globl sym_00000B34
   sym_00000B34:
     /* BA8 00000B34 0400AEC4 */  lwc1       $f14, 0x4($a1)
     /* BAC 00000B38 426B0C46 */  mul.s      $f13, $f13, $f12

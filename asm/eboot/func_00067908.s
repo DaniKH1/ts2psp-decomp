@@ -87,11 +87,14 @@ glabel func_00067908
     /* 67A90 00067A1C 5800A524 */  addiu      $a1, $a1, 0x58
     /* 67A94 00067A20 0000A684 */  lh         $a2, 0x0($a1)
     /* 67A98 00067A24 0400A58C */  lw         $a1, 0x4($a1)
+  .globl sym_00067A28
   sym_00067A28:
     /* 67A9C 00067A28 09F8A000 */  jalr       $a1
+  .globl sym_00067A2C
   sym_00067A2C:
     /* 67AA0 00067A2C 21208600 */   addu      $a0, $a0, $a2
     /* 67AA4 00067A30 2800A48F */  lw         $a0, 0x28($sp)
+  .globl sym_00067A34
   sym_00067A34:
     /* 67AA8 00067A34 35008010 */  beqz       $a0, .Leboot_00067B0C
     /* 67AAC 00067A38 25804000 */   or        $s0, $v0, $zero

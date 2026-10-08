@@ -20,6 +20,7 @@ glabel func_000E9780
     /* E9810 000E979C 1F002931 */  andi       $t1, $t1, 0x1F
     /* E9814 000E97A0 03004A31 */  andi       $t2, $t2, 0x3
     /* E9818 000E97A4 8000A528 */  slti       $a1, $a1, 0x80
+  .globl sym_000E97A8
   sym_000E97A8:
     /* E981C 000E97A8 0900401D */  bgtz       $t2, .Leboot_000E97D0
     /* E9820 000E97AC 6800C490 */   lbu       $a0, 0x68($a2)
@@ -29,6 +30,7 @@ glabel func_000E9780
     /* E9830 000E97BC 68AA0825 */  addiu      $t0, $t0, %lo(sym_001DAA68)
     /* E9834 000E97C0 21402801 */  addu       $t0, $t1, $t0
     /* E9838 000E97C4 00000891 */  lbu        $t0, 0x0($t0)
+  .globl sym_000E97C8
   sym_000E97C8:
     /* E983C 000E97C8 12000010 */  b          .Leboot_000E9814
     /* E9840 000E97CC FF000831 */   andi      $t0, $t0, 0xFF
@@ -48,6 +50,7 @@ glabel func_000E9780
     /* E9870 000E97FC FF000834 */  ori        $t0, $zero, 0xFF
     /* E9874 000E9800 23480901 */  subu       $t1, $t0, $t1
     /* E9878 000E9804 FF002931 */  andi       $t1, $t1, 0xFF
+  .globl sym_000E9808
   sym_000E9808:
     /* E987C 000E9808 02000010 */  b          .Leboot_000E9814
     /* E9880 000E980C FF002831 */   andi      $t0, $t1, 0xFF
@@ -60,6 +63,7 @@ glabel func_000E9780
     /* E9890 000E981C 12400000 */  mflo       $t0
     /* E9894 000E9820 FFFF0831 */  andi       $t0, $t0, 0xFFFF
     /* E9898 000E9824 83410800 */  sra        $t0, $t0, 6
+  .globl sym_000E9828
   sym_000E9828:
     /* E989C 000E9828 0B00A010 */  beqz       $a1, .Leboot_000E9858
     /* E98A0 000E982C FFFF0831 */   andi      $t0, $t0, 0xFFFF

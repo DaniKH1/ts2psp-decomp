@@ -40,69 +40,85 @@ glabel func_000E22BC
     /* E2390 000E231C 0500A52C */  sltiu      $a1, $a1, 0x5
     /* E2394 000E2320 2A00A010 */  beqz       $a1, .Leboot_000E23CC
     /* E2398 000E2324 02008424 */   addiu     $a0, $a0, 0x2
+  .globl sym_000E2328
   sym_000E2328:
     /* E239C 000E2328 01000124 */  addiu      $at, $zero, 0x1
     /* E23A0 000E232C 0E008110 */  beq        $a0, $at, .Leboot_000E2368
+  .globl sym_000E2330
   sym_000E2330:
     /* E23A4 000E2330 02000124 */   addiu     $at, $zero, 0x2
     /* E23A8 000E2334 15008110 */  beq        $a0, $at, .Leboot_000E238C
     /* E23AC 000E2338 03000124 */   addiu     $at, $zero, 0x3
     /* E23B0 000E233C 1B008110 */  beq        $a0, $at, .Leboot_000E23AC
+  .globl sym_000E2340
   sym_000E2340:
     /* E23B4 000E2340 00000000 */   nop
     /* E23B8 000E2344 AA3E043C */  lui        $a0, (0x3EAAAAAB >> 16)
     /* E23BC 000E2348 ABAA8434 */  ori        $a0, $a0, (0x3EAAAAAB & 0xFFFF)
     /* E23C0 000E234C 00008444 */  mtc1       $a0, $f0
+  .globl sym_000E2350
   sym_000E2350:
     /* E23C4 000E2350 803F043C */  lui        $a0, (0x3F800000 >> 16)
     /* E23C8 000E2354 00688444 */  mtc1       $a0, $f13
     /* E23CC 000E2358 416B0046 */  sub.s      $f13, $f13, $f0
     /* E23D0 000E235C 02630D46 */  mul.s      $f12, $f12, $f13
+  .globl sym_000E2360
   sym_000E2360:
     /* E23D4 000E2360 1C000010 */  b          sym_000E23D4
     /* E23D8 000E2364 00000C46 */   add.s     $f0, $f0, $f12
   .Leboot_000E2368:
     /* E23DC 000E2368 2A3F043C */  lui        $a0, (0x3F2AAAAB >> 16)
+  .globl sym_000E236C
   sym_000E236C:
     /* E23E0 000E236C ABAA8434 */  ori        $a0, $a0, (0x3F2AAAAB & 0xFFFF)
+  .globl sym_000E2370
   sym_000E2370:
     /* E23E4 000E2370 00688444 */  mtc1       $a0, $f13
     /* E23E8 000E2374 803F043C */  lui        $a0, (0x3F800000 >> 16)
+  .globl sym_000E2378
   sym_000E2378:
     /* E23EC 000E2378 00008444 */  mtc1       $a0, $f0
     /* E23F0 000E237C 416B0046 */  sub.s      $f13, $f13, $f0
     /* E23F4 000E2380 02630D46 */  mul.s      $f12, $f12, $f13
     /* E23F8 000E2384 13000010 */  b          sym_000E23D4
+  .globl sym_000E2388
   sym_000E2388:
     /* E23FC 000E2388 00000C46 */   add.s     $f0, $f0, $f12
   .Leboot_000E238C:
     /* E2400 000E238C 2A3F043C */  lui        $a0, (0x3F2AAAAB >> 16)
     /* E2404 000E2390 00688044 */  mtc1       $zero, $f13
     /* E2408 000E2394 ABAA8434 */  ori        $a0, $a0, (0x3F2AAAAB & 0xFFFF)
+  .globl sym_000E2398
   sym_000E2398:
     /* E240C 000E2398 00008444 */  mtc1       $a0, $f0
     /* E2410 000E239C 416B0046 */  sub.s      $f13, $f13, $f0
     /* E2414 000E23A0 02630D46 */  mul.s      $f12, $f12, $f13
+  .globl sym_000E23A4
   sym_000E23A4:
     /* E2418 000E23A4 0B000010 */  b          sym_000E23D4
+  .globl sym_000E23A8
   sym_000E23A8:
     /* E241C 000E23A8 00000C46 */   add.s     $f0, $f0, $f12
   .Leboot_000E23AC:
     /* E2420 000E23AC AA3E043C */  lui        $a0, (0x3EAAAAAB >> 16)
     /* E2424 000E23B0 00008044 */  mtc1       $zero, $f0
     /* E2428 000E23B4 ABAA8434 */  ori        $a0, $a0, (0x3EAAAAAB & 0xFFFF)
+  .globl sym_000E23B8
   sym_000E23B8:
     /* E242C 000E23B8 00688444 */  mtc1       $a0, $f13
     /* E2430 000E23BC 416B0046 */  sub.s      $f13, $f13, $f0
     /* E2434 000E23C0 02630D46 */  mul.s      $f12, $f12, $f13
     /* E2438 000E23C4 03000010 */  b          sym_000E23D4
+  .globl sym_000E23C8
   sym_000E23C8:
     /* E243C 000E23C8 00000C46 */   add.s     $f0, $f0, $f12
   .Leboot_000E23CC:
     /* E2440 000E23CC 01000010 */  b          sym_000E23D4
     /* E2444 000E23D0 00008044 */   mtc1      $zero, $f0
+  .globl sym_000E23D4
   sym_000E23D4:
     /* E2448 000E23D4 1800B4C7 */  lwc1       $f20, 0x18($sp)
+  .globl sym_000E23D8
   sym_000E23D8:
     /* E244C 000E23D8 1C00BF8F */  lw         $ra, 0x1C($sp)
     /* E2450 000E23DC 0800E003 */  jr         $ra

@@ -11,6 +11,7 @@ nonmatching func_000647AC, 0x17C
 
 glabel func_000647AC
     /* 64820 000647AC B0FFBD27 */  addiu      $sp, $sp, -0x50
+  .globl sym_000647B0
   sym_000647B0:
     /* 64824 000647B0 3C00B0AF */  sw         $s0, 0x3C($sp)
     /* 64828 000647B4 4000B1AF */  sw         $s1, 0x40($sp)
@@ -26,6 +27,7 @@ glabel func_000647AC
     /* 6484C 000647D8 1E00043C */  lui        $a0, %hi(sym_001E6508)
   .L000647DC:
     /* 64850 000647DC 08658424 */  addiu      $a0, $a0, %lo(sym_001E6508)
+  .globl sym_000647E0
   sym_000647E0:
     /* 64854 000647E0 0C0004AE */  sw         $a0, 0xC($s0)
     /* 64858 000647E4 3C00048E */  lw         $a0, 0x3C($s0)
@@ -49,6 +51,7 @@ glabel func_000647AC
     /* 6489C 00064828 BC3F848C */  lw         $a0, %lo(sym_00073FBC)($a0)
     /* 648A0 0006482C A77E020C */  jal        func_0009FA9C
     /* 648A4 00064830 B400848C */   lw        $a0, 0xB4($a0)
+  .globl sym_00064834
   sym_00064834:
     /* 648A8 00064834 18005324 */  addiu      $s3, $v0, 0x18
     /* 648AC 00064838 25206002 */  or         $a0, $s3, $zero
@@ -94,6 +97,7 @@ glabel func_000647AC
   .Leboot_000648CC:
     /* 64940 000648CC 0000C58C */  lw         $a1, 0x0($a2)
     /* 64944 000648D0 0500B110 */  beq        $a1, $s1, .Leboot_000648E8
+  .globl sym_000648D4
   sym_000648D4:
     /* 64948 000648D4 1400A48F */   lw        $a0, 0x14($sp)
     /* 6494C 000648D8 0400A624 */  addiu      $a2, $a1, 0x4

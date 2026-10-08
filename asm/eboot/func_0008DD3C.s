@@ -28,7 +28,7 @@ glabel func_0008DD3C
     /* 8DDEC 0008DD78 25204000 */  or         $a0, $v0, $zero
     /* 8DDF0 0008DD7C 1400A58F */  lw         $a1, 0x14($sp)
     /* 8DDF4 0008DD80 05008014 */  bnez       $a0, .Leboot_0008DD98
-    /* 8DDF8 0008DD84 0100063C */   lui       $a2, %hi(func_00009378)
+    /* 8DDF8 0008DD84 0100063C */   lui       $a2, 0x0001
     /* 8DDFC 0008DD88 AB41050C */  jal        func_001506AC
     /* 8DE00 0008DD8C 2520A000 */   or        $a0, $a1, $zero
     /* 8DE04 0008DD90 25204000 */  or         $a0, $v0, $zero

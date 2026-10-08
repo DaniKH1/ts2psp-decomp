@@ -14,6 +14,7 @@ glabel func_000EB840
     /* EB8B8 000EB844 2800B0AF */  sw         $s0, 0x28($sp)
     /* EB8BC 000EB848 2C00B1AF */  sw         $s1, 0x2C($sp)
     /* EB8C0 000EB84C 2580C000 */  or         $s0, $a2, $zero
+  .globl sym_000EB850
   sym_000EB850:
     /* EB8C4 000EB850 2588A000 */  or         $s1, $a1, $zero
     /* EB8C8 000EB854 3000B2AF */  sw         $s2, 0x30($sp)

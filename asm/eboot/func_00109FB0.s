@@ -67,7 +67,7 @@ glabel func_00109FB0
     /* 10A0EC 0010A078 593F040C */  jal        func_0010FD64
     /* 10A0F0 0010A07C 01000534 */   ori       $a1, $zero, 0x1
     /* 10A0F4 0010A080 04004010 */  beqz       $v0, .Leboot_0010A094
-    /* 10A0F8 0010A084 1D00043C */   lui       $a0, %hi(sym_001D1B00)
+    /* 10A0F8 0010A084 1D00043C */   lui       $a0, 0x001D
     /* 10A0FC 0010A088 1D00043C */  lui        $a0, %hi(str_false_DB88)
     /* 10A100 0010A08C 02000010 */  b          .Leboot_0010A098
     /* 10A104 0010A090 80DB8424 */   addiu     $a0, $a0, %lo(str_true_DB80)

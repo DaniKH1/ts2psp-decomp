@@ -189,14 +189,18 @@ glabel func_0000D094
   .L0000D328:
     /* D39C 0000D328 C79D040C */  jal        func_0012771C
     /* D3A0 0000D32C 25200002 */   or        $a0, $s0, $zero
+  .globl sym_0000D330
   sym_0000D330:
     /* D3A4 0000D330 1800B08F */  lw         $s0, 0x18($sp)
+  .globl sym_0000D334
   sym_0000D334:
     /* D3A8 0000D334 1C00B18F */  lw         $s1, 0x1C($sp)
     /* D3AC 0000D338 2000B28F */  lw         $s2, 0x20($sp)
     /* D3B0 0000D33C 2400B38F */  lw         $s3, 0x24($sp)
+  .globl sym_0000D340
   sym_0000D340:
     /* D3B4 0000D340 2800B48F */  lw         $s4, 0x28($sp)
+  .globl sym_0000D344
   sym_0000D344:
     /* D3B8 0000D344 2C00B58F */  lw         $s5, 0x2C($sp)
     /* D3BC 0000D348 3000BF8F */  lw         $ra, 0x30($sp)

@@ -46,22 +46,31 @@ glabel func_000E9680
     /* E9770 000E96FC FF000934 */  ori        $t1, $zero, 0xFF
     /* E9774 000E9700 23502A01 */  subu       $t2, $t1, $t2
     /* E9778 000E9704 FF004A31 */  andi       $t2, $t2, 0xFF
+  .globl sym_000E9708
   sym_000E9708:
     /* E977C 000E9708 02000010 */  b          sym_000E9714
+  .globl sym_000E970C
   sym_000E970C:
     /* E9780 000E970C FF004931 */   andi      $t1, $t2, 0xFF
+  .globl sym_000E9710
   sym_000E9710:
     /* E9784 000E9710 FF000934 */  ori        $t1, $zero, 0xFF
+  .globl sym_000E9714
   sym_000E9714:
     /* E9788 000E9714 7A00CA90 */  lbu        $t2, 0x7A($a2)
+  .globl sym_000E9718
   sym_000E9718:
     /* E978C 000E9718 18002A01 */  mult       $t1, $t2
+  .globl sym_000E971C
   sym_000E971C:
     /* E9790 000E971C 12480000 */  mflo       $t1
+  .globl sym_000E9720
   sym_000E9720:
     /* E9794 000E9720 FFFF2931 */  andi       $t1, $t1, 0xFFFF
+  .globl sym_000E9724
   sym_000E9724:
     /* E9798 000E9724 C3490900 */  sra        $t1, $t1, 7
+  .globl sym_000E9728
   sym_000E9728:
     /* E979C 000E9728 FFFF2931 */  andi       $t1, $t1, 0xFFFF
     /* E97A0 000E972C 80480900 */  sll        $t1, $t1, 2

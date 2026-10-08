@@ -135,19 +135,25 @@ glabel func_000E6798
     /* E69D8 000E6964 A6C1060C */  jal        stub_001B0698
     /* E69DC 000E6968 01000534 */   ori       $a1, $zero, 0x1
     /* E69E0 000E696C 0000248E */  lw         $a0, 0x0($s1)
+  .globl sym_000E6970
   sym_000E6970:
     /* E69E4 000E6970 25284002 */  or         $a1, $s2, $zero
+  .globl sym_000E6974
   sym_000E6974:
     /* E69E8 000E6974 78008424 */  addiu      $a0, $a0, 0x78
+  .globl sym_000E6978
   sym_000E6978:
     /* E69EC 000E6978 00008684 */  lh         $a2, 0x0($a0)
+  .globl sym_000E697C
   sym_000E697C:
     /* E69F0 000E697C 0400898C */  lw         $t1, 0x4($a0)
+  .globl sym_000E6980
   sym_000E6980:
     /* E69F4 000E6980 21202602 */  addu       $a0, $s1, $a2
     /* E69F8 000E6984 25306002 */  or         $a2, $s3, $zero
     /* E69FC 000E6988 00200734 */  ori        $a3, $zero, 0x2000
     /* E6A00 000E698C 09F82001 */  jalr       $t1
+  .globl sym_000E6990
   sym_000E6990:
     /* E6A04 000E6990 25400002 */   or        $t0, $s0, $zero
     /* E6A08 000E6994 25108002 */  or         $v0, $s4, $zero

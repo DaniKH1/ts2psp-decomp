@@ -18,7 +18,7 @@ name: eboot
 sha1: a65b73c34233ad1de8574d7c1d82195852d31a52
 options:
   basename: eboot.elf
-  target_path: F:\Sims 2 PSP Decomp\disks\pgs-si2\EBOOT.dec
+  target_path: disks/pgs-si2/EBOOT.dec
   base_path: ..
   platform: psp
   compiler: GCC

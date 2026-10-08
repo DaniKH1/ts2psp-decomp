@@ -74,7 +74,7 @@ glabel elem_register_chunk_tag
     /* 106EE8 00106E74 0C000434 */   ori       $a0, $zero, 0xC
     /* 106EEC 00106E78 25204000 */  or         $a0, $v0, $zero
     /* 106EF0 00106E7C 06008050 */  beql       $a0, $zero, .Leboot_00106E98
-    /* 106EF4 00106E80 0600043C */   lui       $a0, %hi(func_0005C45C)
+    /* 106EF4 00106E80 0600043C */   lui       $a0, 0x0006
     /* 106EF8 00106E84 000080AC */  sw         $zero, 0x0($a0)
     /* 106EFC 00106E88 040080AC */  sw         $zero, 0x4($a0)
     /* 106F00 00106E8C 080080AC */  sw         $zero, 0x8($a0)

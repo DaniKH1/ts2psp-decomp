@@ -41,6 +41,7 @@ glabel func_000E1D44
     /* E1E28 000E1DB4 0500801C */  bgtz       $a0, .Leboot_000E1DCC
     /* E1E2C 000E1DB8 02008528 */   slti      $a1, $a0, 0x2
     /* E1E30 000E1DBC 0E008004 */  bltz       $a0, .Leboot_000E1DF8
+  .globl sym_000E1DC0
   sym_000E1DC0:
     /* E1E34 000E1DC0 00000000 */   nop
     /* E1E38 000E1DC4 0C000010 */  b          .Leboot_000E1DF8

@@ -13,7 +13,7 @@ glabel func_000ACA1C
     /* ACA90 000ACA1C 1D00053C */  lui        $a1, %hi(sym_001D56C4)
     /* ACA94 000ACA20 C456A48C */  lw         $a0, %lo(sym_001D56C4)($a1)
     /* ACA98 000ACA24 08008010 */  beqz       $a0, .Leboot_000ACA48
-    /* ACA9C 000ACA28 1D00063C */   lui       $a2, %hi(sym_001D1B00)
+    /* ACA9C 000ACA28 1D00063C */   lui       $a2, 0x001D
   .Leboot_000ACA2C:
     /* ACAA0 000ACA2C 9001868C */  lw         $a2, 0x190($a0)
     /* ACAA4 000ACA30 940180AC */  sw         $zero, 0x194($a0)

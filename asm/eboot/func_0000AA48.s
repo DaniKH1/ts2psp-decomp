@@ -423,8 +423,10 @@ glabel func_0000AA48
     /* B0C4 0000B050 B000B78F */  lw         $s7, 0xB0($sp)
     /* B0C8 0000B054 B400BE8F */  lw         $fp, 0xB4($sp)
     /* B0CC 0000B058 B800BF8F */  lw         $ra, 0xB8($sp)
+  .globl sym_0000B05C
   sym_0000B05C:
     /* B0D0 0000B05C 0800E003 */  jr         $ra
+  .globl sym_0000B060
   sym_0000B060:
     /* B0D4 0000B060 C000BD27 */   addiu     $sp, $sp, 0xC0
 endlabel func_0000AA48

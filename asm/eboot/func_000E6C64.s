@@ -45,14 +45,17 @@ glabel func_000E6C64
     /* E6D50 000E6CDC 6A8D040C */  jal        func_001235A8
     /* E6D54 000E6CE0 25206002 */   or        $a0, $s3, $zero
     /* E6D58 000E6CE4 00000434 */  ori        $a0, $zero, 0x0
+  .globl sym_000E6CE8
   sym_000E6CE8:
     /* E6D5C 000E6CE8 01006056 */  bnel       $s3, $zero, sym_000E6CF0
     /* E6D60 000E6CEC FCFF6426 */   addiu     $a0, $s3, -0x4
+  .globl sym_000E6CF0
   sym_000E6CF0:
     /* E6D64 000E6CF0 25288000 */  or         $a1, $a0, $zero
     /* E6D68 000E6CF4 00000434 */  ori        $a0, $zero, 0x0
     /* E6D6C 000E6CF8 0100A054 */  bnel       $a1, $zero, sym_000E6D00
     /* E6D70 000E6CFC 0400A424 */   addiu     $a0, $a1, 0x4
+  .globl sym_000E6D00
   sym_000E6D00:
     /* E6D74 000E6D00 25288000 */  or         $a1, $a0, $zero
     /* E6D78 000E6D04 4E8D040C */  jal        func_00123538
@@ -60,17 +63,21 @@ glabel func_000E6C64
     /* E6D80 000E6D0C 8400138E */  lw         $s3, 0x84($s0)
     /* E6D84 000E6D10 26207202 */  xor        $a0, $s3, $s2
     /* E6D88 000E6D14 0100842C */  sltiu      $a0, $a0, 0x1
+  .globl sym_000E6D18
   sym_000E6D18:
     /* E6D8C 000E6D18 FF008430 */  andi       $a0, $a0, 0xFF
     /* E6D90 000E6D1C E7FF8010 */  beqz       $a0, .Leboot_000E6CBC
+  .globl sym_000E6D20
   sym_000E6D20:
     /* E6D94 000E6D20 00000000 */   nop
   .Leboot_000E6D24:
     /* E6D98 000E6D24 1E00043C */  lui        $a0, %hi(sym_001DA350)
   .L000E6D28:
     /* E6D9C 000E6D28 50A39124 */  addiu      $s1, $a0, %lo(sym_001DA350)
+  .globl sym_000E6D2C
   sym_000E6D2C:
     /* E6DA0 000E6D2C 7C00078E */  lw         $a3, 0x7C($s0)
+  .globl sym_000E6D30
   sym_000E6D30:
     /* E6DA4 000E6D30 25202002 */  or         $a0, $s1, $zero
     /* E6DA8 000E6D34 25282002 */  or         $a1, $s1, $zero

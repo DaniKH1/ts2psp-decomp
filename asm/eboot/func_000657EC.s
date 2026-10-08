@@ -165,6 +165,7 @@ glabel func_000657EC
     /* 65A90 00065A1C 25280000 */   or        $a1, $zero, $zero
     /* 65A94 00065A20 02004014 */  bnez       $v0, .Leboot_00065A2C
     /* 65A98 00065A24 00000000 */   nop
+  .globl sym_00065A28
   sym_00065A28:
     /* 65A9C 00065A28 700200A2 */  sb         $zero, 0x270($s0)
   .Leboot_00065A2C:

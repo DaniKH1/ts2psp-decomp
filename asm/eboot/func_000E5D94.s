@@ -154,7 +154,7 @@ glabel func_000E5D94
     /* E6018 000E5FA4 2120A400 */  addu       $a0, $a1, $a0
     /* E601C 000E5FA8 00008490 */  lbu        $a0, 0x0($a0)
     /* E6020 000E5FAC 1F008010 */  beqz       $a0, .Leboot_000E602C
-    /* E6024 000E5FB0 0500043C */   lui       $a0, %hi(func_00048744)
+    /* E6024 000E5FB0 0500043C */   lui       $a0, 0x0005
     /* E6028 000E5FB4 0500043C */  lui        $a0, %hi(func_00051968)
     /* E602C 000E5FB8 6819848C */  lw         $a0, %lo(func_00051968)($a0)
     /* E6030 000E5FBC 0200053C */  lui        $a1, %hi(D_eboot_00020080)
@@ -166,7 +166,7 @@ glabel func_000E5D94
     /* E6048 000E5FD4 2120A400 */  addu       $a0, $a1, $a0
     /* E604C 000E5FD8 02008490 */  lbu        $a0, 0x2($a0)
     /* E6050 000E5FDC 13008010 */  beqz       $a0, .Leboot_000E602C
-    /* E6054 000E5FE0 0500043C */   lui       $a0, %hi(func_00048744)
+    /* E6054 000E5FE0 0500043C */   lui       $a0, 0x0005
     /* E6058 000E5FE4 0500113C */  lui        $s1, %hi(sym_00051974)
     /* E605C 000E5FE8 7419248E */  lw         $a0, %lo(sym_00051974)($s1)
     /* E6060 000E5FEC A6C1060C */  jal        stub_001B0698
@@ -183,7 +183,7 @@ glabel func_000E5D94
     /* E608C 000E6018 A8C1060C */  jal        stub_001B06A0
     /* E6090 000E601C 25300000 */   or        $a2, $zero, $zero
     /* E6094 000E6020 D9FF0010 */  b          .Leboot_000E5F88
-    /* E6098 000E6024 0500043C */   lui       $a0, %hi(func_00048744)
+    /* E6098 000E6024 0500043C */   lui       $a0, 0x0005
     /* E609C 000E6028 0500043C */  lui        $a0, %hi(func_00051968)
   .Leboot_000E602C:
     /* E60A0 000E602C 6819848C */  lw         $a0, %lo(func_00051968)($a0)
@@ -340,7 +340,7 @@ glabel func_000E5D94
     /* E62E4 000E6270 A899848C */  lw         $a0, %lo(sym_000599A8)($a0)
     /* E62E8 000E6274 0018842C */  sltiu      $a0, $a0, 0x1800
     /* E62EC 000E6278 0F008014 */  bnez       $a0, .Leboot_000E62B8
-    /* E62F0 000E627C 0500043C */   lui       $a0, %hi(func_00048744)
+    /* E62F0 000E627C 0500043C */   lui       $a0, 0x0005
     /* E62F4 000E6280 0600043C */  lui        $a0, %hi(sym_000599A8)
     /* E62F8 000E6284 A899858C */  lw         $a1, %lo(sym_000599A8)($a0)
     /* E62FC 000E6288 0600113C */  lui        $s1, %hi(sym_000599AC)

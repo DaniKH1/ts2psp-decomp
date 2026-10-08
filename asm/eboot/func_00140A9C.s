@@ -11,7 +11,7 @@ nonmatching func_00140A9C, 0x28
 
 glabel func_00140A9C
     /* 140B10 00140A9C 05000010 */  b          .Leboot_00140AB4
-    /* 140B14 00140AA0 1E00043C */   lui       $a0, %hi(sym_001E2AA4)
+    /* 140B14 00140AA0 1E00043C */   lui       $a0, 0x001E
     /* 140B18 00140AA4 0400028C */  lw         $v0, 0x4($zero)
     /* 140B1C 00140AA8 04004014 */  bnez       $v0, .Leboot_00140ABC
     /* 140B20 00140AAC 00000000 */   nop

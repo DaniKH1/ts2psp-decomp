@@ -22,7 +22,7 @@ glabel func_0012C4C0
     /* 12C558 0012C4E4 25202002 */   or        $a0, $s1, $zero
     /* 12C55C 0012C4E8 24092426 */  addiu      $a0, $s1, 0x924
     /* 12C560 0012C4EC 07008010 */  beqz       $a0, .Leboot_0012C50C
-    /* 12C564 0012C4F0 1B00053C */   lui       $a1, %hi(func_001ABA4C)
+    /* 12C564 0012C4F0 1B00053C */   lui       $a1, 0x001B
     /* 12C568 0012C4F4 1F00053C */  lui        $a1, %hi(sym_001EDEF8)
     /* 12C56C 0012C4F8 F8DEA524 */  addiu      $a1, $a1, %lo(sym_001EDEF8)
     /* 12C570 0012C4FC 380925AE */  sw         $a1, 0x938($s1)

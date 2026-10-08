@@ -24,7 +24,7 @@ glabel func_0008A65C
     /* 8A6F8 0008A684 97B2040C */  jal        func_0012CA5C
     /* 8A6FC 0008A688 28000634 */   ori       $a2, $zero, 0x28
     /* 8A700 0008A68C 03000010 */  b          .Leboot_0008A69C
-    /* 8A704 0008A690 0E00043C */   lui       $a0, %hi(sym_000E1B68)
+    /* 8A704 0008A690 0E00043C */   lui       $a0, 0x000E
   .Leboot_0008A694:
     /* 8A708 0008A694 1000A0A3 */  sb         $zero, 0x10($sp)
     /* 8A70C 0008A698 0E00043C */  lui        $a0, %hi(sym_000E2388)
@@ -33,7 +33,7 @@ glabel func_0008A65C
     /* 8A714 0008A6A0 04004426 */  addiu      $a0, $s2, 0x4
     /* 8A718 0008A6A4 0000918C */  lw         $s1, 0x0($a0)
     /* 8A71C 0008A6A8 11002012 */  beqz       $s1, .Leboot_0008A6F0
-    /* 8A720 0008A6AC 0E00043C */   lui       $a0, %hi(sym_000E1B68)
+    /* 8A720 0008A6AC 0E00043C */   lui       $a0, 0x000E
     /* 8A724 0008A6B0 CC00A0A3 */  sb         $zero, 0xCC($sp)
   .Leboot_0008A6B4:
     /* 8A728 0008A6B4 10002426 */  addiu      $a0, $s1, 0x10
@@ -56,7 +56,7 @@ glabel func_0008A65C
   .Leboot_0008A6F0:
     /* 8A764 0008A6F0 8823848C */  lw         $a0, %lo(sym_000E2388)($a0)
     /* 8A768 0008A6F4 0A004412 */  beq        $s2, $a0, .Leboot_0008A720
-    /* 8A76C 0008A6F8 0E00043C */   lui       $a0, %hi(sym_000E1B68)
+    /* 8A76C 0008A6F8 0E00043C */   lui       $a0, 0x000E
     /* 8A770 0008A6FC CD00A0A3 */  sb         $zero, 0xCD($sp)
     /* 8A774 0008A700 1000A427 */  addiu      $a0, $sp, 0x10
     /* 8A778 0008A704 610E050C */  jal        func_00143984

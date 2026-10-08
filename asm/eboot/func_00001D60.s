@@ -50,20 +50,28 @@ glabel func_00001D60
     /* 1E5C 00001DE8 21208600 */   addu      $a0, $a0, $a2
     /* 1E60 00001DEC CC00448E */  lw         $a0, 0xCC($s2)
     /* 1E64 00001DF0 CC004526 */  addiu      $a1, $s2, 0xCC
+  .globl sym_00001DF4
   sym_00001DF4:
     /* 1E68 00001DF4 1C00848C */  lw         $a0, 0x1C($a0)
+  .globl sym_00001DF8
   sym_00001DF8:
     /* 1E6C 00001DF8 26208500 */  xor        $a0, $a0, $a1
+  .globl sym_00001DFC
   sym_00001DFC:
     /* 1E70 00001DFC 0100842C */  sltiu      $a0, $a0, 0x1
+  .globl sym_00001E00
   sym_00001E00:
     /* 1E74 00001E00 FF008430 */  andi       $a0, $a0, 0xFF
+  .globl sym_00001E04
   sym_00001E04:
     /* 1E78 00001E04 05008014 */  bnez       $a0, .Leboot_00001E1C
+  .globl sym_00001E08
   sym_00001E08:
     /* 1E7C 00001E08 25A04000 */   or        $s4, $v0, $zero
+  .globl sym_00001E0C
   sym_00001E0C:
     /* 1E80 00001E0C 25000010 */  b          .Leboot_00001EA4
+  .globl sym_00001E10
   sym_00001E10:
     /* 1E84 00001E10 0000248E */   lw        $a0, 0x0($s1)
   .Leboot_00001E14:
@@ -73,6 +81,7 @@ glabel func_00001D60
     /* 1E90 00001E1C 7059958E */  lw         $s5, 0x5970($s4)
     /* 1E94 00001E20 78009626 */  addiu      $s6, $s4, 0x78
     /* 1E98 00001E24 B184000C */  jal        func_000212C4
+  .globl sym_00001E28
   sym_00001E28:
     /* 1E9C 00001E28 25208002 */   or        $a0, $s4, $zero
     /* 1EA0 00001E2C 2520A002 */  or         $a0, $s5, $zero
@@ -130,6 +139,7 @@ glabel func_00001D60
   .Leboot_00001EE8:
     /* 1F5C 00001EE8 1000B08F */  lw         $s0, 0x10($sp)
     /* 1F60 00001EEC 1400B18F */  lw         $s1, 0x14($sp)
+  .globl sym_00001EF0
   sym_00001EF0:
     /* 1F64 00001EF0 1800B28F */  lw         $s2, 0x18($sp)
     /* 1F68 00001EF4 1C00B38F */  lw         $s3, 0x1C($sp)

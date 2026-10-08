@@ -11,6 +11,7 @@ nonmatching func_000E23E4, 0x160
 
 glabel func_000E23E4
     /* E2458 000E23E4 B0FFBD27 */  addiu      $sp, $sp, -0x50
+  .globl sym_000E23E8
   sym_000E23E8:
     /* E245C 000E23E8 2000B0AF */  sw         $s0, 0x20($sp)
     /* E2460 000E23EC 3800B6AF */  sw         $s6, 0x38($sp)
@@ -21,14 +22,17 @@ glabel func_000E23E4
     /* E2470 000E23FC 2C00B3AF */  sw         $s3, 0x2C($sp)
     /* E2474 000E2400 FF00F330 */  andi       $s3, $a3, 0xFF
     /* E2478 000E2404 3876D626 */  addiu      $s6, $s6, %lo(sym_000E7638)
+  .globl sym_000E2408
   sym_000E2408:
     /* E247C 000E2408 26389600 */  xor        $a3, $a0, $s6
     /* E2480 000E240C 0100E72C */  sltiu      $a3, $a3, 0x1
     /* E2484 000E2410 2400B1AF */  sw         $s1, 0x24($sp)
     /* E2488 000E2414 3000B4AF */  sw         $s4, 0x30($sp)
+  .globl sym_000E2418
   sym_000E2418:
     /* E248C 000E2418 3400B5AF */  sw         $s5, 0x34($sp)
     /* E2490 000E241C FF001431 */  andi       $s4, $t0, 0xFF
+  .globl sym_000E2420
   sym_000E2420:
     /* E2494 000E2420 00001534 */  ori        $s5, $zero, 0x0
     /* E2498 000E2424 FF00E730 */  andi       $a3, $a3, 0xFF
@@ -38,6 +42,7 @@ glabel func_000E23E4
     /* E24A8 000E2434 4000BFAF */  sw         $ra, 0x40($sp)
     /* E24AC 000E2438 3600E014 */  bnez       $a3, .Leboot_000E2514
     /* E24B0 000E243C 2590C000 */   or        $s2, $a2, $zero
+  .globl sym_000E2440
   sym_000E2440:
     /* E24B4 000E2440 25A88000 */  or         $s5, $a0, $zero
     /* E24B8 000E2444 0000A48E */  lw         $a0, 0x0($s5)
@@ -47,6 +52,7 @@ glabel func_000E23E4
     /* E24C8 000E2454 03008010 */  beqz       $a0, .Leboot_000E2464
     /* E24CC 000E2458 00000000 */   nop
     /* E24D0 000E245C 06000010 */  b          .Leboot_000E2478
+  .globl sym_000E2460
   sym_000E2460:
     /* E24D4 000E2460 00001734 */   ori       $s7, $zero, 0x0
   .Leboot_000E2464:

@@ -57,7 +57,7 @@ glabel func_0014A0BC
     /* 14A1E0 0014A16C 6000BD27 */   addiu     $sp, $sp, 0x60
   .Leboot_0014A170:
     /* 14A1E4 0014A170 10000005 */  bltz       $t0, .Leboot_0014A1B4
-    /* 14A1E8 0014A174 1E00043C */   lui       $a0, %hi(sym_001E2AA4)
+    /* 14A1E8 0014A174 1E00043C */   lui       $a0, 0x001E
     /* 14A1EC 0014A178 1E00043C */  lui        $a0, %hi(sym_001E2568)
     /* 14A1F0 0014A17C 2C25898C */  lw         $t1, %lo(sym_001E252C)($a0)
     /* 14A1F4 0014A180 2825888C */  lw         $t0, %lo(sym_001E2528)($a0)
@@ -132,7 +132,7 @@ glabel func_0014A0BC
     /* 14A300 0014A28C 12008014 */  bnez       $a0, .Leboot_0014A2D8
     /* 14A304 0014A290 25A04000 */   or        $s4, $v0, $zero
     /* 14A308 0014A294 A4000010 */  b          .Leboot_0014A528
-    /* 14A30C 0014A298 1E00043C */   lui       $a0, %hi(sym_001E2AA4)
+    /* 14A30C 0014A298 1E00043C */   lui       $a0, 0x001E
   .Leboot_0014A29C:
     /* 14A310 0014A29C 2520C000 */  or         $a0, $a2, $zero
     /* 14A314 0014A2A0 CA34050C */  jal        func_0014D328

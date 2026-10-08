@@ -11,12 +11,15 @@ nonmatching func_0000C9E8, 0x278
 
 glabel func_0000C9E8
     /* CA5C 0000C9E8 C0FFBD27 */  addiu      $sp, $sp, -0x40
+  .globl sym_0000C9EC
   sym_0000C9EC:
     /* CA60 0000C9EC 3000B1AF */  sw         $s1, 0x30($sp)
     /* CA64 0000C9F0 3400B2AF */  sw         $s2, 0x34($sp)
     /* CA68 0000C9F4 2588A000 */  or         $s1, $a1, $zero
+  .globl sym_0000C9F8
   sym_0000C9F8:
     /* CA6C 0000C9F8 25908000 */  or         $s2, $a0, $zero
+  .globl sym_0000C9FC
   sym_0000C9FC:
     /* CA70 0000C9FC 2C00B0AF */  sw         $s0, 0x2C($sp)
   .L0000CA00:
@@ -36,9 +39,11 @@ glabel func_0000C9E8
     /* CAA8 0000CA34 FFFF0524 */  addiu      $a1, $zero, -0x1
     /* CAAC 0000CA38 6B3F040C */  jal        func_0010FDAC
     /* CAB0 0000CA3C 2188C700 */   addu      $s1, $a2, $a3
+  .globl sym_0000CA40
   sym_0000CA40:
     /* CAB4 0000CA40 0400068E */  lw         $a2, 0x4($s0)
     /* CAB8 0000CA44 25202002 */  or         $a0, $s1, $zero
+  .globl sym_0000CA48
   sym_0000CA48:
     /* CABC 0000CA48 09F8C000 */  jalr       $a2
     /* CAC0 0000CA4C 25284000 */   or        $a1, $v0, $zero

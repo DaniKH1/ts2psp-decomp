@@ -26,7 +26,7 @@ glabel func_0012CEDC
     /* 12CF84 0012CF10 3C090434 */   ori       $a0, $zero, 0x93C
     /* 12CF88 0012CF14 25884000 */  or         $s1, $v0, $zero
     /* 12CF8C 0012CF18 23002012 */  beqz       $s1, .Leboot_0012CFA8
-    /* 12CF90 0012CF1C 1E00043C */   lui       $a0, %hi(sym_001E2AA4)
+    /* 12CF90 0012CF1C 1E00043C */   lui       $a0, 0x001E
     /* 12CF94 0012CF20 00608044 */  mtc1       $zero, $f12
     /* 12CF98 0012CF24 100020AE */  sw         $zero, 0x10($s1)
     /* 12CF9C 0012CF28 14002CE6 */  swc1       $f12, 0x14($s1)

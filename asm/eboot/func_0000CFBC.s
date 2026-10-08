@@ -34,6 +34,7 @@ glabel func_0000CFBC
     /* D07C 0000D008 640000AE */  sw         $zero, 0x64($s0)
   .L0000D00C:
     /* D080 0000D00C 70C5040C */  jal        func_001315C0
+  .globl sym_0000D010
   sym_0000D010:
     /* D084 0000D010 1400A4AF */   sw        $a0, 0x14($sp)
     /* D088 0000D014 25204000 */  or         $a0, $v0, $zero
