@@ -19,18 +19,14 @@ glabel func_000E69C4
     /* E6A50 000E69DC 1E00073C */  lui        $a3, %hi(sym_001DA348)
     /* E6A54 000E69E0 7363043C */  lui        $a0, %hi(D_6373756D)
     /* E6A58 000E69E4 1E00083C */  lui        $t0, %hi(sym_001DA34C)
-  .globl sym_000E69E8
   sym_000E69E8:
     /* E6A5C 000E69E8 03000534 */  ori        $a1, $zero, 0x3
   .L000E69EC:
     /* E6A60 000E69EC 08000634 */  ori        $a2, $zero, 0x8
-  .globl sym_000E69F0
   sym_000E69F0:
     /* E6A64 000E69F0 6D758424 */  addiu      $a0, $a0, %lo(D_6373756D)
-  .globl sym_000E69F4
   sym_000E69F4:
     /* E6A68 000E69F4 1000BFAF */  sw         $ra, 0x10($sp)
-  .globl sym_000E69F8
   sym_000E69F8:
     /* E6A6C 000E69F8 036B0C46 */  div.s      $f12, $f13, $f12
   .L000E69FC:
@@ -39,16 +35,13 @@ glabel func_000E69C4
     /* E6A74 000E6A00 611B040C */  jal        elem_register_chunk_tag
   .L000E6A04:
     /* E6A78 000E6A04 4CA30CE5 */   swc1      $f12, %lo(sym_001DA34C)($t0)
-  .globl sym_000E6A08
   sym_000E6A08:
     /* E6A7C 000E6A08 6174043C */  lui        $a0, %hi(D_7461646D)
   .L000E6A0C:
     /* E6A80 000E6A0C 03000534 */  ori        $a1, $zero, 0x3
-  .globl sym_000E6A10
   sym_000E6A10:
     /* E6A84 000E6A10 00100634 */  ori        $a2, $zero, 0x1000
     /* E6A88 000E6A14 611B040C */  jal        elem_register_chunk_tag
-  .globl sym_000E6A18
   sym_000E6A18:
     /* E6A8C 000E6A18 6D648424 */   addiu     $a0, $a0, %lo(D_7461646D)
     /* E6A90 000E6A1C 1F00043C */  lui        $a0, %hi(sym_001ECFA0)

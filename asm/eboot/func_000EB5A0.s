@@ -186,13 +186,10 @@ glabel func_000EB5A0
     /* EB890 000EB81C 2C00B38F */  lw         $s3, 0x2C($sp)
     /* EB894 000EB820 3000B48F */  lw         $s4, 0x30($sp)
     /* EB898 000EB824 3400B58F */  lw         $s5, 0x34($sp)
-  .globl sym_000EB828
   sym_000EB828:
     /* EB89C 000EB828 3800B68F */  lw         $s6, 0x38($sp)
-  .globl sym_000EB82C
   sym_000EB82C:
     /* EB8A0 000EB82C 3C00B78F */  lw         $s7, 0x3C($sp)
-  .globl sym_000EB830
   sym_000EB830:
     /* EB8A4 000EB830 4000BE8F */  lw         $fp, 0x40($sp)
     /* EB8A8 000EB834 4400BF8F */  lw         $ra, 0x44($sp)

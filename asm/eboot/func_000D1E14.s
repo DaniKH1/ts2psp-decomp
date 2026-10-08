@@ -100,7 +100,7 @@ glabel func_000D1E14
     /* D1FE4 000D1F70 25204000 */  or         $a0, $v0, $zero
     /* D1FE8 000D1F74 2400A58F */  lw         $a1, 0x24($sp)
     /* D1FEC 000D1F78 05008014 */  bnez       $a0, .Leboot_000D1F90
-    /* D1FF0 000D1F7C 1E00063C */   lui       $a2, 0x001E
+    /* D1FF0 000D1F7C 1E00063C */   lui       $a2, %hi(sym_001E2AA4)
     /* D1FF4 000D1F80 AB41050C */  jal        func_001506AC
     /* D1FF8 000D1F84 2520A000 */   or        $a0, $a1, $zero
     /* D1FFC 000D1F88 25204000 */  or         $a0, $v0, $zero

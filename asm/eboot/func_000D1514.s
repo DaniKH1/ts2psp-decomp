@@ -39,7 +39,7 @@ glabel func_000D1514
     /* D15F0 000D157C 04008524 */  addiu      $a1, $a0, 0x4
     /* D15F4 000D1580 0000A58C */  lw         $a1, 0x0($a1)
     /* D15F8 000D1584 1000A050 */  beql       $a1, $zero, .Leboot_000D15C8
-    /* D15FC 000D1588 1E00053C */   lui       $a1, 0x001E
+    /* D15FC 000D1588 1E00053C */   lui       $a1, %hi(sym_001E2AA4)
     /* D1600 000D158C 2C00A0A3 */  sb         $zero, 0x2C($sp)
   .Leboot_000D1590:
     /* D1604 000D1590 1000A68C */  lw         $a2, 0x10($a1)
@@ -61,7 +61,7 @@ glabel func_000D1514
   .Leboot_000D15C8:
     /* D163C 000D15C8 E499A58C */  lw         $a1, %lo(sym_001D99E4)($a1)
     /* D1640 000D15CC 09008550 */  beql       $a0, $a1, .Leboot_000D15F4
-    /* D1644 000D15D0 1E00043C */   lui       $a0, 0x001E
+    /* D1644 000D15D0 1E00043C */   lui       $a0, %hi(sym_001E2AA4)
     /* D1648 000D15D4 2D00A0A3 */  sb         $zero, 0x2D($sp)
     /* D164C 000D15D8 5800458E */  lw         $a1, 0x58($s2)
     /* D1650 000D15DC 1000868C */  lw         $a2, 0x10($a0)
@@ -112,7 +112,7 @@ glabel func_000D1514
     /* D16FC 000D1688 0C00E724 */   addiu     $a3, $a3, 0xC
     /* D1700 000D168C 25904000 */  or         $s2, $v0, $zero
     /* D1704 000D1690 04004012 */  beqz       $s2, .Leboot_000D16A4
-    /* D1708 000D1694 1E00043C */   lui       $a0, 0x001E
+    /* D1708 000D1694 1E00043C */   lui       $a0, %hi(sym_001E2AA4)
     /* D170C 000D1698 DDC6040C */  jal        func_00131B74
     /* D1710 000D169C 25204002 */   or        $a0, $s2, $zero
     /* D1714 000D16A0 1E00043C */  lui        $a0, %hi(sym_001D99E4)

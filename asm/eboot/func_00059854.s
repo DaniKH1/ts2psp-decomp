@@ -101,28 +101,20 @@ glabel func_00059854
     /* 59A10 0005999C 080091C4 */  lwc1       $f17, 0x8($a0)
     /* 59A14 000599A0 428C0F46 */  mul.s      $f17, $f17, $f15
     /* 59A18 000599A4 41641146 */  sub.s      $f17, $f12, $f17
-  .globl sym_000599A8
   sym_000599A8:
     /* 59A1C 000599A8 458C0046 */  abs.s      $f17, $f17
-  .globl sym_000599AC
   sym_000599AC:
     /* 59A20 000599AC 3C880E46 */  c.lt.s     $f17, $f14
-  .globl sym_000599B0
   sym_000599B0:
     /* 59A24 000599B0 00000000 */  nop
-  .globl sym_000599B4
   sym_000599B4:
     /* 59A28 000599B4 07000145 */  bc1t       .Leboot_000599D4 /* handwritten instruction */
-  .globl sym_000599B8
   sym_000599B8:
     /* 59A2C 000599B8 00000000 */   nop
-  .globl sym_000599BC
   sym_000599BC:
     /* 59A30 000599BC 0100A524 */  addiu      $a1, $a1, 0x1
-  .globl sym_000599C0
   sym_000599C0:
     /* 59A34 000599C0 0A00A628 */  slti       $a2, $a1, 0xA
-  .globl sym_000599C4
   sym_000599C4:
     /* 59A38 000599C4 E5FFC014 */  bnez       $a2, .Leboot_0005995C
     /* 59A3C 000599C8 0C008424 */   addiu     $a0, $a0, 0xC

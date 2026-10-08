@@ -14,7 +14,6 @@ glabel func_000E6A58
     /* E6AD0 000E6A5C 1000B0AF */  sw         $s0, 0x10($sp)
     /* E6AD4 000E6A60 1400BFAF */  sw         $ra, 0x14($sp)
     /* E6AD8 000E6A64 B28B030C */  jal        func_000E2EC8
-  .globl sym_000E6A68
   sym_000E6A68:
     /* E6ADC 000E6A68 25808000 */   or        $s0, $a0, $zero
     /* E6AE0 000E6A6C 1F00043C */  lui        $a0, %hi(sym_001ECFD0)

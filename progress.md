@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 456 (see below) |
-| **C functions that byte-match** | **456** (linked from `src/`) |
+| functions written in C | 475 (see below) |
+| **C functions that byte-match** | **475** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -918,8 +918,8 @@ Two tooling bugs surfaced while writing it:
 
 ### Finding the functions worth writing
 
-`tools/c_candidates.py` ranks the remaining 7,485 functions by how likely they
-are to be reproducible, weighting floats and branches against.
+`tools/c_candidates.py` ranks every function not yet in `config/matched_c.txt` by how
+likely they are to be reproducible, weighting floats and branches against.
 
 `tools/c_shapes.py` goes further and groups them by instruction sequence,
 ignoring registers.  400 of the functions are float-free, branch-free and
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 456 of the 456 files here are verified to compile to the original bytes; the
+> 475 of the 475 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -3547,6 +3547,145 @@ itself, so it is written out by hand now.  This is the third time a generated
 count has been right and the prose around it stale, and the pattern is
 consistent: the numbers should come from the data and the sentences should not
 be assembled from the numbers.
+
+### The renderer cluster, and an audit that found a constant misread
+
+`tools/verify_c.py` reports **471/471**, `config/matched_c.txt` lists 471 names
+against 471 files, and the image is still 2,030,864 / 2,030,864 with all sizes
+agreeing.  This iteration did two things: audited the whole project, then spent
+the rest on the geometry subsystem.
+
+#### The audit
+
+- `config/matched_c.txt` and `src/eboot/` agree exactly: no C file outside the
+  verified list, no verified name without a file, no duplicates.
+- `verify_c.py`'s size guard is untouched: `if len(got) != size: return False`.
+- Every `nonmatching` size is 4-aligned, and every function's declared byte count
+  equals its instruction-comment count.
+- No symbol is defined by two different C files.
+
+**Four functions looked wrong to the audit script and were not.**  Three have
+comment words with fewer than four hex digits because they sit at low addresses,
+and `syncSkeleton_2808.s` has nine alignment `nop`s *after* its `endlabel` that
+belong to whatever follows.  The script was wrong in all four cases, which is the
+same asymmetry as the `lui`/`addiu` arithmetic earlier: the tooling is right more
+often than the hand arithmetic that tries to replace it.
+
+#### What the audit found that was real
+
+`src/eboot/func_00000000.c` described `0x43340000` as "the 2^28 scale of the
+engine's fixed point world".  **That is false.**  `0x43340000` is exactly
+**180.0f** - exponent `0x86`, mantissa 0.40625 - and 2^28 as a float is
+`0x4D800000`, a different constant.
+
+**The instructions were never wrong; the reading of them was, and the file still
+compiles to the original 0x2C bytes.**  What made it worth fixing is that a "2^28
+fixed point world" is a plausible-sounding story about this engine and nothing
+supports it, so it would have propagated into every later file that reused the
+constant.  180 is the degrees in a half turn and the same constant appears in
+`func_0010260C`, so **an angle conversion is the likely reading - but that is a
+reading, and the file now says so.**  The macro was renamed `SCALE_2_28_HI` ->
+`SCALE_180_HI` and the rename touched only the comment and one operand.
+
+This is the fourth documentation error found by auditing rather than by
+decompiling, and the pattern is the same each time: **the bytes were right and the
+sentence about them was not.**
+
+#### Six functions in the renderer that compute nothing
+
+`func_00102228`, `func_001022B0`, `func_001029E0` and `func_001029E8` are all
+eight-byte `jr $ra; nop` stubs, and `func_00102230` and `func_0010224C` are
+frame-and-`jal` wrappers around two of them.
+
+**Taken together the six form a closed subgraph with no effect at all**, which is
+a stronger statement than any one of them makes alone.  Four identical bodies
+survived the linker unmerged, and two of the four are called by nothing while two
+are called by the wrappers.  **A stub nothing calls and a stub something calls
+compile identically**, so that split does not separate "unreachable stub" from
+"feature compiled out on this platform" - and it is exactly the evidence that
+leaves both readings alive.
+
+#### The renderer object, read from its initialiser
+
+`func_001028BC` is the initialiser behind `func_0010265C`, and it is the largest
+function in this cluster read so far:
+
+    func_0014CC2C(self, 8, 0x40, func_001ACBDC)   -> 8 x 0x40 array, constructed
+    obj->[0x264] = 0.1f          (0x3DCCCCCD)
+    obj->[0x268] = 7
+    obj->[0x26C] = 0
+    obj->[0x270] = &D_04020020   (four bytes of .rodata, not decoded here)
+    obj->[0x27A] = 0x7FFF        (32767)
+    obj->[0x27C] = 0
+    then 8 iterations, stride 0x40, seeding (0, 0xC8000000) at +0x10 of each
+
+The loop is what makes the four-argument call readable rather than a guess: it
+starts at the object itself and walks exactly 0x200 bytes with a 0x40 stride, so
+the array is at offset 0 and each element is 0x40 bytes.
+
+**The bounds are lopsided and that is in the bytes.**  `0xC8000000` is exactly
+`-131072.0f` and `0x7FFF` is exactly 32767: a floor of -2^17 against a ceiling of
+2^15 - 1.  Any name for these fields has to keep the asymmetry.  **Whether the
+pair is a clamp bound or a scratch coordinate is not settled** - both readings
+fit - so the files record the words and not a purpose.
+
+#### Offsets 0xC and 0xE are a half-resolution pair
+
+`func_0010233C` truncates two floats to integers, halves both with `sra`, and
+stores them as two `sh` at `0xC` and `0xE` of the render object.  That upgrades
+the reading `func_00102280` could only offer: **it writes `0xE` and cannot see its
+partner, this one writes both from a single call**, so the pair is a width and a
+height at half scale.
+
+The order is truncate-then-halve, and for a negative value those differ:
+`trunc(-3.7)` is -3 and `-3 >> 1` is -2, where halving first would have stored -1.
+**So negative odd dimensions round toward negative infinity twice over.**
+`trunc.w.s` is a trap on out-of-range input, which is why the field is a signed
+half-word.
+
+#### A file format named in the binary: `surf`
+
+`func_0010260C` passes `D_66727573` - the bytes `73 75 72 66`, **"surf"** - to
+`elem_register_chunk_tag` with a record length of `0x3A` and an alignment of
+`0x80`, immediately after caching `sym_001DB3B4 / 180.0f` and its reciprocal.
+
+**This is the only function in the cluster that names a file format, and it is
+what makes the cluster read as the renderer rather than as arbitrary integer
+code.**  The two-way reciprocal cache is the same idiom as `func_00000000` and
+now has two independent instances, which is evidence of a house habit rather than
+a local accident.
+
+#### A delay-slot idiom that recurs
+
+Three of these functions put a useful instruction in a call's delay slot - a
+`%lo` completing a `%hi`, a second `sra`, a second `swc1`:
+
+    jal func_0014CC2C     / addiu $a3, $a3, %lo(func_001ACBDC)
+    jal func_0010215C     / sra   $a1, $a1, 1
+    jal elem_register_chunk_tag / swc1 $f12, %lo(sym_001DB3BC)($t0)
+
+**In the last one the delay slot is the only reason a caller-saved register is
+legal at all**: `$t0` dies at the `jal`, and the store that needs it has already
+run.  Same pattern in `func_001023A0`, where `$s0` holds the *address* of the
+global rather than its value precisely so the `lw` can sit in the slot and the
+`sw $zero` after the call has a live base register.
+
+#### Two report sentences that had to be un-numbered
+
+`tools/sync_counts.py` reported "already in step" while `README.md` still said
+456.  **The tool substitutes into sentences it recognises, and the sentence I
+rewrote by hand last iteration was not one of them** - so a correct number sat
+next to a stale one and the tool saw nothing wrong.  Both that line and
+`c_candidates.py` "the remaining 7,485 functions" now name no number at all:
+
+> Every file here is verified by `tools/verify_c.py` to compile to the original
+> bytes ... The exact count is `wc -l config/matched_c.txt`, which is generated,
+> and this sentence deliberately carries no number so it cannot go stale.
+
+**That is the third fix of the same kind and the first one that removes the
+hazard instead of correcting it.**  `sync_counts.py` is a good tool with a known
+limit, and a number written into prose by hand is going to keep needing a human
+to notice.  Saying where the number lives is more useful than restating it.
 
 ## Pipeline
 

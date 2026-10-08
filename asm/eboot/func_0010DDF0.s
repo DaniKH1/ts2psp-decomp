@@ -50,7 +50,7 @@ glabel func_0010DDF0
     /* 10DEF4 0010DE80 25200002 */   or        $a0, $s0, $zero
     /* 10DEF8 0010DE84 03004428 */  slti       $a0, $v0, 0x3
     /* 10DEFC 0010DE88 0C008014 */  bnez       $a0, .Leboot_0010DEBC
-    /* 10DF00 0010DE8C 1D00063C */   lui       $a2, 0x001D
+    /* 10DF00 0010DE8C 1D00063C */   lui       $a2, %hi(sym_001D1B00)
     /* 10DF04 0010DE90 25200002 */  or         $a0, $s0, $zero
     /* 10DF08 0010DE94 DB3E040C */  jal        func_0010FB6C
     /* 10DF0C 0010DE98 03000534 */   ori       $a1, $zero, 0x3

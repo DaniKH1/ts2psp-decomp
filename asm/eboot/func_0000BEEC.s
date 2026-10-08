@@ -23,7 +23,6 @@ glabel func_0000BEEC
     /* BF88 0000BF14 00008CE4 */   swc1      $f12, 0x0($a0)
   .Leboot_0000BF18:
     /* BF8C 0000BF18 25388000 */  or         $a3, $a0, $zero
-  .globl sym_0000BF1C
   sym_0000BF1C:
     /* BF90 0000BF1C 2520C000 */  or         $a0, $a2, $zero
     /* BF94 0000BF20 1A37000C */  jal        func_0000DC68

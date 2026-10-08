@@ -41,21 +41,21 @@ glabel func_001A8878
     /* 1A895C 001A88E8 00000000 */   nop
   .Leboot_001A88EC:
     /* 1A8960 001A88EC 12004012 */  beqz       $s2, .Leboot_001A8938
-    /* 1A8964 001A88F0 1B00053C */   lui       $a1, 0x001B
+    /* 1A8964 001A88F0 1B00053C */   lui       $a1, %hi(func_001ABA4C)
     /* 1A8968 001A88F4 10004012 */  beqz       $s2, .Leboot_001A8938
-    /* 1A896C 001A88F8 1B00053C */   lui       $a1, 0x001B
+    /* 1A896C 001A88F8 1B00053C */   lui       $a1, %hi(func_001ABA4C)
     /* 1A8970 001A88FC 0EA5060C */  jal        func_001A9438
     /* 1A8974 001A8900 25204002 */   or        $a0, $s2, $zero
     /* 1A8978 001A8904 40001226 */  addiu      $s2, $s0, 0x40
     /* 1A897C 001A8908 0B004012 */  beqz       $s2, .Leboot_001A8938
-    /* 1A8980 001A890C 1B00053C */   lui       $a1, 0x001B
+    /* 1A8980 001A890C 1B00053C */   lui       $a1, %hi(func_001ABA4C)
     /* 1A8984 001A8910 4000048E */  lw         $a0, 0x40($s0)
     /* 1A8988 001A8914 07004012 */  beqz       $s2, .Leboot_001A8934
     /* 1A898C 001A8918 2100A0A3 */   sb        $zero, 0x21($sp)
     /* 1A8990 001A891C 06008010 */  beqz       $a0, .Leboot_001A8938
-    /* 1A8994 001A8920 1B00053C */   lui       $a1, 0x001B
+    /* 1A8994 001A8920 1B00053C */   lui       $a1, %hi(func_001ABA4C)
     /* 1A8998 001A8924 04008010 */  beqz       $a0, .Leboot_001A8938
-    /* 1A899C 001A8928 1B00053C */   lui       $a1, 0x001B
+    /* 1A899C 001A8928 1B00053C */   lui       $a1, %hi(func_001ABA4C)
     /* 1A89A0 001A892C DDC6040C */  jal        func_00131B74
     /* 1A89A4 001A8930 00000000 */   nop
   .Leboot_001A8934:

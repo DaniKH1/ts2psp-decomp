@@ -12,7 +12,6 @@ nonmatching func_00072DA8, 0x258
 glabel func_00072DA8
     /* 72E1C 00072DA8 80F9BD27 */  addiu      $sp, $sp, -0x680
     /* 72E20 00072DAC 5406B1AF */  sw         $s1, 0x654($sp)
-  .globl sym_00072DB0
   sym_00072DB0:
     /* 72E24 00072DB0 5806B2AF */  sw         $s2, 0x658($sp)
     /* 72E28 00072DB4 5C06B3AF */  sw         $s3, 0x65C($sp)
@@ -26,10 +25,8 @@ glabel func_00072DA8
     /* 72E48 00072DD4 2580C000 */  or         $s0, $a2, $zero
     /* 72E4C 00072DD8 25202002 */  or         $a0, $s1, $zero
     /* 72E50 00072DDC 6006B4AF */  sw         $s4, 0x660($sp)
-  .globl sym_00072DE0
   sym_00072DE0:
     /* 72E54 00072DE0 6406B5AF */  sw         $s5, 0x664($sp)
-  .globl sym_00072DE4
   sym_00072DE4:
     /* 72E58 00072DE4 6806B6AF */  sw         $s6, 0x668($sp)
     /* 72E5C 00072DE8 7006BEAF */  sw         $fp, 0x670($sp)
@@ -110,10 +107,10 @@ glabel func_00072DA8
     /* 72F74 00072F00 080050AE */  sw         $s0, 0x8($s2)
     /* 72F78 00072F04 0C00448E */  lw         $a0, 0xC($s2)
     /* 72F7C 00072F08 09008010 */  beqz       $a0, .Leboot_00072F30
-    /* 72F80 00072F0C 0700043C */   lui       $a0, 0x0007
+    /* 72F80 00072F0C 0700043C */   lui       $a0, %hi(sym_00073318)
     /* 72F84 00072F10 0400448E */  lw         $a0, 0x4($s2)
     /* 72F88 00072F14 06008050 */  beql       $a0, $zero, .Leboot_00072F30
-    /* 72F8C 00072F18 0700043C */   lui       $a0, 0x0007
+    /* 72F8C 00072F18 0700043C */   lui       $a0, %hi(sym_00073318)
     /* 72F90 00072F1C FF62030C */  jal        func_000D8BFC
     /* 72F94 00072F20 00000000 */   nop
     /* 72F98 00072F24 040040AE */  sw         $zero, 0x4($s2)

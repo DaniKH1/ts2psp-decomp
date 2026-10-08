@@ -21,7 +21,6 @@ glabel func_000ECD80
     /* ECE10 000ECD9C 7665043C */  lui        $a0, %hi(D_65766177)
     /* ECE14 000ECDA0 1E00083C */  lui        $t0, %hi(sym_001DAB08)
     /* ECE18 000ECDA4 09000534 */  ori        $a1, $zero, 0x9
-  .globl sym_000ECDA8
   sym_000ECDA8:
     /* ECE1C 000ECDA8 20000634 */  ori        $a2, $zero, 0x20
     /* ECE20 000ECDAC 77618424 */  addiu      $a0, $a0, %lo(D_65766177)
@@ -31,7 +30,6 @@ glabel func_000ECD80
     /* ECE30 000ECDBC 611B040C */  jal        elem_register_chunk_tag
     /* ECE34 000ECDC0 08AB0CE5 */   swc1      $f12, %lo(sym_001DAB08)($t0)
     /* ECE38 000ECDC4 7461043C */  lui        $a0, %hi(D_61746473)
-  .globl sym_000ECDC8
   sym_000ECDC8:
     /* ECE3C 000ECDC8 01000534 */  ori        $a1, $zero, 0x1
     /* ECE40 000ECDCC 20000634 */  ori        $a2, $zero, 0x20
@@ -41,7 +39,6 @@ glabel func_000ECD80
     /* ECE50 000ECDDC 25280000 */  or         $a1, $zero, $zero
     /* ECE54 000ECDE0 40000634 */  ori        $a2, $zero, 0x40
     /* ECE58 000ECDE4 611B040C */  jal        elem_register_chunk_tag
-  .globl sym_000ECDE8
   sym_000ECDE8:
     /* ECE5C 000ECDE8 786D8424 */   addiu     $a0, $a0, %lo(D_20626D78)
     /* ECE60 000ECDEC 7320043C */  lui        $a0, %hi(D_20736D78)
@@ -51,7 +48,6 @@ glabel func_000ECD80
     /* ECE70 000ECDFC 786D8424 */   addiu     $a0, $a0, %lo(D_20736D78)
     /* ECE74 000ECE00 6820043C */  lui        $a0, %hi(D_20686D78)
     /* ECE78 000ECE04 25280000 */  or         $a1, $zero, $zero
-  .globl sym_000ECE08
   sym_000ECE08:
     /* ECE7C 000ECE08 20000634 */  ori        $a2, $zero, 0x20
     /* ECE80 000ECE0C 611B040C */  jal        elem_register_chunk_tag
@@ -61,7 +57,6 @@ glabel func_000ECD80
     /* ECE90 000ECE1C 80000634 */  ori        $a2, $zero, 0x80
     /* ECE94 000ECE20 611B040C */  jal        elem_register_chunk_tag
     /* ECE98 000ECE24 73758424 */   addiu     $a0, $a0, %lo(D_66727573)
-  .globl sym_000ECE28
   sym_000ECE28:
     /* ECE9C 000ECE28 6864043C */  lui        $a0, %hi(D_64687367)
     /* ECEA0 000ECE2C 0D000534 */  ori        $a1, $zero, 0xD
@@ -80,7 +75,6 @@ glabel func_000ECD80
     /* ECED0 000ECE5C 611B040C */  jal        elem_register_chunk_tag
     /* ECED4 000ECE60 74658424 */   addiu     $a0, $a0, %lo(D_6E726574)
     /* ECED8 000ECE64 6267043C */  lui        $a0, %hi(D_6762646E)
-  .globl sym_000ECE68
   sym_000ECE68:
     /* ECEDC 000ECE68 04000534 */  ori        $a1, $zero, 0x4
     /* ECEE0 000ECE6C 20000634 */  ori        $a2, $zero, 0x20
@@ -90,7 +84,6 @@ glabel func_000ECD80
     /* ECEF0 000ECE7C D0000534 */  ori        $a1, $zero, 0xD0
     /* ECEF4 000ECE80 20000634 */  ori        $a2, $zero, 0x20
     /* ECEF8 000ECE84 611B040C */  jal        elem_register_chunk_tag
-  .globl sym_000ECE88
   sym_000ECE88:
     /* ECEFC 000ECE88 6E6F8424 */   addiu     $a0, $a0, %lo(D_65646F6E)
     /* ECF00 000ECE8C 1000BF8F */  lw         $ra, 0x10($sp)

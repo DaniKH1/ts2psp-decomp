@@ -12,13 +12,10 @@ nonmatching func_00063FF8, 0xC8
 glabel func_00063FF8
     /* 6406C 00063FF8 E0FFBD27 */  addiu      $sp, $sp, -0x20
     /* 64070 00063FFC 1800B1AF */  sw         $s1, 0x18($sp)
-  .globl sym_00064000
   sym_00064000:
     /* 64074 00064000 2588C000 */  or         $s1, $a2, $zero
-  .globl sym_00064004
   sym_00064004:
     /* 64078 00064004 1400B0AF */  sw         $s0, 0x14($sp)
-  .globl sym_00064008
   sym_00064008:
     /* 6407C 00064008 1C00BFAF */  sw         $ra, 0x1C($sp)
   .L0006400C:

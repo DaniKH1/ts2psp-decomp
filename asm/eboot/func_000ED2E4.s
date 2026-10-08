@@ -11,7 +11,6 @@ nonmatching func_000ED2E4, 0xA8
 
 glabel func_000ED2E4
     /* ED358 000ED2E4 E0FFBD27 */  addiu      $sp, $sp, -0x20
-  .globl sym_000ED2E8
   sym_000ED2E8:
     /* ED35C 000ED2E8 1400B1AF */  sw         $s1, 0x14($sp)
     /* ED360 000ED2EC 25888000 */  or         $s1, $a0, $zero
@@ -47,7 +46,6 @@ glabel func_000ED2E4
     /* ED3D4 000ED360 25280000 */   or        $a1, $zero, $zero
   .Leboot_000ED364:
     /* ED3D8 000ED364 01000432 */  andi       $a0, $s0, 0x1
-  .globl sym_000ED368
   sym_000ED368:
     /* ED3DC 000ED368 03008010 */  beqz       $a0, .Leboot_000ED378
     /* ED3E0 000ED36C 00000000 */   nop

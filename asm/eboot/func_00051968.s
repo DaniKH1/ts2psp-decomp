@@ -11,13 +11,10 @@ nonmatching func_00051968, 0x58
 
 glabel func_00051968
     /* 519DC 00051968 E0FFBD27 */  addiu      $sp, $sp, -0x20
-  .globl sym_0005196C
   sym_0005196C:
     /* 519E0 0005196C C0380600 */  sll        $a3, $a2, 3
-  .globl sym_00051970
   sym_00051970:
     /* 519E4 00051970 21388700 */  addu       $a3, $a0, $a3
-  .globl sym_00051974
   sym_00051974:
     /* 519E8 00051974 2540A000 */  or         $t0, $a1, $zero
     /* 519EC 00051978 0000E68C */  lw         $a2, 0x0($a3)
@@ -33,7 +30,6 @@ glabel func_00051968
     /* 51A14 000519A0 00000000 */   nop
   .Leboot_000519A4:
     /* 51A18 000519A4 25308000 */  or         $a2, $a0, $zero
-  .globl sym_000519A8
   sym_000519A8:
     /* 51A1C 000519A8 2520A000 */  or         $a0, $a1, $zero
     /* 51A20 000519AC 8646010C */  jal        func_00051A18

@@ -12,29 +12,22 @@ nonmatching func_000599E8, 0xAC
 glabel func_000599E8
     /* 59A5C 000599E8 C0FFBD27 */  addiu      $sp, $sp, -0x40
     /* 59A60 000599EC 2000B4E7 */  swc1       $f20, 0x20($sp)
-  .globl sym_000599F0
   sym_000599F0:
     /* 59A64 000599F0 2400B0AF */  sw         $s0, 0x24($sp)
     /* 59A68 000599F4 2800B1AF */  sw         $s1, 0x28($sp)
     /* 59A6C 000599F8 2C00B2AF */  sw         $s2, 0x2C($sp)
-  .globl sym_000599FC
   sym_000599FC:
     /* 59A70 000599FC 3000B3AF */  sw         $s3, 0x30($sp)
-  .globl sym_00059A00
   sym_00059A00:
     /* 59A74 00059A00 06650046 */  mov.s      $f20, $f12
-  .globl sym_00059A04
   sym_00059A04:
     /* 59A78 00059A04 25988000 */  or         $s3, $a0, $zero
-  .globl sym_00059A08
   sym_00059A08:
     /* 59A7C 00059A08 25800001 */  or         $s0, $t0, $zero
-  .globl sym_00059A0C
   sym_00059A0C:
     /* 59A80 00059A0C 2588E000 */  or         $s1, $a3, $zero
     /* 59A84 00059A10 2590C000 */  or         $s2, $a2, $zero
     /* 59A88 00059A14 3400B4AF */  sw         $s4, 0x34($sp)
-  .globl sym_00059A18
   sym_00059A18:
     /* 59A8C 00059A18 3800BFAF */  sw         $ra, 0x38($sp)
     /* 59A90 00059A1C B365010C */  jal        func_000596CC

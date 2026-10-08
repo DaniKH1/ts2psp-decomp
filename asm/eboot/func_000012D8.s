@@ -16,7 +16,6 @@ glabel func_000012D8
     /* 1354 000012E0 25808000 */  or         $s0, $a0, $zero
     /* 1358 000012E4 3C00048E */  lw         $a0, 0x3C($s0)
     /* 135C 000012E8 5800858C */  lw         $a1, 0x58($a0)
-  .globl sym_000012EC
   sym_000012EC:
     /* 1360 000012EC 2800A524 */  addiu      $a1, $a1, 0x28
     /* 1364 000012F0 0000A684 */  lh         $a2, 0x0($a1)
@@ -77,7 +76,6 @@ glabel func_000012D8
     /* 1434 000013C0 3C000C46 */  c.lt.s     $f0, $f12
     /* 1438 000013C4 00000000 */  nop
     /* 143C 000013C8 0B000045 */  bc1f       .Leboot_000013F8 /* handwritten instruction */
-  .globl sym_000013CC
   sym_000013CC:
     /* 1440 000013CC 80BF063C */   lui       $a2, (0xBF800000 >> 16)
     /* 1444 000013D0 3C00048E */  lw         $a0, 0x3C($s0)

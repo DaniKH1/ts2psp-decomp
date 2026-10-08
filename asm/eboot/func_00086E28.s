@@ -49,7 +49,7 @@ glabel func_00086E28
     /* 86F28 00086EB4 09F8E000 */  jalr       $a3
     /* 86F2C 00086EB8 02000534 */   ori       $a1, $zero, 0x2
     /* 86F30 00086EBC 05004014 */  bnez       $v0, .Leboot_00086ED4
-    /* 86F34 00086EC0 1D00043C */   lui       $a0, 0x001D
+    /* 86F34 00086EC0 1D00043C */   lui       $a0, %hi(sym_001D1B00)
     /* 86F38 00086EC4 1D00043C */  lui        $a0, %hi(str_Cameraman_control_must_implement_I_CAMERA)
     /* 86F3C 00086EC8 DCBB040C */  jal        elem_throw_bad_alloc
     /* 86F40 00086ECC D0868424 */   addiu     $a0, $a0, %lo(str_Cameraman_control_must_implement_I_CAMERA)

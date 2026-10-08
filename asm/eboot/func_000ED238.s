@@ -24,7 +24,6 @@ glabel func_000ED238
   .Leboot_000ED260:
     /* ED2D4 000ED260 FF00C630 */  andi       $a2, $a2, 0xFF
     /* ED2D8 000ED264 0700C010 */  beqz       $a2, .Leboot_000ED284
-  .globl sym_000ED268
   sym_000ED268:
     /* ED2DC 000ED268 00000000 */   nop
     /* ED2E0 000ED26C 5001848C */  lw         $a0, 0x150($a0)

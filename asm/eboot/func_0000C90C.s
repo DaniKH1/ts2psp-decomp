@@ -25,42 +25,31 @@ glabel func_0000C90C
     /* C9B0 0000C93C 21208600 */  addu       $a0, $a0, $a2
     /* C9B4 0000C940 25284002 */  or         $a1, $s2, $zero
     /* C9B8 0000C944 1C00BFAF */  sw         $ra, 0x1C($sp)
-  .globl sym_0000C948
   sym_0000C948:
     /* C9BC 0000C948 09F8E000 */  jalr       $a3
     /* C9C0 0000C94C 25302002 */   or        $a2, $s1, $zero
     /* C9C4 0000C950 C800048E */  lw         $a0, 0xC8($s0)
     /* C9C8 0000C954 2C00868C */  lw         $a2, 0x2C($a0)
-  .globl sym_0000C958
   sym_0000C958:
     /* C9CC 0000C958 6800C624 */  addiu      $a2, $a2, 0x68
-  .globl sym_0000C95C
   sym_0000C95C:
     /* C9D0 0000C95C 0000C784 */  lh         $a3, 0x0($a2)
-  .globl sym_0000C960
   sym_0000C960:
     /* C9D4 0000C960 0400C88C */  lw         $t0, 0x4($a2)
-  .globl sym_0000C964
   sym_0000C964:
     /* C9D8 0000C964 25284002 */  or         $a1, $s2, $zero
-  .globl sym_0000C968
   sym_0000C968:
     /* C9DC 0000C968 21208700 */  addu       $a0, $a0, $a3
-  .globl sym_0000C96C
   sym_0000C96C:
     /* C9E0 0000C96C 09F80001 */  jalr       $t0
-  .globl sym_0000C970
   sym_0000C970:
     /* C9E4 0000C970 25302002 */   or        $a2, $s1, $zero
-  .globl sym_0000C974
   sym_0000C974:
     /* C9E8 0000C974 1000B08F */  lw         $s0, 0x10($sp)
     /* C9EC 0000C978 1400B18F */  lw         $s1, 0x14($sp)
     /* C9F0 0000C97C 1800B28F */  lw         $s2, 0x18($sp)
-  .globl sym_0000C980
   sym_0000C980:
     /* C9F4 0000C980 1C00BF8F */  lw         $ra, 0x1C($sp)
-  .globl sym_0000C984
   sym_0000C984:
     /* C9F8 0000C984 0800E003 */  jr         $ra
     /* C9FC 0000C988 2000BD27 */   addiu     $sp, $sp, 0x20

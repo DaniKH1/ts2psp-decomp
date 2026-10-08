@@ -18,7 +18,6 @@ glabel func_00001AB8
     /* 1B3C 00001AC8 5800858C */  lw         $a1, 0x58($a0)
     /* 1B40 00001ACC 2800A524 */  addiu      $a1, $a1, 0x28
     /* 1B44 00001AD0 0000A684 */  lh         $a2, 0x0($a1)
-  .globl sym_00001AD4
   sym_00001AD4:
     /* 1B48 00001AD4 0400A78C */  lw         $a3, 0x4($a1)
     /* 1B4C 00001AD8 3C00B1AF */  sw         $s1, 0x3C($sp)
@@ -69,7 +68,6 @@ glabel func_00001AB8
     /* 1BFC 00001B88 3800B08F */  lw         $s0, 0x38($sp)
     /* 1C00 00001B8C 3C00B18F */  lw         $s1, 0x3C($sp)
     /* 1C04 00001B90 4000BF8F */  lw         $ra, 0x40($sp)
-  .globl sym_00001B94
   sym_00001B94:
     /* 1C08 00001B94 0800E003 */  jr         $ra
     /* 1C0C 00001B98 5000BD27 */   addiu     $sp, $sp, 0x50

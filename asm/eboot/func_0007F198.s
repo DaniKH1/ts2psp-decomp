@@ -79,7 +79,7 @@ glabel func_0007F198
     /* 7F314 0007F2A0 25204000 */  or         $a0, $v0, $zero
     /* 7F318 0007F2A4 2400A58F */  lw         $a1, 0x24($sp)
     /* 7F31C 0007F2A8 05008014 */  bnez       $a0, .Leboot_0007F2C0
-    /* 7F320 0007F2AC 1D00063C */   lui       $a2, 0x001D
+    /* 7F320 0007F2AC 1D00063C */   lui       $a2, %hi(sym_001D1B00)
     /* 7F324 0007F2B0 AB41050C */  jal        func_001506AC
     /* 7F328 0007F2B4 2520A000 */   or        $a0, $a1, $zero
     /* 7F32C 0007F2B8 25204000 */  or         $a0, $v0, $zero

@@ -22,7 +22,6 @@ glabel func_00000A48
     /* ADC 00000A68 0400CCC4 */  lwc1       $f12, 0x4($a2)
     /* AE0 00000A6C 00730C46 */  add.s      $f12, $f14, $f12
     /* AE4 00000A70 5C008CE4 */  swc1       $f12, 0x5C($a0)
-  .globl sym_00000A74
   sym_00000A74:
     /* AE8 00000A74 0000ACC4 */  lwc1       $f12, 0x0($a1)
     /* AEC 00000A78 0400AFC4 */  lwc1       $f15, 0x4($a1)
@@ -52,7 +51,6 @@ glabel func_00000A48
     /* B4C 00000AD8 0000C7AC */  sw         $a3, 0x0($a2)
     /* B50 00000ADC 0400C8AC */  sw         $t0, 0x4($a2)
     /* B54 00000AE0 54008DC4 */  lwc1       $f13, 0x54($a0)
-  .globl sym_00000AE4
   sym_00000AE4:
     /* B58 00000AE4 3E680C46 */  c.le.s     $f13, $f12
     /* B5C 00000AE8 00000000 */  nop
@@ -68,7 +66,6 @@ glabel func_00000A48
     /* B84 00000B10 1000A78F */  lw         $a3, 0x10($sp)
     /* B88 00000B14 0000A6AC */  sw         $a2, 0x0($a1)
     /* B8C 00000B18 0400A7AC */  sw         $a3, 0x4($a1)
-  .globl sym_00000B1C
   sym_00000B1C:
     /* B90 00000B1C 54008CE4 */  swc1       $f12, 0x54($a0)
   .Leboot_00000B20:

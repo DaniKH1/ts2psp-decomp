@@ -28,7 +28,6 @@ glabel func_000EBCD8
     /* EBD88 000EBD14 611B040C */  jal        elem_register_chunk_tag
     /* EBD8C 000EBD18 98AA0CE5 */   swc1      $f12, %lo(sym_001DAA98)($t0)
     /* EBD90 000EBD1C 7461043C */  lui        $a0, %hi(D_61746473)
-  .globl sym_000EBD20
   sym_000EBD20:
     /* EBD94 000EBD20 01000534 */  ori        $a1, $zero, 0x1
     /* EBD98 000EBD24 20000634 */  ori        $a2, $zero, 0x20

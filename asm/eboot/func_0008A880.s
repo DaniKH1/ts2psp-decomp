@@ -52,7 +52,7 @@ glabel func_0008A880
     /* 8A988 0008A914 97B2040C */  jal        func_0012CA5C
     /* 8A98C 0008A918 28000634 */   ori       $a2, $zero, 0x28
     /* 8A990 0008A91C 03000010 */  b          .Leboot_0008A92C
-    /* 8A994 0008A920 0E00043C */   lui       $a0, 0x000E
+    /* 8A994 0008A920 0E00043C */   lui       $a0, %hi(sym_000E1B68)
   .Leboot_0008A924:
     /* 8A998 0008A924 6400A0A3 */  sb         $zero, 0x64($sp)
     /* 8A99C 0008A928 0E00043C */  lui        $a0, %hi(sym_000E2378)

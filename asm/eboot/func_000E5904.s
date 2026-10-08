@@ -24,7 +24,7 @@ glabel func_000E5904
     /* E59A4 000E5930 0300043C */   lui       $a0, %hi(sym_000318E9)
     /* E59A8 000E5934 E9188490 */  lbu        $a0, %lo(sym_000318E9)($a0)
     /* E59AC 000E5938 03008010 */  beqz       $a0, .Leboot_000E5948
-    /* E59B0 000E593C 0600043C */   lui       $a0, 0x0006
+    /* E59B0 000E593C 0600043C */   lui       $a0, %hi(func_0005C45C)
   .Leboot_000E5940:
     /* E59B4 000E5940 01000534 */  ori        $a1, $zero, 0x1
   .Leboot_000E5944:

@@ -30,13 +30,13 @@ glabel func_00086A64
     /* 86B1C 00086AA8 704ACCE4 */   swc1      $f12, %lo(sym_001D4A70)($a2)
     /* 86B20 00086AAC 25284000 */  or         $a1, $v0, $zero
     /* 86B24 00086AB0 1C00A78F */  lw         $a3, 0x1C($sp)
-    /* 86B28 00086AB4 0E00043C */  lui        $a0, 0x000E
+    /* 86B28 00086AB4 0E00043C */  lui        $a0, %hi(sym_000E1B68)
     /* 86B2C 00086AB8 0600A014 */  bnez       $a1, .Leboot_00086AD4
-    /* 86B30 00086ABC 0E00063C */   lui       $a2, 0x000E
+    /* 86B30 00086ABC 0E00063C */   lui       $a2, %hi(sym_000E1B68)
     /* 86B34 00086AC0 AB41050C */  jal        func_001506AC
     /* 86B38 00086AC4 2520E000 */   or        $a0, $a3, $zero
     /* 86B3C 00086AC8 25284000 */  or         $a1, $v0, $zero
-    /* 86B40 00086ACC 0E00043C */  lui        $a0, 0x000E
+    /* 86B40 00086ACC 0E00043C */  lui        $a0, %hi(sym_000E1B68)
     /* 86B44 00086AD0 0E00063C */  lui        $a2, %hi(sym_000E2360)
   .Leboot_00086AD4:
     /* 86B48 00086AD4 6023C5AC */  sw         $a1, %lo(sym_000E2360)($a2)
@@ -65,7 +65,7 @@ glabel func_00086A64
     /* 86BA4 00086B30 25304000 */  or         $a2, $v0, $zero
     /* 86BA8 00086B34 1800A58F */  lw         $a1, 0x18($sp)
     /* 86BAC 00086B38 0500C014 */  bnez       $a2, .Leboot_00086B50
-    /* 86BB0 00086B3C 0E00043C */   lui       $a0, 0x000E
+    /* 86BB0 00086B3C 0E00043C */   lui       $a0, %hi(sym_000E1B68)
     /* 86BB4 00086B40 AB41050C */  jal        func_001506AC
     /* 86BB8 00086B44 2520A000 */   or        $a0, $a1, $zero
     /* 86BBC 00086B48 25304000 */  or         $a2, $v0, $zero

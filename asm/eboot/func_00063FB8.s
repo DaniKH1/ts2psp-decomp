@@ -25,7 +25,6 @@ glabel func_00063FB8
     /* 6405C 00063FE8 1000B08F */  lw         $s0, 0x10($sp)
     /* 64060 00063FEC 1400BF8F */  lw         $ra, 0x14($sp)
     /* 64064 00063FF0 0800E003 */  jr         $ra
-  .globl sym_00063FF4
   sym_00063FF4:
     /* 64068 00063FF4 2000BD27 */   addiu     $sp, $sp, 0x20
 endlabel func_00063FB8

@@ -42,7 +42,7 @@ glabel func_00139A10
     /* 139AF4 00139A80 2C00468E */  lw         $a2, 0x2C($s2)
     /* 139AF8 00139A84 2330C500 */  subu       $a2, $a2, $a1
   .Leboot_00139A88:
-    /* 139AFC 00139A88 1E001E3C */  lui        $fp, 0x001E
+    /* 139AFC 00139A88 1E001E3C */  lui        $fp, %hi(sym_001E1FB0)
     /* 139B00 00139A8C F013DE27 */  addiu      $fp, $fp, %lo(sym_001E13F0)
   .Leboot_00139A90:
     /* 139B04 00139A90 0A00E82C */  sltiu      $t0, $a3, 0xA
