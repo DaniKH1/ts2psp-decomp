@@ -13,7 +13,7 @@ relative.
 | code | **507,673 / 507,673 instructions identical** |
 | functions recovered | 7,497 |
 | relocations recovered | 66,503 / 66,503 |
-| C functions byte-exact and hand written | 396 |
+| C functions byte-exact and hand written | 399 |
 
 The engine is Maxis' "Elem", the shared engine also used by *The Sims 3* — the
 build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
@@ -23,7 +23,7 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 | directory | |
 | --- | --- |
 | `asm/` | one `.s` per function, as splat produced them.  Assembling and linking this reproduces the original exactly.  Recovered material — see [Legal](#legal). |
-| `src/eboot/` | the hand written decompilation: what each function does, in C.  396 of the 417 files here are verified to compile to the original bytes; the other 21 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
+| `src/eboot/` | the hand written decompilation: what each function does, in C.  399 of the 420 files here are verified to compile to the original bytes; the other 21 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
 | `include/` | the shared types: `f32`, `Vec3f`, and the object layouts the early functions reveal. |
 | `tools/` | everything that produced the above, and the checks that keep it honest.  MIT licensed. |
 | `config/` | the recovered symbol map, the relocation map, and hand recovered names. |
@@ -35,13 +35,13 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 **The assembly is byte-exact and complete.**  `asm/` reproduces every byte of
 the module image.  That part is finished and has been for some time.
 
-**The C is the readable layer, and it is partial.**  396 of 7,497 functions.  The
+**The C is the readable layer, and it is partial.**  399 of 7,497 functions.  The
 original was built with CodeWarrior for PSP (`mwccpsp.exe`), and psp-gcc does
 not reproduce its instruction selection.  Reaching byte-exact C for *all* 7,497
-needs that proprietary compiler; 396 were reached without it, by pinning the
+needs that proprietary compiler; 399 were reached without it, by pinning the
 handful of registers and delay slots where the two compilers disagree.
 
-What those 396 have in common is that the disagreement is small enough to name.
+What those 399 have in common is that the disagreement is small enough to name.
 Both compilers emit the same *instructions* and differ over which register is the
 destination, or when a value is loaded, so pinning the registers makes them agree.
 The pinning is deliberately narrow: an inline `asm` block over the two or three
@@ -118,6 +118,16 @@ Three results from that work are worth knowing before reading the C:
   by ten.  The result is used; it is always zero.  Every other piece of dead code
   found so far computes something that *is* used, so this one is the clearest
   instance yet of byte-exact and correct being different questions.
+* **236 functions move floats through their stack frame, and the three transcribed
+  here are at the mild end of that.**  `tools/spill_frame.py` is the census;
+  `func_000C3470` — a 4x4 matrix scale that is 632 bytes for sixteen multiplies,
+  with three passes over the data and a final `lw`/`sw` reload of values last written
+  by `swc1` — is transcribed as machine code, as the two lerps are.  But it sits at
+  48 frame stores and 40 loads, while the worst function in the module is at 4 and 28
+  across 2,028 bytes.  **The report had called the lerps extreme and the count says
+  they are middling** — they came out of the work queue, not out of being the worst of
+  anything.  The ratio is not the discriminator either: what makes these need machine
+  code is that the compiler spilled where it had registers free.
 * **The module keeps writable data inside its code section, and three clusters inside
   live code are written by two dozen live functions.**  `tools/code_writers.py` is
   the census: 12 functions name 0x0E9728, 9 name 0x0E97A8, 3 name 0x0EB850, and each

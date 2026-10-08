@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 417 (see below) |
-| **C functions that byte-match** | **396** (linked from `src/`) |
+| functions written in C | 420 (see below) |
+| **C functions that byte-match** | **399** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -2580,6 +2580,71 @@ That is the same observation as the dead channel in `func_000706A8` seen from th
 other side: there the *arithmetic* was dead, here the *high half* is, and in both the
 compiler had a cheaper spelling available and did not take it.
 
+### Three functions, and a census that says the first two were not the worst
+
+`func_000C3470` is a 4x4 matrix scale - sixteen floats in, multiplied by one factor,
+sixteen out - and it is **632 bytes**, thirty-nine instructions per element, for one
+`mul.s` each.  Byte-exact on the second attempt; the one wrong word was the last
+`sw`, which `.set reorder` hoisted into `jr $ra`'s delay slot.
+
+What it does with the values is the point:
+
+* the four source rows are copied from `$a1` to `sp+0x50`, `sp+0x70`, `sp+0x90` and
+  `sp+0xB0` - sixteen `lwc1`, sixteen `swc1`;
+* each row is reloaded, multiplied by `$f12`, and spilled to a *second* set at
+  `sp+0x40`, `sp+0x60`, `sp+0x80`, `sp+0xA0` - so the unscaled copy is kept and never
+  read again;
+* the sixteen scaled values are reloaded into `sp+0`..`sp+0x3C`;
+* and only then are they loaded a **third** time, this time with `lw`, and stored to
+  `$a0`.
+
+**Three passes over the data for one multiply each, where load-multiply-store would
+do.**  The frame is 0xC0 bytes: four rows unscaled, four scaled, one output block, all
+live at once.  Nothing forces it - `$f13` to `$f17` are free throughout.
+
+**The last sixteen loads use `lw` and the last sixteen stores use `sw`** on values
+last written by `swc1`.  That is the clearest evidence in the function that the
+compiler was copying rather than computing: a float already in a float register
+would be one `swc1`, and the `lw`/`sw` pair exists because the value was last
+written on a *different* path through the compiler's data-flow model.
+
+`renderMeshInstances_1060` and `renderMeshInstances_1034` are in the vector-coprocessor
+translation unit, so they have no C spelling at all and are machine code for the same
+reason as `syncSkeleton_27D0.c`.  The interesting parts:
+
+* **three consecutive `lui 0x2B00`s are dead** in `1060` - each overwritten by an
+  `lwr` two instructions later, before anything reads it.  The most concentrated
+  instance of the pattern `func_0009674C` shows once.
+* **the `lwr` offsets are 1, 5 and 9**, which is how a 4x4 becomes a 4x3: bytes 1-4,
+  5-8 and 9-12 of each sixteen-byte row, so component 0 - the homogeneous w - is
+  dropped.  `lwr` is the unaligned load, the only way to reach those bytes.
+* **`cache 0x18, 0x3C($a1)` before the stores** is a cache hint on the command
+  buffer, at the same offset in both functions, so it belongs to the "about to write
+  to the command buffer" convention rather than to either operation.
+* **`cache`'s sub-opcode field is five bits**, so 0x18 is the whole instruction
+  encoding; reading it as a flag or a size would be inventing structure that is not
+  there.
+
+**And the census says the two lerps were not the extreme case after all.**
+`tools/spill_frame.py` counts every function that moves floats through its frame -
+three or more `swc1`, six or more `lwc1`, some floating-point arithmetic - and there
+are **236**.  The three this project transcribed sit at 6 stores / 6 loads, 8 / 8 and
+48 / 40, while the worst is `func_0013C8A4` at **4 stores and 28 loads across 2,028
+bytes**.
+
+That is worth recording as a correction rather than as a discovery.  The write-up on
+the lerps calls their spilling extreme, and the count says they are middling: they
+were found by the work queue, not by being the worst of anything.  And the ratio is
+not the discriminator anyway - `func_000C3470` has *more* stores than loads, so what
+makes these three need machine code is not the proportion of stack traffic but the
+fact that the compiler spilled where it had registers free, which is a decision
+rather than a register shortage.
+
+The tool also had to learn something to count any of this: **the loads are not
+against `$sp`.**  `func_000C3470` has forty-eight `swc1`s with `$sp` as the base and
+not one `lwc1` with it, because the compiler materialises each frame offset into a
+register once - `addiu $a2, $sp, 0x40` - and loads through that.  Counting `$sp`
+alone gives 48 and 0.
 ## Pipeline
 
 ```
@@ -2618,6 +2683,7 @@ tools/flag_accessors.py      census the C++ boolean accessors: mask, offset, dir
 tools/check_report.py        names the report writes about that have no src/eboot file
 tools/stride_table.py        addresses several functions materialise; code or constant
 tools/code_writers.py       functions that name an address inside the code section
+tools/spill_frame.py         float functions that move values through the frame
 ```
 
 ```

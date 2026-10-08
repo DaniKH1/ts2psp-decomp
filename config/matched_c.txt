@@ -133,6 +133,7 @@ func_000BBA80
 func_000BF43C
 func_000BF46C
 func_000C2FE4
+func_000C3470
 func_000C42C8
 func_000CA084
 func_000CD5B0
@@ -395,5 +396,7 @@ func_001AE164
 func_001AF144
 func_001AF15C
 func_001AF16C
+renderMeshInstances_1034
+renderMeshInstances_1060
 syncSkeleton_27D0
 syncSkeleton_2808
