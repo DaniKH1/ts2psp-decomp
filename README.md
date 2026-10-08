@@ -13,7 +13,7 @@ relative.
 | code | **507,673 / 507,673 instructions identical** |
 | functions recovered | 7,497 |
 | relocations recovered | 66,503 / 66,503 |
-| C functions byte-exact and hand written | 416 |
+| C functions byte-exact and hand written | 423 |
 
 The engine is Maxis' "Elem", the shared engine also used by *The Sims 3* — the
 build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
@@ -23,7 +23,7 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 | directory | |
 | --- | --- |
 | `asm/` | one `.s` per function, as splat produced them.  Assembling and linking this reproduces the original exactly.  Recovered material — see [Legal](#legal). |
-| `src/eboot/` | the hand written decompilation: what each function does, in C.  416 of the 437 files here are verified to compile to the original bytes; the other 21 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
+| `src/eboot/` | the hand written decompilation: what each function does, in C.  423 of the 443 files here are verified to compile to the original bytes; the other 21 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
 | `include/` | the shared types: `f32`, `Vec3f`, and the object layouts the early functions reveal. |
 | `tools/` | everything that produced the above, and the checks that keep it honest.  MIT licensed. |
 | `config/` | the recovered symbol map, the relocation map, and hand recovered names. |
@@ -35,13 +35,13 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 **The assembly is byte-exact and complete.**  `asm/` reproduces every byte of
 the module image.  That part is finished and has been for some time.
 
-**The C is the readable layer, and it is partial.**  416 of 7,497 functions.  The
+**The C is the readable layer, and it is partial.**  423 of 7,497 functions.  The
 original was built with CodeWarrior for PSP (`mwccpsp.exe`), and psp-gcc does
 not reproduce its instruction selection.  Reaching byte-exact C for *all* 7,497
-needs that proprietary compiler; 416 were reached without it, by pinning the
+needs that proprietary compiler; 423 were reached without it, by pinning the
 handful of registers and delay slots where the two compilers disagree.
 
-What those 416 have in common is that the disagreement is small enough to name.
+What those 423 have in common is that the disagreement is small enough to name.
 Both compilers emit the same *instructions* and differ over which register is the
 destination, or when a value is loaded, so pinning the registers makes them agree.
 The pinning is deliberately narrow: an inline `asm` block over the two or three
@@ -157,6 +157,24 @@ Three results from that work are worth knowing before reading the C:
   they are middling** — they came out of the work queue, not out of being the worst of
   anything.  The ratio is not the discriminator either: what makes these need machine
   code is that the compiler spilled where it had registers free.
+* **850 functions form a base pointer once and then run consecutive accesses through
+  it, so a function's length here is mostly codegen.**  `tools/base_pointer.py` counts
+  687 that run stores through the formed base, 275 that run loads, 112 that do both.
+  The five functions that prompted the tool are five of the 850, and `func_00102D34`
+  holds the longest store run found at fifteen.  **The tool's first version counted 4,
+  and none of the five were in it** — it required every store to follow the `addiu`
+  with nothing in between, and `func_00194ADC` puts a load there, as four of the five
+  do; it also insisted the run start at offset zero, which `func_00102D34` cannot
+  satisfy.  **Both were the test being more specific than the shape.**  The count also
+  caught a wrong claim in a file comment: `func_0018A650.c` cited the store count as
+  evidence for itself, and that function forms its base for three `lwc1`s.
+* **Two functions, one a strict superset of the other.**  `func_00123588` and
+  `func_00123560` are 0x28 apart and the first is inside the second, differing only in
+  that three instructions of a second list-unlink are threaded through the middle.
+  Two of the four visible differences are consequences rather than choices — the second
+  load reads the field the first unlink just repaired, and a reload becomes unnecessary
+  because the register is still live.  The three-word copies around them are members of
+  the 687, and read whole the pair is a splice across two containers.
 * **A dead mask in 168 functions, and a flag setter shape the census could not see.**
   `tools/boolean_shapes.py` counts two shapes that hand-transcribing turned up.
   `sltiu rt, rs, 1` followed by `andi rd, rs, 0xFF` — where the `sltiu` already yields

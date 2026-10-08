@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 437 (see below) |
-| **C functions that byte-match** | **416** (linked from `src/`) |
+| functions written in C | 443 (see below) |
+| **C functions that byte-match** | **423** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3073,6 +3073,132 @@ than its arithmetic warrants.
 And both of them agree with `func_0010FFF4` last iteration: **neither writes the cursor
 back**, so the caller owns the advance and `func_0010FFF4`'s self-advance is the
 exception rather than the rule.
+### A pair where one function is a strict superset of the other
+
+`func_00123588` and `func_00123560` are 0x28 apart and the first is inside the second:
+
+```
+func_00123588                  func_00123560
+lw   $a2, 0x4($a1)            lw   $a2, 0x4($a1)
+lw   $a3, 0x0($a0)            lw   $a3, 0x0($a1)   <- $a0 becomes $a1
+sw   $a2, 0x4($a3)            sw   $a2, 0x4($a3)
+lw   $a3, 0x0($a0)            sw   $a3, 0x0($a2)   <- reload not needed
+sw   $a3, 0x0($a2)            sw   $a0, 0x4($a1)
+sw   $a0, 0x4($a1)            lw   $a2, 0x0($a0)   <- new
+                                sw   $a2, 0x0($a1)   <- new
+jr   $ra                      sw   $a1, 0x4($a2)   <- new
+sw   $a1, 0x0($a0)            jr   $ra
+                                sw   $a1, 0x0($a0)
+```
+
+**Two of the four differences are consequences, not choices.**  The second load reads
+`$a1` rather than `$a0` because the first unlink has already repaired that link, so
+re-reading it would read a value the function has just written.  And the reload that
+`func_00123588` needs disappears, because in this version `$a3` is still live from the
+first unlink.
+
+**The three added instructions are one unlink**, in the same `prev`-then-`next` order as
+the first three - so the function is **two calls to the same four-instruction idiom
+with one node shared**, and the eight extra bytes are the second call plus one load.
+
+Read whole, it moves a node from one list into another and puts the other node where it
+was: a splice across two containers, sixteen fields, all at offsets 0 and 4 of four
+different objects.  **`func_00123588` on its own is a swap of two nodes' positions, not
+an unlink** - an unlink would leave one of the four stores out - and the swap reading
+rests on all four stores being present.
+
+**The reload in `func_00123588` is a third kind.**  `func_0010FFF4` and
+`func_000F7DA8` reload because a store through a memory-loaded base could alias the
+value; here the value is reloaded because **it cannot survive its own use** - the
+compiler would have to store from a register that the immediately preceding store had
+just written through.
+
+### `tools/base_pointer.py`: 687 functions, and my own comment was wrong
+
+Five functions in this tree form a base pointer once and then run consecutive accesses
+through it - `func_00102C84`, `func_00194ADC`, `func_000E3C24`, `func_0018A650` and
+`func_00102D34` - and five instances cannot tell you whether that is a habit of the
+module or of those five.
+
+**850 functions do it: 687 through stores, 275 through loads, 112 through both.**  All
+five hand-found ones are members, and `func_00102D34` has the longest store run found
+at fifteen.  **So a function's length here is mostly a property of its codegen, not of
+its data**, which is the opposite of what the three-word copies look like from the
+inside.
+
+**And the count contradicted a comment I had already written.**  `func_0018A650.c`
+claimed the habit was store-side and cited the store count as evidence - but that
+function forms `$a3 = $a0 + 0x1A0` for three **`lwc1`s**, and its three stores go
+through `$a1`, which arrives as an argument and is never computed.  **It is only in the
+load group.**  The file now says so, and this is the third time in this project that a
+tool's output contradicted a claim in a file comment rather than the reverse.
+
+**The tool's first version counted 4, and none of the five were among them.**  It
+required every store to follow the `addiu` with nothing in between, on the reasoning
+that a straight line is what makes the form worth noticing - **and `func_00194ADC` puts
+`lw $a1, 0x8($a1)` between its `addiu` and its first store, as four of the five do.**
+It also insisted the run start at offset 0, which `func_00102D34` cannot satisfy
+because its first store goes through the *pre-`addiu`* register.  **Both were the test
+being more specific than the shape.**  The habit this project has is to check that a
+filter finds the examples that motivated it before counting anything with it; this one
+was counted before that check, and the check is now written into the tool's docstring.
+
+### The record format has more than one shape
+
+`func_00110314` is `func_0010FFF4` with the tag changed from 3 to 2 and the payload
+changed from a float to a word.  Same eight-byte record, same layout - payload high,
+tag low - same cursor reload, same advance by eight.
+
+**The reload is not optional in one and merely harmless in the other.**  Here the
+payload arrives in `$a1` and the cursor is then reloaded into `$a1` itself, which
+destroys it - but the payload is already stored by then.  `func_0010FFF4` carries its
+payload in `$f12`, a different register file, which a reload cannot touch.  **The same
+instruction sequence is correct for both because the two payloads live in different
+register files.**
+
+**All three of the record builders write the record's first word first** - `func_00110314`,
+`func_0010FFF4` and `func_0018A650` - which is not the order a reader would guess and
+is a shared habit rather than three coincidences.
+
+### `func_000F7DA8`: a ring buffer, and `mfhi` where `mflo` usually goes
+
+`*out = base[index]; remaining--; index = (index + 1) % limit;` - the `div` computes a
+quotient nobody reads and a remainder that becomes the new index.  `div` and not
+`divu`, again by function field 0x1A.
+
+**The counter decrement is wedged between the `div` and the `mfhi`**, four
+instructions from the instruction that writes `$hi`.  Nothing in between touches `$hi`,
+so the value survives, but the ordering is a fact about the scheduler rather than about
+the source.
+
+**`ori $v0, $zero, 0x0` is written and never read.**  The function's results are the
+store through `$a1` and the store in the delay slot; the remainder is left in `$a1`.
+Under o32 a non-void function returns in `$v0`, so one reading is that it returns 0
+*and* updates the ring, and the other is that the store is dead.  **The bytes cannot
+settle it** - nothing here reads `$v0` and no caller is in the module - so it is
+recorded as a zero being written to the return register and nothing more.
+
+### `func_00093EEC`: two addresses of different kinds in one breath
+
+Four words to 0x0E21C0, and a sixteen-bit counter at 0x01D4D00 incremented.  **The two
+are not the same sort of thing and that is why both are written down separately.**
+
+0x01D4D00 is in `.data` with seven relocations naming it: a real global counter.  0x0E21C0
+is inside `.text`, 0x50 bytes into `func_000E2170`'s nominal body and before that
+function's own last `jr $ra`, with five relocations naming it - **the same shape as
+0x0E2168, which `func_00102D34` writes seventeen words to, and the two are 88 bytes
+apart.**  So the module has at least three addresses written from code that sit in
+code: 0x0E2168, 0x0E21C0 and 0x0EC768.
+
+**What they are is still not established, and the position has not moved.**  splat's
+function sizes are "distance to the next label", there is no label at 0x0E21C0, and the
+same test that admits the three verified clusters in `code_writers.py --real` cannot
+separate a runtime patch from a data block the symbol map has no label for.
+
+The counter's `lh`/`sh` pair is signed and can go negative, but **the signedness is
+real for the increment and irrelevant for the store** - the arithmetic is the same
+modulo 2^16 either way - so a signed load is one instruction wider than needed and
+says only that the field was read as a signed short.
 ## Pipeline
 
 ```
@@ -3114,6 +3240,7 @@ tools/code_writers.py       functions that name an address inside the code secti
 tools/spill_frame.py         float functions that move values through the frame
 tools/branch_load.py         branch-likely delay slots: loads, or any register write
 tools/boolean_shapes.py     dead zero-test masks, and immediate-width flag setters
+tools/base_pointer.py      forming an offset once, then a run of loads or stores
 ```
 
 ```

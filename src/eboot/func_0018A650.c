@@ -32,9 +32,16 @@
  * `lwc1 $f12, 0x1A0($a0)`, `0x1A4`, `0x1A8`.  **This is the same decision
  * `func_000C3470` makes, at the other end of the module**: when a function touches a
  * run of consecutive offsets it forms a base pointer once and indexes it, and when it
- * touches a run of stack slots it forms the offsets once and indexes the stack.  The
- * saved instructions are one `addiu` against two saved `addiu`s in the immediate form,
- * so it is a wash on count and a difference in shape.
+ * touches a run of stack slots it forms the offsets once and indexes the stack.
+ *
+ * **An earlier draft of this comment called this a store-side habit and cited
+ * `tools/base_pointer.py`'s store count as evidence.  It is a load-side one** - the
+ * three stores here go through `$a1`, which arrives as an argument and is never
+ * computed - and the tool's own numbers are what caught it: 687 functions run stores
+ * through a formed base and 275 run loads through one, and this function is only in
+ * the second group.  **A count that excludes the function you are writing a comment
+ * about is a check worth having run**, and it is the third time in this project that a
+ * tool's output contradicted a claim in a file comment rather than the reverse.
  *
  * **The offsets 0x19C and 0x1AC are sixteen bytes apart with the three floats between
  * them**, so the record read from the object has one word before the vector and one
