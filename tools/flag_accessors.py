@@ -12,21 +12,58 @@ Three shapes account for all of them:
     clear lw rX, OFF($a0) / lui rY, HI / addiu rY, rY, LO / and rX, rX, rY
            / jr ra / sw rX, OFF($a0)
 
-The mask is always built with `lui`, never an immediate, because these are all
-bits above 15.  `clear` needs a second instruction because the mask it wants is
-`~small_mask`, whose high half has to be `lui`-loaded and then finished with an
-`addiu` to set the low half.
+and one more, four instructions instead of five:
 
-They are five to six instructions each, so there are enough to be worth a table
+    get    lw rt, OFF($a0) / andi v0, rt, MASK
+           / jr ra / sltu v0, $zero, v0
+
+**The mask is built with `lui` when its bit is above 15 and with `andi` when it is not,
+and the table now shows both halves of that rule rather than one.**
+
+    spelling    bits found
+    andi        3   15
+    lui         17  18  20  20  31
+
+Nothing overlaps and nothing is missing at the join: the `andi` masks are all at or
+below bit 15 and the `lui` masks all at or above bit 17.  `andi` takes a *zero-extended*
+sixteen-bit immediate, so bit 15 is the last bit it can reach and bit 16 the first it
+cannot - which is why there is no accessor at bit 16 in either column.  An earlier
+version of this tool stated the rule ("always `lui`, because these are all bits above
+15") and had no case at the boundary, so the rule was consistent with a second
+explanation the bytes also allow: that the compiler simply prefers `lui` for flags.
+**`func_001A9ABC` and `func_001A9ACC` settle it** - they are two getters on the same
+word at offset 0x18, sixteen bytes apart, one masking bit 15 with `andi` and one
+masking bit 17 with `lui`, and nothing else differs between them.
+
+`clear` needs a second instruction because the mask it wants is `~small_mask`, whose
+high half has to be `lui`-loaded and then finished with an `addiu` to set the low
+half.  **There is no immediate form of `set` or `clear`**, and there cannot be: both
+have to write the whole word back, and `andi` and `ori` can only produce one.
+
+They are four to six instructions each, so there are enough to be worth a table
 rather than a guess, and enough that the pairing matters: a getter with no setter
 is evidence that the other half was inlined away at every call site, not that the
 accessor does something else.
 
+**Two bugs were hiding behind that missing fourth shape**, both of which had been
+sitting in the file looking like they handled the immediate case:
+
+* the fallback that looks for an immediate mask tested opcode `0x0D` (`ori`) and not
+  `0x0C` (`andi`), so it could never see an `andi`-masked accessor - the one
+  instruction that defines the shape;
+* the length filter required at least five instructions, which is right only when a
+  `lui` is present.  An `andi`-masked getter has no `lui` and is *four*, so the filter
+  rejected it even after the first fix.
+
+Neither could have been found by reading the code, because both were plausible lines
+in a plausible branch; they were found because a function transcribed by hand - bit 15,
+the one bit the rule said would need an immediate - did not appear in the tool built
+to find it.
+
 The earlier attempt at this (`tools/flag_table.py`) tried to recover the meaning of
 every mask in the module and found that patterns recognised from two examples did
-not survive being counted.  This tool is deliberately narrower - it matches the
-three shapes above exactly and reports what it finds without inferring what the
-bits mean.
+not survive being counted.  This tool is deliberately narrower - it matches the four
+shapes above exactly and reports what it finds without inferring what the bits mean.
 
     python tools/flag_accessors.py            # the table
     python tools/flag_accessors.py --show 2   # full disassembly of row 2
@@ -104,7 +141,7 @@ def accessor(words: list[int]) -> dict | None:
     with the same five or six instructions at the end, so those are allowed too and
     the leading instructions are simply stepped over.
     """
-    if not 5 <= len(words) <= 14:
+    if not 4 <= len(words) <= 14:
         return None
 
     # The flags word is loaded out of the object with `$a0` as the base, and the
@@ -131,6 +168,7 @@ def accessor(words: list[int]) -> dict | None:
     for i, w in enumerate(words):
         if w >> 26 == 0x0F:
             mask, mask_reg = (w & 0xFFFF) << 16, (w >> 16) & 0x1F
+    via_lui = mask is not None
     if mask is not None:
         # `addiu $mask, $mask, -1` fills the low sixteen bits in, which is what a
         # *clear* needs: the top half of the mask and all the bits below it.
@@ -139,12 +177,39 @@ def accessor(words: list[int]) -> dict | None:
                 mask = (mask - 1) & 0xFFFFFFFF    # `addiu` sign extends -1
                 break
     else:
+        # No `lui`, so the mask is an immediate.  Both `andi` (0x0C) and `ori` (0x0D)
+        # carry one in the low half with the destination in `rt`, and the destination
+        # must not be `$a0` - an `ori $a0, ...` would be an address, not a flag.  The
+        # opcode set here originally held 0x0D only, which meant an `andi`-masked
+        # accessor could never be seen at all: the very case the fallback exists for.
         for w in words:
-            if w >> 26 == 0x0D and (w & 0xFFFF) < 0x10000 \
-                    and (w >> 16) & 0x1F != 4:
+            if w >> 26 in (0x0C, 0x0D) and (w >> 16) & 0x1F not in (0, 4):
                 mask, mask_reg = w & 0xFFFF, (w >> 16) & 0x1F
                 break
     if mask is None or mask_reg < 0:
+        return None
+
+    if not via_lui:
+        # The mask fits a zero-extended immediate, so there is no `lui` and the
+        # masking instruction is the `andi` itself - which cannot be the
+        # `op` check's SPECIAL-register `and`/`or`, so this path has to return on its
+        # own.  Only a getter is possible: an `andi` writes a whole word, so a setter
+        # or clearer would destroy the flags it meant to preserve.
+        andi = next((w for w in words
+                     if w >> 26 == 0x0C and (w >> 16) & 0x1F == 2
+                     and reg(w) == word_reg), None)
+        if andi is None:
+            return None
+        if narrows and special(tail[1]) == 0x2B and reg(tail[1]) == 0 \
+                and (tail[1] >> 16) & 0x1F == 2:
+            return {"offset": offset, "mask": mask, "kind": "get",
+                    "bits": bits_of(mask), "immediate": True}
+        return None
+
+    # A getter or setter whose mask needs a `lui` is five instructions; the length
+    # test above has to allow four only for the immediate case above, or it rejects
+    # exactly the rows that distinguish the two spellings from each other.
+    if len(words) < 5:
         return None
 
     op = words[-3]

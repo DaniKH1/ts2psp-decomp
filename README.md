@@ -13,7 +13,7 @@ relative.
 | code | **507,673 / 507,673 instructions identical** |
 | functions recovered | 7,497 |
 | relocations recovered | 66,503 / 66,503 |
-| C functions byte-exact and hand written | 405 |
+| C functions byte-exact and hand written | 410 |
 
 The engine is Maxis' "Elem", the shared engine also used by *The Sims 3* — the
 build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
@@ -23,7 +23,7 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 | directory | |
 | --- | --- |
 | `asm/` | one `.s` per function, as splat produced them.  Assembling and linking this reproduces the original exactly.  Recovered material — see [Legal](#legal). |
-| `src/eboot/` | the hand written decompilation: what each function does, in C.  405 of the 426 files here are verified to compile to the original bytes; the other 21 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
+| `src/eboot/` | the hand written decompilation: what each function does, in C.  410 of the 431 files here are verified to compile to the original bytes; the other 21 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
 | `include/` | the shared types: `f32`, `Vec3f`, and the object layouts the early functions reveal. |
 | `tools/` | everything that produced the above, and the checks that keep it honest.  MIT licensed. |
 | `config/` | the recovered symbol map, the relocation map, and hand recovered names. |
@@ -35,13 +35,13 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 **The assembly is byte-exact and complete.**  `asm/` reproduces every byte of
 the module image.  That part is finished and has been for some time.
 
-**The C is the readable layer, and it is partial.**  405 of 7,497 functions.  The
+**The C is the readable layer, and it is partial.**  410 of 7,497 functions.  The
 original was built with CodeWarrior for PSP (`mwccpsp.exe`), and psp-gcc does
 not reproduce its instruction selection.  Reaching byte-exact C for *all* 7,497
-needs that proprietary compiler; 405 were reached without it, by pinning the
+needs that proprietary compiler; 410 were reached without it, by pinning the
 handful of registers and delay slots where the two compilers disagree.
 
-What those 405 have in common is that the disagreement is small enough to name.
+What those 410 have in common is that the disagreement is small enough to name.
 Both compilers emit the same *instructions* and differ over which register is the
 destination, or when a value is loaded, so pinning the registers makes them agree.
 The pinning is deliberately narrow: an inline `asm` block over the two or three
@@ -118,15 +118,27 @@ Three results from that work are worth knowing before reading the C:
   by ten.  The result is used; it is always zero.  Every other piece of dead code
   found so far computes something that *is* used, so this one is the clearest
   instance yet of byte-exact and correct being different questions.
-* **The module uses branch-likely to make a delay slot conditional, and 616 functions
-  do it.**  `tools/branch_load.py` counts 38,336 `beq`/`bne`/`beql`/`bnel`, of which
-  3,214 are the likely forms — 8.4 % — and 616 functions put a load in a *likely*
-  branch's delay slot.  The 43 that write a literal into the destination first are a
-  `value or sentinel` accessor: `sortAndCullScene_10BC` defaults to `-2`, and
-  `func_00052950` to `0`.  **The likely form is the whole trick** — it runs the delay
-  slot only when taken, so a conditional load costs one branch and no label — and it
-  being *uncommon* is what makes it read as deliberate rather than as a scheduling
-  accident.  What the sentinel means is still not established.
+* **The module uses branch-likely to make a delay slot conditional, and 1,173
+  functions do it.**  `tools/branch_load.py` counts 38,336 `beq`/`bne`/`beql`/`bnel`,
+  of which 3,214 are the likely forms — 8.4 % — and 1,173 functions put *any register
+  write* in a likely branch's delay slot, 311 of them writing a literal into the
+  destination first.  That is "conditionally materialise a value, defaulting to a
+  constant": `func_0000E04C` guards `addiu $s1, $a0, 0x8`, so `s1 = node ? node + 8 :
+  NULL`, and `func_0000EBDC` does the whole thing three times into three registers in
+  one function.  **The likely form is the whole trick** — the slot runs only when the
+  branch is taken, so this costs one branch and no label — and it being *uncommon* is
+  what makes it read as deliberate rather than as a scheduling accident.  What the
+  sentinel means is still not established.
+* **A tool's rule said "always `lui`, because these are all bits above 15", and had no
+  test at bit 15.**  `func_001A9ABC` masks `0x8000` with `andi` — the one bit an
+  `andi` immediate can still reach — and sixteen bytes away `func_001A9ACC` masks
+  `0x20000` with `lui`, on the same word, with nothing else differing.  Bit 15 is what
+  separates "the compiler prefers `lui`" from "the immediate stops at 16 bits", so the
+  missing boundary case was the only thing standing between a rule and two rules.  It
+  turned up because the function was transcribed by hand and the tool built to find it
+  did not.  Two bugs were behind it: the immediate-mask fallback tested opcode `0x0D`
+  (`ori`) instead of `0x0C` (`andi`), and the length filter demanded five instructions
+  when an `andi`-masked getter has no `lui` and is four.
 * **A comment in this repo argued from a missing name to a real fact, and the census
   caught it.**  `updateNodeGraph_0E48` is a fifth member of the four-member
   three-float copy family; the first draft claimed the other four shared a translation

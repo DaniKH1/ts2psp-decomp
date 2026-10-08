@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 426 (see below) |
-| **C functions that byte-match** | **405** (linked from `src/`) |
+| functions written in C | 431 (see below) |
+| **C functions that byte-match** | **410** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -2766,6 +2766,153 @@ function is also *wrong*, not merely long.  Writing the target as a local label 
 makes the likely form survive.  This is a fourth member of the family of places where
 `.set` and pseudo-instruction spelling change the encoding, after the `jr $ra` delay
 slot rules.
+### The flag-mask rule, confirmed at its boundary
+
+`func_001A9ABC` is sixteen bytes and tests one bit:
+
+```
+lw   $a0, 0x18($a0)
+andi $v0, $a0, 0x8000
+jr   $ra
+sltu $v0, $zero, $v0
+```
+
+**`tools/flag_accessors.py` did not find it, and the tool had stated the rule that
+explains exactly why it should have.**  Its docstring said the mask is always built
+with `lui`, "because these are all bits above 15" - and `0x8000` is bit 15, the last
+bit `andi`'s zero-extended immediate can reach.  So the tool had no case at the
+boundary, which left the rule consistent with a second explanation the bytes also
+allow: that psp-gcc simply prefers `lui` for flag masks.  **Bit 15 picks between those
+two explanations and it picks the first.**
+
+The evidence is a pair sixteen bytes apart on the same word:
+
+```
+0x001A9ABC  func_001A9ABC  andi $v0, $a0, 0x8000     bit 15
+0x001A9ACC  func_001A9ACC  lui  $a1, 0x2 / and       bit 17
+```
+
+**Nothing else about the two differs.**  With the fourth shape added the table reads:
+
+    spelling    bits found
+    andi        3   15
+    lui         17  18  20  20  31
+
+Six accessors before, **eight now**, with the split falling exactly where the rule says
+and no accessor at bit 16 in either column.
+
+**Two bugs were sitting in the tool behind that missing shape**, and neither could
+have been found by reading the code:
+
+* the fallback that looks for an immediate mask tested opcode `0x0D` (`ori`) and not
+  `0x0C` (`andi`) - so it could never see an `andi`-masked accessor, the one
+  instruction that defines the shape.  It was dead code that *looked* like it handled
+  the immediate case;
+* the length filter required five instructions, which is correct only when a `lui` is
+  present.  **An `andi`-masked getter has no `lui` and is four**, so the filter rejected
+  it even after the first fix.
+
+Both are plausible lines in a plausible branch.  They were found because a function
+transcribed by hand - bit 15, the one bit the tool's own rule predicted would need an
+immediate - did not appear in the tool built to find it.  **That is the whole argument
+for transcribing rather than only mining.**
+
+### The `value or sentinel` count was wrong by more than seven times
+
+Last iteration's census reported **43** functions where a branch-likely chooses between
+a literal and a value, and this iteration's two functions are both that idiom with the
+delay slot holding something that is not a load:
+
+```
+func_000BF49C   ori $v0, $zero, 0x0 ... beql + move $v0, $a0
+func_000BAB78   ori $v0, $zero, 0x0 ... bnel + addu $v0, $a1, $a0
+```
+
+**A delay slot does not have to hold a load.**  `branch_load.py --all` counts any
+register write in one:
+
+```
+  616   functions, load in a likely delay slot      (43 with a constant default)
+1,173   functions, any register write in one       (311 with a constant default)
+```
+
+**So 43 described only the loads, and the idiom is at least seven times commoner than
+that.**  The slot holds `move` 295 times, `addu` 111, `andi` 130, `ori` 88 - anything
+that writes the register the branch is choosing between.  The idiom is not
+"conditionally load", it is **"conditionally materialise a value, defaulting to a
+literal"**, and the load-only framing was an artefact of the tool.
+
+**What it means is still not established, but the best-supported reading is an
+address.**  `func_0000E04C` guards `addiu $s1, $a0, 0x8` with `bnel $a0, $zero`, so
+`s1 = node ? node + 8 : NULL` - "the field at +8, if the link exists".  And
+`func_0000EBDC`, 696 bytes, does the whole thing **three times into three different
+registers**:
+
+```
+ori $fp, $zero, 0x0 ... lw $a2, 0x0($a1) / bnel $a2, $t1 / addu $fp, $a1, $a2
+ori $s7, $zero, 0x0 ... lw $a2, 0x0($a1) / bnel $a2, $t1 / addu $s7, $a1, $a2
+ori $s5, $zero, 0x0 ... ...                    / ... / ...
+```
+
+**Three in one function is what makes it an idiom rather than three coincidences**, and
+it is the reason the general reading is now "base plus index" rather than "a constant
+the branch proved".
+
+**That in turn corrects a claim in `func_000BAB78.c` itself.**  Its first draft called
+the delay slot's addend "the constant the branch has just proved" and treated that as
+the whole story.  It is true there and it is the degenerate case: the test is equality
+against 1, so the index and the tested constant are the same register and `$a0` fills
+both roles.  In `func_0000EBDC` the roles are distinct - `$t1` is what `$a2` is compared
+against, `$a2` is what is added - so the idiom is about indexing, not about proving.
+
+### A census that widened downwards, and how the tell worked
+
+The first `--all` run reported **265 functions, fewer than the 616 it was meant to
+extend**, with no loads anywhere in the breakdown.  A census that goes *down* when it
+is widened is not a surprising result to argue about - it is a broken predicate, and the
+number itself said so.
+
+The cause was one line: `_dest` asked rabbitizer's `getDestinationGpr()` for the
+destination, **which raises for `lw` because `lw` has no `rd` field at all**, and
+`insn.rt` is a `RegGprO32` object rather than an integer, so the obvious fixes both
+fail silently.  It now asks rabbitizer only *which field* is the destination and reads
+the bits itself.  **The lesson is the same one the `$sp` counter in `spill_frame.py`
+produced:** a helper asked about the wrong argument class answers confidently about
+the wrong thing, and the only reliable detector was a case that should have been
+impossible.
+
+The same class of bug bit `_writes_const`, which had been hardened to demand a load and
+therefore *could not be used by `--all` at all*.  The fix was not to remove the guard
+but to write a second predicate for the general case - `_default_before`, which walks
+back from the branch to the last write of the destination register instead of looking
+one instruction back.  **One instruction back is right for a load, whose destination
+is also its `rt`, and wrong for everything else:** `func_000BF49C` sets its NULL
+default six instructions before its `beql` and the one-instruction rule reports no
+default for it.
+
+### Four more functions
+
+`func_00080758` already claimed a "field counter whose step size depends on its own
+value".  `func_001160C0` and `func_0010FFF4` are the pair that makes the **reload**
+question answerable, and they answer it in opposite directions:
+
+* `func_0010FFF4` loads its cursor `twice` - `lw $a1, 0x8($a0)` at the top and again
+  after two stores - because the store went through a pointer the compiler had loaded
+  from memory and it cannot prove the write missed the cursor;
+* `func_001160C0` stores through `$a0` and then **reuses** `$a0` without reloading,
+  because its store is at a *fixed offset* from the same base and no second pointer is
+  involved, so non-aliasing is provable.
+
+**So the reload is neither redundancy nor a compiler whim: it is the difference between
+a provable and an unprovable aliasing question.**  `func_001160C0` also reads a word at
++0x14 and stores its low byte at +5 with nothing between them, which is a
+source-level narrowing and not something the compiler introduced.
+
+`func_00080758`'s dead masks are now four of a kind across this tree - `and` against
+0xFFFFFFFF in `func_0014EAAC`, `and` against 0xFFFFFF0F in `func_00080758`, and
+`sltiu 1` followed by a dead `andi 0xFF` in `func_000BF49C`, which is the first of the
+four where the redundant mask is a *zero*-extending `andi` rather than a full-word
+`and`.
 ## Pipeline
 
 ```
@@ -2805,7 +2952,7 @@ tools/check_report.py        names the report writes about that have no src/eboo
 tools/stride_table.py        addresses several functions materialise; code or constant
 tools/code_writers.py       functions that name an address inside the code section
 tools/spill_frame.py         float functions that move values through the frame
-tools/branch_load.py         loads in a likely branch's delay slot
+tools/branch_load.py         branch-likely delay slots: loads, or any register write
 ```
 
 ```
