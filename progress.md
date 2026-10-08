@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 183 (see below) |
-| **C functions that byte-match** | **177** (linked from `src/`) |
+| functions written in C | 188 (see below) |
+| **C functions that byte-match** | **182** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  One hundred and seventy-seven
+CodeWarrior and only the *register choice* differs.  One hundred and eighty-two
 now byte exact this way:
 
 ```
@@ -259,6 +259,11 @@ func_00084E48  u32            branchless equality test: xor + sltiu
 func_001235A8  void            swap prev/next of a node, make both point to self
 func_00091360  Node*           pop from list: take node at a1, put at a0, advance
 func_001A9B78  void            store float at 0x34, set bit 2 on ptr at 0x18
+func_001102F0  void            stream advance: sign flag, constant, advance ptr by 8
+func_000F8974  u32            array store: base[10] = arg, return 0
+func_000F8990  u32            array load: *out = base[18], return 0
+func_000E4B0C  u32            array load: *out = base[10], return 0
+func_00120C48  void            complex pointer chain: base[ptr0->idx]-1 = arg
 func_00128F50  Elapsed*        start - now
 func_00140A58  u32             flags[index] & 0x07, packed flag bytes
 func_00140A74  u32             ... the same, mask 0x04
@@ -1024,7 +1029,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the one hundred and seventy-seven that work: if the function has no
+The rule of thumb from the one hundred and eighty-two that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -2373,7 +2378,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 177 are done.  Each shape that works yields several functions
+   identified and 182 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
