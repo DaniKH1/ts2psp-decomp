@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 443 (see below) |
-| **C functions that byte-match** | **423** (linked from `src/`) |
+| functions written in C | 451 (see below) |
+| **C functions that byte-match** | **432** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3349,6 +3349,108 @@ the first base is dead and the compiler knew it.
 `base_pointer.py`'s 687 with a longest store run of six.  Nothing checks whether the two
 sources are adjacent, which is the only reason to mention it: written as two copies
 rather than a loop, the aliasing question never arises.
+### The cheapest pair of related functions in the module
+
+`syncSkeleton_22B8` and `func_0012A9D0` are fifty-two bytes each and differ in **exactly
+one instruction** - the thirteenth, the one in `jr $ra`'s delay slot:
+
+```
+syncSkeleton_22B8   ... vqmul.q R100, R200, R201 / svr.q / svl.q / jr $ra / nop
+func_0012A9D0       ... vqmul.q R100, R200, R201 / svr.q / svl.q / jr $ra / move $v0, $a0
+```
+
+**The return costs nothing, because the delay slot was going to be a `nop` anyway.**
+
+The pair `func_00123588` / `func_00123560` differs by eight bytes and three instructions
+of genuinely different work; `func_00110314` / `func_0010FFF4` by a constant and a
+payload type.  **This pair differs only in what the function hands back.**
+
+**They are in different translation units**, and that is worth saying carefully because
+it is a naming fact and not a unit-boundary one: `updateNodeGraph_0E48.c` records the
+opposite caution at length.  Here both are byte-identical modulo one instruction, **so
+whatever produced them was available to both, and the names tell us only that the
+linker kept one of them.**  The operand registers *do* differ - `$a0`/`$a1` against
+`$a1`/`$a2` - because one writes through its first argument, and that is a real
+convention difference rather than a naming artefact.
+
+### A bounded negative, and the tool that records it
+
+Both functions store their result with two 64-bit stores of one quad's two halves,
+**twelve bytes apart**:
+
+```
+svr.q R100, 0x0($a0)     the encoded immediate is 0x3
+svl.q R100, 0xC($a0)     the encoded immediate is 0xD
+```
+
+**The immediates are three and thirteen because `svl`/`svr` encode offset minus three**,
+the same convention as `lwl`/`lwr` - so a listing and the word disagree by three in both
+stores.  **Two 64-bit stores of consecutive halves twelve bytes apart do not tile a
+sixteen-byte vector**: a contiguous four-float store would need offsets 0 and 8.  So
+either the destination has a four-byte gap at offset 8, or the two instructions write
+halves in an order this project has not established.
+
+`tools/vfpu_split_store.py` was written to settle it from the module and could not.
+**Five functions use an `svr.q` + `svl.q` pair - `func_0012A9D0`, `func_0012DE0C`,
+`func_0012DE70`, `syncSkeleton_2120` and `syncSkeleton_22B8` - and every one uses the
+identical pair of offsets, 0x3 and 0xD.**  There is no second instance at different
+offsets, so nothing here disambiguates which half each store writes.  **That is a bounded
+negative and the tool says so**, rather than leaving the question open in a comment
+where it would read as an oversight.
+
+### A round trip that changes nothing
+
+`func_0012D9F8` loads sixteen floats into four quads with sixteen `lv.s` and stores
+them back with four `sv.q`.  **S200-S203 are one quad, S210-S213 the next, and so on, so
+each `sv.q` writes back exactly the four floats that fed it** - and a byte comparison of
+the sixteen words before and after finds no difference.  There is no arithmetic between
+the last load and the first store, and the return's delay slot is a plain `nop`.
+
+So it is not a computation.  Three readings and no way to choose between them from the
+bytes: it exists to touch the memory and the vector cache; it is a stub the compiler
+emitted before the operation using it went away; or it is a no-op by accident.  **What
+can be said is the shape, and the shape is the vector-unit counterpart of
+`func_000C3470`'s spill storm** - opposite cases, twenty instructions where zero would do
+against sixteen floats through 0xC0 bytes of stack three times over.  **That one moves
+floats through memory because psp-gcc would not keep them in registers; this one keeps
+them in registers and does nothing with them.**
+
+**And the vector unit is used the long way here.**  Sixteen `lv.s` loads where four
+`lv.q` would do the same work, because `lv.s` is the only scalar load the vector unit
+has and the source named sixteen separate floats.  `renderMeshInstances_1060` uses eight
+`lv.q`, so **both spellings are present and the module does not always pick the
+shorter one** - which is the same lesson as `func_00150730` last iteration from the
+other side of the ISA.
+
+### The listing this file was transcribed from was one instruction wrong
+
+`func_0012D9F8` was first written with the fourth `sv.q` in the return's delay slot.
+**That built 84 bytes against an original of 88 - one instruction short - and was wrong
+about the function.**  `tools/c_shapes.py` had printed it that way:
+`sv.q R203` at 0x0012DA44, then `jr $ra` at 0x0012DA48 and `sv.q R203` again at
+0x0012DA4C.
+
+`tools/disasm_range.py` prints four stores and then `jr $ra` and `nop` - the twenty-two
+words the declared size says are there.  **The project's standing rule is to trust
+`disasm_range.py` over a shape listing, and this is the case the rule exists for**:
+the shape tool's rendering was plausible, readable and one instruction wrong, and
+`verify_c.py`'s size check caught it in one pass.  `try_func.py` alone would have shown
+a 4-byte shortfall rather than naming the cause, which is why the size check is not to be
+weakened.
+
+### A claim about `vqmul.q` that was withdrawn
+
+Both new vector files first described `vqmul.q` as "the saturating form".  **That was not
+supported.**  What the module shows is narrower: the `.q` suffix is the quad element
+format - `lv.q`, `sv.q`, `vmmul.q`, `vpfxs` all carry it - and the leading `q` of
+`vqmul` is a different modifier.
+
+**The module contains exactly two `vqmul.q` instructions and both are in these two
+functions**, so it is the only quad multiply here at all, against six `vmmul.q` - the
+matrix form `renderMeshInstances_1060` uses - **and no `sat` anywhere in its 542 vector
+instructions.**  So whether the multiply clamps is not established, and a saturating
+variant would have been spelled with a `sat` this module never writes.  Both files now
+say that instead of asserting the stronger and wrong thing.
 ## Pipeline
 
 ```
@@ -3387,6 +3489,7 @@ tools/flag_accessors.py      census the C++ boolean accessors: mask, offset, dir
 tools/check_report.py        names the report writes about that have no src/eboot file
 tools/stride_table.py        addresses several functions materialise; code or constant
 tools/code_writers.py       functions that name an address inside the code section
+tools/vfpu_split_store.py  staggered vector stores: svr.q with svl.q
 tools/spill_frame.py         float functions that move values through the frame
 tools/branch_load.py         branch-likely delay slots: loads, or any register write
 tools/boolean_shapes.py     dead zero-test masks, and immediate-width flag setters

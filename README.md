@@ -13,7 +13,7 @@ relative.
 | code | **507,673 / 507,673 instructions identical** |
 | functions recovered | 7,497 |
 | relocations recovered | 66,503 / 66,503 |
-| C functions byte-exact and hand written | 429 |
+| C functions byte-exact and hand written | 432 |
 
 The engine is Maxis' "Elem", the shared engine also used by *The Sims 3* — the
 build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
@@ -23,7 +23,7 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 | directory | |
 | --- | --- |
 | `asm/` | one `.s` per function, as splat produced them.  Assembling and linking this reproduces the original exactly.  Recovered material — see [Legal](#legal). |
-| `src/eboot/` | the hand written decompilation: what each function does, in C.  429 of the 448 files here are verified to compile to the original bytes; the other 21 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
+| `src/eboot/` | the hand written decompilation: what each function does, in C.  432 of the 451 files here are verified to compile to the original bytes; the other 19 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
 | `include/` | the shared types: `f32`, `Vec3f`, and the object layouts the early functions reveal. |
 | `tools/` | everything that produced the above, and the checks that keep it honest.  MIT licensed. |
 | `config/` | the recovered symbol map, the relocation map, and hand recovered names. |
@@ -35,13 +35,13 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 **The assembly is byte-exact and complete.**  `asm/` reproduces every byte of
 the module image.  That part is finished and has been for some time.
 
-**The C is the readable layer, and it is partial.**  429 of 7,497 functions.  The
+**The C is the readable layer, and it is partial.**  432 of 7,497 functions.  The
 original was built with CodeWarrior for PSP (`mwccpsp.exe`), and psp-gcc does
 not reproduce its instruction selection.  Reaching byte-exact C for *all* 7,497
-needs that proprietary compiler; 429 were reached without it, by pinning the
+needs that proprietary compiler; 432 were reached without it, by pinning the
 handful of registers and delay slots where the two compilers disagree.
 
-What those 429 have in common is that the disagreement is small enough to name.
+What those 432 have in common is that the disagreement is small enough to name.
 Both compilers emit the same *instructions* and differ over which register is the
 destination, or when a value is loaded, so pinning the registers makes them agree.
 The pinning is deliberately narrow: an inline `asm` block over the two or three
@@ -157,6 +157,23 @@ Three results from that work are worth knowing before reading the C:
   they are middling** — they came out of the work queue, not out of being the worst of
   anything.  The ratio is not the discriminator either: what makes these need machine
   code is that the compiler spilled where it had registers free.
+* **The cheapest pair of related functions in the module.**  `syncSkeleton_22B8` and
+  `func_0012A9D0` are fifty-two bytes each and differ in exactly one instruction — the
+  one in `jr $ra`'s delay slot, `nop` against `move $v0, $a0`.  **The return costs
+  nothing because the slot was going to be a `nop` anyway**, which makes it the closest
+  thing to two related functions this module offers.
+* **The vector unit is used the long way, and used well.**  `func_0012D9F8` loads
+  sixteen floats with sixteen `lv.s` where four `lv.q` would do, then stores them back
+  with four `sv.q` to the same addresses — **a round trip whose effect on memory is
+  nil**, with no arithmetic between the last load and the first store.  It is the
+  vector-unit counterpart of `func_000C3470`'s spill storm and the opposite case: that
+  one moves floats through memory because psp-gcc would not keep them in registers,
+  this one keeps them in registers and does nothing with them.  `renderMeshInstances_1060`
+  does use eight `lv.q`, so **both spellings are present and the module does not always
+  pick the shorter one.**  And a tool was written to settle the staggered `svr.q` /
+  `svl.q` store and could not: five instances, all at the identical offsets, so the
+  module cannot say which half each store writes — a bounded negative the tool records
+  as one.
 * **One family, one member that returns, and the instruction it spends instead.**  The
   six-member three-float copy family has five void copies that begin with an `addiu`
   forming a base pointer and one that returns the destination pointer instead.  **Both

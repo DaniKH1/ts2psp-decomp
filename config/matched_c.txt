@@ -284,8 +284,10 @@ func_00128278
 func_0012828C
 func_001282B4
 func_00128F50
+func_0012A9D0
 func_0012C2D0
 func_0012C954
+func_0012D9F8
 func_0012E9D4
 func_0012EB30
 func_0012F854
@@ -427,6 +429,7 @@ renderMeshInstances_1034
 renderMeshInstances_1060
 sortAndCullScene_1080
 sortAndCullScene_10BC
+syncSkeleton_22B8
 syncSkeleton_27D0
 syncSkeleton_2808
 updateNodeGraph_0E48
