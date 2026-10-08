@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 399 (see below) |
-| **C functions that byte-match** | **378** (linked from `src/`) |
+| functions written in C | 404 (see below) |
+| **C functions that byte-match** | **383** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -1561,6 +1561,32 @@ before writing the word down is the lesson from
 [the copy census](#a-copy-is-a-scheduler's-answer-and-there-are-only-two-of-them),
 applied one iteration later and this time in advance.
 
+**Both files were missing from the tree while this section claimed them.**  The
+paragraph above says both "matched on the first attempt" and were "transcribed that
+way" - and neither `src/eboot/func_00197414.c` nor `src/eboot/func_001AF16C.c` was
+there.  A report entry is not a file, and nothing cross-checked the prose against the
+directory.  Both are written and byte-exact now.
+
+They came back out of `tools/c_shapes.py --show`, which lists instruction sequences
+rather than function names, so it cannot see that a function has already been written
+up in the report - which is also why it was worth transcribing the two *other*
+functions that had a shape and looked like more lerps before assuming this pair was
+the only pair of its kind.  That near-miss is what the gap guard is for:
+`tools/check_report.py` walks the backtick-quoted symbol names out of this file and
+the README and lists the ones with no `src/eboot/<name>.c`.  It does not decide
+whether a mention was a *claim* - plenty are not, `func_001129E0` and the 223 import
+stubs among them - so it prints the line and lets a reader judge.  It reports 31
+names with no file out of 97 mentioned, and each of those 31 needs a human to say
+which kind it is.
+
+**And a near-collision the guard found rather than a gap.**  `func_0011354C` - an
+abort site in the guard's error table - and `func_0001354C` - a 28-byte wrapper this
+project transcribed - differ by one leading zero, and the first has 212 bytes against
+the second's 28.  Two symbols four orders of magnitude apart in size and one
+character apart in name is the kind of thing that gets mixed up silently, because
+every tool here prints addresses in hex with a fixed width and the names carry the
+same tail.  Worth knowing before either is looked up by eye.
+
 ### A copy is a scheduler's answer, and there are only two of them
 
 `func_00103E88` copies six words and the interesting part is how, not what:
@@ -2174,6 +2200,104 @@ because it is in the original.  That is worth saying plainly, because it is the
 kind of instruction a decompilation "should" remove and this project's whole
 premise is that it should not.
 
+### A cross product at 0xEBC88, and why it is not on the vector unit
+
+`func_000EBC88` computes the cross product of the `f32[3]` at offset 0x30 of its
+first argument and the `f32[3]` at the start of its second, into the vector its
+third argument points at.  All six products are computed and three of them are
+dead, which is what a cross product written straight from the algebra looks like:
+
+```
+    x = a.y*b.z - a.z*b.y      $f16 = $f12*$f13 - $f14*$f15
+    y = a.z*b.x - a.x*b.z      $f13 = $f14*$f17 - $f19*$f13
+    z = a.x*b.y - a.y*b.x      $f12 = $f19*$f15 - $f12*$f17
+```
+
+It is worth having as a second data point for `tools/vector_unit.py`'s claim that the
+vector coprocessor is confined to rendering.  A cross product is exactly what a
+vector unit exists to do, it sits in the physics-adjacent part of the module rather
+than the rendering part, and it is six scalar `mul.s` and three scalar `sub.s` with
+`$f12` to `$f19` - the eight scalar FP temporaries of the o32 ABI - as destinations.
+All six products are live at once, so every one of the six destinations is distinct,
+and from the `sub.s` on the same registers are reused for the three results.
+
+The shape is also the only one in `tools/c_shapes.py --done` with 20 instructions of
+float arithmetic and no branch, which is how it came to be looked at.
+
+### `collision_1210`: two volumes tested in one call, sign-only, no multiply
+
+`collision_1210` at 0x1B1A30 is 192 bytes with sixteen `lh`s, twelve `subu`s, ten
+`and`s and not one multiply or branch but the return.  Written out as arithmetic,
+with the first argument's twelve signed halfwords as `a[0..11]` and the second's
+eight as `b[0..7]`:
+
+```
+    s1 = (a[0]-b[4]) & (a[1]-b[5]) & (a[2]-b[6])
+       & (b[0]-a[6]) & (b[1]-a[7]) & (b[2]-a[8])
+
+    s2 = (a[3]-b[4]) & (a[4]-b[5]) & (a[5]-b[6])
+       & (b[0]-a[9]) & (b[1]-a[10]) & (b[2]-a[11])
+
+    return ((s1 >> 31) & 1) | ((s2 >> 31) & 2)
+```
+
+Each `s1` is the sign of a product of six differences, three taken one way and three
+the other, so its sign bit is the parity of six comparisons - which is what an
+orientation or interval-overlap decision needs, obtained without multiplying.  The
+answer is two bits: which of two volumes overlapped the one in the second argument.
+`b[3]` is never read, and `a2 = b + 8` is what makes `b[4..6]` reachable as a group.
+
+**The caller is what settles "two volumes".**  There is exactly one, `collision_0C18`,
+and it calls with `$a0 = this` and `$a1` from the stack, then does
+
+```
+    lbu   $s1, 0x1C($s4)
+    jal   collision_1210        ; with `move $a0, $s4` in the delay slot
+    or    $a0, $s1, $v0
+    sltiu $a1, $a0, 0x16
+    beqz  $a1, ...
+    ...
+    jr    $at
+```
+
+on `byte_at_0x1C | result` - a **22-way jump table**.  A one-bit "collided" answer
+would be redundant with a byte-sized field; a two-bit one is not, and the jump table
+has room for it.  That is the whole argument, and it is an argument from the call
+site rather than from the function.
+
+**What is not settled, and is recorded as open in the file: which end of each
+interval is the low one.**  The code asks only for the *sign* of six differences, and
+the answer's meaning flips depending on which of `a[0]` and `a[6]` is the minimum.
+Nothing in the 192 bytes says, and settling it means reading a 752-byte caller.
+
+### Naming the register rule that took a function to get wrong
+
+`func_00140B28` is the `longjmp` half of the pair with `func_00140AC4`, and it took
+one attempt and one discovery:
+
+> **A callee-saved register in the clobber list makes GCC *save* it.**  The obvious
+> transcription of a function that restores `$s0`-`$s7` and `$f20`-`$f31` lists them
+> as clobbered.  psp-gcc then emits a prologue that spills `$f31` down to `$f24`
+> before the block, and the function comes out 56 bytes long with a frame it does
+> not have.  Declaring them clobbered tells GCC the block destroys them - it does -
+> but GCC's own convention is that a *callee* preserves them, so it preserves them
+> around the call site it thinks the block is.
+>
+> The fix is the omission `func_00140AC4` already makes: clobber `memory` and nothing
+> else.  A callee-saved register a whole-body block overwrites needs no declaration
+> when nothing follows the block to read it, which is what `noreturn` plus
+> `__builtin_unreachable()` guarantee.
+
+It is the mirror image of the `$sp` rule, and worth having side by side.  `$sp` is
+not callee-saved and listing it makes GCC emit a frame; `$s0` is callee-saved and
+listing it makes GCC emit a *save*.  Both push a prologue in front of a block that is
+supposed to have none.
+
+`$ra` and `$sp` cannot be left to C here either, which is the one place this function
+differs from its `setjmp` half: the `jr $ra` has to branch to the address *loaded
+from offset 0x28*, not to the one the function was called with, so the block ends
+with its own `jr $ra`.
+
 ## Pipeline
 
 ```
@@ -2209,6 +2333,7 @@ tools/check_symbols.py       every C-linked function reports the size it should
 tools/nid_table.py           the PSP import table: stubs, libraries, NID words
 tools/flag_table.py          decode the packed flag bytes and list their readers
 tools/flag_accessors.py      census the C++ boolean accessors: mask, offset, direction
+tools/check_report.py        names the report writes about that have no src/eboot file
 ```
 
 ```

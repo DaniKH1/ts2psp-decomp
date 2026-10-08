@@ -13,7 +13,7 @@ relative.
 | code | **507,673 / 507,673 instructions identical** |
 | functions recovered | 7,497 |
 | relocations recovered | 66,503 / 66,503 |
-| C functions byte-exact and hand written | 378 |
+| C functions byte-exact and hand written | 383 |
 
 The engine is Maxis' "Elem", the shared engine also used by *The Sims 3* — the
 build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
@@ -23,7 +23,7 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 | directory | |
 | --- | --- |
 | `asm/` | one `.s` per function, as splat produced them.  Assembling and linking this reproduces the original exactly.  Recovered material — see [Legal](#legal). |
-| `src/eboot/` | the hand written decompilation: what each function does, in C.  378 of the 399 files here are verified to compile to the original bytes; the other 21 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
+| `src/eboot/` | the hand written decompilation: what each function does, in C.  383 of the 404 files here are verified to compile to the original bytes; the other 21 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
 | `include/` | the shared types: `f32`, `Vec3f`, and the object layouts the early functions reveal. |
 | `tools/` | everything that produced the above, and the checks that keep it honest.  MIT licensed. |
 | `config/` | the recovered symbol map, the relocation map, and hand recovered names. |
@@ -35,13 +35,13 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 **The assembly is byte-exact and complete.**  `asm/` reproduces every byte of
 the module image.  That part is finished and has been for some time.
 
-**The C is the readable layer, and it is partial.**  378 of 7,497 functions.  The
+**The C is the readable layer, and it is partial.**  383 of 7,497 functions.  The
 original was built with CodeWarrior for PSP (`mwccpsp.exe`), and psp-gcc does
 not reproduce its instruction selection.  Reaching byte-exact C for *all* 7,497
-needs that proprietary compiler; 378 were reached without it, by pinning the
+needs that proprietary compiler; 383 were reached without it, by pinning the
 handful of registers and delay slots where the two compilers disagree.
 
-What those 378 have in common is that the disagreement is small enough to name.
+What those 383 have in common is that the disagreement is small enough to name.
 Both compilers emit the same *instructions* and differ over which register is the
 destination, or when a value is loaded, so pinning the registers makes them agree.
 The pinning is deliberately narrow: an inline `asm` block over the two or three
@@ -73,6 +73,10 @@ Three results from that work are worth knowing before reading the C:
 * **The engine has a `setjmp`-based guard for calls that cannot report failure in
   band.**  `func_00140AC4` and `func_00140B28` are `setjmp` and `longjmp` — they save
   and restore exactly the registers o32 says a callee must preserve, and nothing else.
+  Both are byte-exact, and the `longjmp` half is where the register rules bite: its
+  first attempt listed `$s0`–`$s7` and `$f20`–`$f31` as clobbered, and psp-gcc emitted
+  a prologue *saving* them — the mirror image of the `$sp` rule, where listing `$sp`
+  makes it emit a frame.  Both push a prologue in front of a block meant to have none.
   `func_001129E0` installs a handler record on an object and runs a **function
   pointer** under it; if anything calls `func_0011296C` the record's reason code is
   written into that frame's own return slot and control jumps back out, so the caller
