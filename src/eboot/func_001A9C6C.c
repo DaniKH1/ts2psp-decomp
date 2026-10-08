@@ -1,43 +1,74 @@
 /**
  * The Sims 2 PSP - func_001A9C6C (0x001A9C6C, 0x2C bytes)
  *
- * Copies a three-float vector from the second argument into offset 0x48 of the
- * object, then sets bit 7 of the object's flags word at 0x18.
+ * Copies three words from the structure pointed to by the second argument
+ * to offset 0x48 of the first argument, then sets bit 0x100 in the word
+ * at offset 0x18 of the first argument.
  *
- * The same "install a vector and mark it present" as func_001A9C40, with the
- * field at 0x48 instead of 0x3C; see that function for the pins, in particular
- * why `$t0` is named in the asm rather than bound as an operand and why the
- * flags word is reloaded instead of kept live.
+ *     lw   $a2, 0x0($a1)        load word 0 from *a1
+ *     lw   $t0, 0x4($a1)        load word 1 from *a1
+ *     addiu $a3, $a0, 0x48      dest = a0 + 0x48
+ *     lw   $a1, 0x8($a1)        load word 2 from *a1
+ *     sw   $a2, 0x0($a3)        store word 0 to dest
+ *     sw   $t0, 0x4($a3)        store word 1 to dest
+ *     sw   $a1, 0x8($a3)        store word 2 to dest
+ *     lw   $a1, 0x18($a0)       load flags word from a0+0x18
+ *     ori  $a1, $a1, 0x100      set bit 0x100
+ *     jr   $ra
+ *     sw   $a1, 0x18($a0)       store back flags, in delay slot
+ *
+ * **Copies three consecutive words** from one structure to another, then
+ * sets a flag bit (0x100 = 256) in a flags word at offset 0x18.
+ *
+ * The destination is at a0 + 0x48, which is 18 words into the first
+ * structure. The source is the second argument's first three words.
  */
 #include "types.h"
-#include "vec.h"
 
-typedef struct HasVec48 {
-    u8 pad[0x18];
+typedef struct Source {
+    u32 w0;   /* 0x00 */
+    u32 w1;   /* 0x04 */
+    u32 w2;   /* 0x08 */
+} Source;
+
+typedef struct Dest {
+    u32 pad[18];   /* 0x00 .. 0x47 */
+    u32 w0;        /* 0x48 */
+    u32 w1;        /* 0x4C */
+    u32 w2;        /* 0x50 */
+    u32 pad2[6];   /* 0x54 .. 0x6B */
+    u32 flags;     /* 0x6C (0x18 from start of flags section?) wait */
+} Dest;
+
+/* Actually 0x18 from a0, not from 0x48. So flags at 0x18. */
+
+typedef struct Dest2 {
+    u32 pad[6];    /* 0x00 .. 0x17 */
     u32 flags;     /* 0x18 */
-    u8 pad2[0x30];
-    Vec3f value;   /* 0x48 */
-} HasVec48;
+    u32 pad2[12];  /* 0x1C .. 0x47 */
+    u32 w0;        /* 0x48 */
+    u32 w1;        /* 0x4C */
+    u32 w2;        /* 0x50 */
+} Dest2;
 
-/* Copies `source` into the object's vector field and sets flag bit 7. */
-void func_001A9C6C(HasVec48 *self, Vec3f *source) {
-    register HasVec48 *obj asm("$a0") = self;
-    register Vec3f *src asm("$a1") = source;
-    register u32 x asm("$a2");
-    register u32 dst asm("$a3");
-
+__attribute__((noreturn)) void func_001A9C6C(Dest2 *dest, Source *src) {
+    register Dest2 *d asm("$a0") = dest;
+    register Source *s asm("$a1") = src;
     __asm__ __volatile__(
-        "lw    %[a2], 0x0(%[a1])\n\t"
-        "lw    $t0, 0x4(%[a1])\n\t"
-        "addiu %[a3], %[a0], 0x48\n\t"
-        "lw    %[a1], 0x8(%[a1])\n\t"
-        "sw    %[a2], 0x0(%[a3])\n\t"
-        "sw    $t0, 0x4(%[a3])\n\t"
-        "sw    %[a1], 0x8(%[a3])\n\t"
-        "lw    %[a1], 0x18(%[a0])\n\t"
-        "ori   %[a1], %[a1], 0x80\n\t"
-        "sw    %[a1], 0x18(%[a0])\n\t"
-        : [a0] "+r"(obj), [a1] "+r"(src), [a2] "+r"(x), [a3] "+r"(dst)
+        "lw   $a2, 0x0(%[s])\n\t"
+        "lw   $t0, 0x4(%[s])\n\t"
+        "addiu $a3, %[d], 0x48\n\t"
+        "lw   %[s], 0x8(%[s])\n\t"
+        "sw   $a2, 0x0($a3)\n\t"
+        "sw   $t0, 0x4($a3)\n\t"
+        "sw   %[s], 0x8($a3)\n\t"
+        "lw   $a1, 0x18(%[d])\n\t"
+        "ori  $a1, $a1, 0x100\n\t"
+        ".set noreorder\n\t"
+        "jr   $ra\n\t"
+        "sw   $a1, 0x18(%[d])\n\t"
+        ".set reorder\n\t"
+        : [d] "+r"(d), [s] "+r"(s)
         :
-        : "$t0", "memory");
+        : "memory", "$a2", "$a3", "$t0");
 }
