@@ -1060,7 +1060,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the three hundred and one that work: if the function has no
+The rule of thumb from the three hundred and thirty that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -2409,7 +2409,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 301 are done.  Each shape that works yields several functions
+   identified and 330 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all

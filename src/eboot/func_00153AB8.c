@@ -1,5 +1,5 @@
 /**
- * The Sims 2 PSP - func_00151240 (0x00151240, 0x14 bytes)
+ * The Sims 2 PSP - func_00153AB8 (0x00153AB8, 0x14 bytes)
  *
  * Stores a zero byte on the stack, reads it back as a word, and returns it.
  *
@@ -16,7 +16,7 @@
 #include "types.h"
 
 /* An empty body that still owns the frame it built. */
-__attribute__((noreturn)) u32 func_00151240(void) {
+__attribute__((noreturn)) u32 func_00153AB8(void) {
     /* $sp is not listed as clobbered, deliberately.  If it were, gcc would emit a
      * prologue of its own - allocate, save $fp and $ra, move $fp - and the
      * function would come out longer than the original and with a prologue it does not
