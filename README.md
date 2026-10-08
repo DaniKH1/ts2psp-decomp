@@ -13,7 +13,7 @@ relative.
 | code | **507,673 / 507,673 instructions identical** |
 | functions recovered | 7,497 |
 | relocations recovered | 66,503 / 66,503 |
-| C functions byte-exact and hand written | 389 |
+| C functions byte-exact and hand written | 396 |
 
 The engine is Maxis' "Elem", the shared engine also used by *The Sims 3* — the
 build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
@@ -23,7 +23,7 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 | directory | |
 | --- | --- |
 | `asm/` | one `.s` per function, as splat produced them.  Assembling and linking this reproduces the original exactly.  Recovered material — see [Legal](#legal). |
-| `src/eboot/` | the hand written decompilation: what each function does, in C.  389 of the 410 files here are verified to compile to the original bytes; the other 21 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
+| `src/eboot/` | the hand written decompilation: what each function does, in C.  396 of the 417 files here are verified to compile to the original bytes; the other 21 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
 | `include/` | the shared types: `f32`, `Vec3f`, and the object layouts the early functions reveal. |
 | `tools/` | everything that produced the above, and the checks that keep it honest.  MIT licensed. |
 | `config/` | the recovered symbol map, the relocation map, and hand recovered names. |
@@ -35,13 +35,13 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 **The assembly is byte-exact and complete.**  `asm/` reproduces every byte of
 the module image.  That part is finished and has been for some time.
 
-**The C is the readable layer, and it is partial.**  389 of 7,497 functions.  The
+**The C is the readable layer, and it is partial.**  396 of 7,497 functions.  The
 original was built with CodeWarrior for PSP (`mwccpsp.exe`), and psp-gcc does
 not reproduce its instruction selection.  Reaching byte-exact C for *all* 7,497
-needs that proprietary compiler; 389 were reached without it, by pinning the
+needs that proprietary compiler; 396 were reached without it, by pinning the
 handful of registers and delay slots where the two compilers disagree.
 
-What those 389 have in common is that the disagreement is small enough to name.
+What those 396 have in common is that the disagreement is small enough to name.
 Both compilers emit the same *instructions* and differ over which register is the
 destination, or when a value is loaded, so pinning the registers makes them agree.
 The pinning is deliberately narrow: an inline `asm` block over the two or three
@@ -118,6 +118,15 @@ Three results from that work are worth knowing before reading the C:
   by ten.  The result is used; it is always zero.  Every other piece of dead code
   found so far computes something that *is* used, so this one is the clearest
   instance yet of byte-exact and correct being different questions.
+* **The module keeps writable data inside its code section, and three clusters inside
+  live code are written by two dozen live functions.**  `tools/code_writers.py` is
+  the census: 12 functions name 0x0E9728, 9 name 0x0E97A8, 3 name 0x0EB850, and each
+  of those addresses falls inside a function's own body — checked by disassembling
+  the containing function to its `jr $ra`.  Every one of the 24 is referenced by an
+  `R_MIPS_26` relocation, so none is dead code.  The unfiltered count is 1,024 and
+  that is an upper bound, not a finding: splat derives function sizes from "distance
+  to the next label", so a data block after a function is attributed to it.  What the
+  writes are *for* is not established.
 * **Nine functions in the module write into its own code section.**  `tools/stride_table.py`
   is the census: nine functions build the address 0x0EB850 and index it with a
   28-byte stride, and 0x0EB850 is sixteen bytes into `func_000EB840`'s prologue,

@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 410 (see below) |
-| **C functions that byte-match** | **389** (linked from `src/`) |
+| functions written in C | 417 (see below) |
+| **C functions that byte-match** | **396** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -2483,7 +2483,104 @@ Two scheduling details worth keeping:
   targets the `addiu $v1, $v1, -1`, so the decrement is the first instruction of the
   body and runs four times.  Putting the label after it - the obvious arrangement -
   runs the body five times and shifts the branch by one instruction.  That was the one
-  wrong word in this function's first attempt.## Pipeline
+  wrong word in this function's first attempt.
+
+### The code-section writers are a lot more numerous than one function
+
+The 0x0EB850 cluster above turned out to be the small end of something, and
+`tools/code_writers.py` is the census of it: **every function that materialises an
+address with `lui`/`addiu`, lands inside `.text`, and then loads or stores through
+it.**
+
+Three clusters are hand-checked - the containing function was disassembled to its own
+`jr $ra`, so "inside the body" is a measurement rather than an inference from the
+size map:
+
+```
+  base       uses  lands in              called
+  0xe9728      12  func_000E9680+0xa8   12/12
+  0xe97a8       9  func_000E9780+0x28    9/9
+  0xeb850       3  func_000EB840+0x10    3/3
+```
+
+**Every function in all three is referenced by an R_MIPS_26 relocation**, so none of
+them is dead code - which removes the reading that would have made this uninteresting.
+The 0xE9 cluster's writes are index-bounded (`slti $a1, $a0, 0x20` in
+`func_000E7614`), so they land in a 128-byte window that straddles the end of
+`func_000E9680` and the start of `func_000E9780`.
+
+**The unfiltered count is 1,024 functions at 455 bases, and that number is an upper
+bound, not a finding.**  It is what the test gives when "lands inside a nominal
+function body" is inferred from splat's `nonmatching` sizes, which are "distance to
+the next label".  Where the module keeps a data block after a function, the block is
+attributed to that function and every address in it is reported as landing inside
+code.  That is the size map's limitation showing through, and the three clusters
+above are the ones where disassembly settled it the other way.
+
+**So there are two separate things and they are not yet joined.**  Plenty of this
+module's writable data plainly does live inside `.text` - `func_000E5524` toggles a
+one-bit flag at 0x5196C and remembers the old value at 0x51968, which is a pair of
+ordinary globals in the middle of the code section.  And three addresses inside
+genuinely live code are written by two dozen live functions.  Both statements are
+verifiable from the bytes.  Whether they are the same phenomenon or two, is not
+established, and this file does not say it is.
+
+### A toggle that returns nothing
+
+`func_000E5524` flips a one-bit flag and remembers what it was:
+
+```
+    previous = flag; old = previous; flag = (previous + 1) & 1;
+```
+
+over the two adjacent words at 0x51968 and 0x5196C.  **Nothing in its twenty bytes
+writes `$v0`**, so it is a `void` function and declaring it anything else would be a
+guess.  That it records the old value is what makes it `void`: the point is that
+0x51968 holds the answer afterwards, and a caller wanting the new one can read
+0x5196C just as well.
+
+`(previous + 1) & 1` rather than `previous ^ 1` is worth a line.  The two are the
+same for a one-bit value, so the choice is free, and the compiler picked the
+increment - which suggests the source spelled the flag as a small integer or a
+`++` rather than as a `bool`.  The `addiu` goes to a scratch register so that `$a1`
+stays live for the store at 0x51968, which has to happen *before* the flip is written
+back.
+
+### Three functions that are mostly about where their data lives
+
+`func_000F9274` and `func_000F9590` are two more of the 0x0EB850 cluster: one does
+`flags |= 0x10; field4 = value`, the other `return record[0x14]`.  The first is the
+only one of the nine that *reads*, and its two halves are kept apart for as long as
+the code can afford - the flags word is read into `$a2` so that `$a1` is free to
+receive the second argument and the store at +4 happens before the `ori`.
+
+`func_000E5A24` copies the two adjacent words at 0x599A8 and 0x599AC into two
+caller-supplied pointers and returns 1.  **Returning a hard-coded 1 with no condition
+anywhere in the twenty bytes** says this is a getter whose failure is not
+representable, not an operation that can fail.
+
+`func_000E7F9C` is three stores sharing one index - a halfword array at 0x0E97C8, a
+byte on the object at +0x30, and a pointer into a word array at 0x0E9728 - and its
+`$a1` is written twice and read once, so it cannot be an asm input at all.  The
+parameters are named in the comment and the block clobbers `$a0` through `$a3`
+outright, which is the trade `func_0000BEC0` makes.
+
+### Two constructors, and a `lui 0x0` that does nothing
+
+`func_0009674C` sets six fields and returns `this`; `func_00024D04` sets four, three
+of them pointers sixteen bytes apart in `.rodata`, and returns `this`.
+
+The first has a **`lui $a1, 0x0` that is dead**: 0x17BC fits a signed 16-bit
+immediate, so the `addiu` alone would do, and the `lui` is there because the source's
+constant went through the same `%hi`/`%lo` path as the one at +4 - which does need
+both halves, since 0x18E80 does not fit.  Written as one `addiu` the function would
+be 24 bytes instead of 52.
+
+That is the same observation as the dead channel in `func_000706A8` seen from the
+other side: there the *arithmetic* was dead, here the *high half* is, and in both the
+compiler had a cheaper spelling available and did not take it.
+
+## Pipeline
 
 ```
 tools/iso9660.py             ISO9660 reader for the UMD image
@@ -2520,6 +2617,7 @@ tools/flag_table.py          decode the packed flag bytes and list their readers
 tools/flag_accessors.py      census the C++ boolean accessors: mask, offset, direction
 tools/check_report.py        names the report writes about that have no src/eboot file
 tools/stride_table.py        addresses several functions materialise; code or constant
+tools/code_writers.py       functions that name an address inside the code section
 ```
 
 ```
