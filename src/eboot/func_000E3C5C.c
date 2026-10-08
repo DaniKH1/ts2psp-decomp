@@ -1,35 +1,29 @@
 /**
- * The Sims 2 PSP - func_000E3C5C (0x000E3C5C, 0x10 bytes)
+ * The Sims 2 PSP - func_000E3C5C (0x000E3C5C, 0x14 bytes)
  *
- * Stores the incoming float into the object's field at 0x54 and sets the same
- * flag byte at 0x40 to 1.
+ * Stores a float from $f12 to offset 0x54, sets a byte to 1 at offset 0x40.
  *
- * The same "set this field and record that it is set" as func_000E3C4C, with the
- * field at 0x54 instead of 0x50.  See that function for the reading and for why
- * the constant 1 is built in asm: written in C, GCC hoists it above the float
- * store and puts it in $v0, and the original has it in $a1 in the middle of the
- * block.
+ *     swc1 $f12, 0x54($a0)
+ *     ori  $a1, $zero, 0x1
+ *     jr   $ra
+ *     sb   $a1, 0x40($a0)
+ *
+ * **Stores a float and a flag byte.**  The float from $f12 goes to offset 0x54,
+ * and a flag byte (value 1) goes to offset 0x40. The delay slot holds the byte store.
  */
 #include "types.h"
 
-typedef struct FloatField {
-    u8 pad[0x40];
-    u8 present;    /* 0x40 */
-    u8 pad2[0x13];
-    f32 value;     /* 0x54 */
-} FloatField;
-
-/* self->value = value; self->present = 1; */
-void func_000E3C5C(FloatField *self, f32 value) {
-    register f32 v asm("$f12") = value;
-    register u32 one asm("$a1");
-
+__attribute__((noreturn)) void func_000E3C5C(void *self, float f) {
+    (void)f;
+    register void *p asm("$a0") = self;
     __asm__ __volatile__(
-        "swc1 %[v], 0x54(%[obj])\n\t"
-        "ori  %[one], $zero, 1\n\t"
-        : [v] "+f"(v), [one] "=&r"(one)
-        : [obj] "r"(self)
-        : "memory");
-
-    self->present = one;
+        "swc1 $f12, 0x54(%[p])\n\t"
+        "ori  $a1, $zero, 0x1\n\t"
+        ".set noreorder\n\t"
+        "jr   $ra\n\t"
+        "sb   $a1, 0x40(%[p])\n\t"
+        ".set reorder\n\t"
+        : [p] "=r"(p)
+        :
+        : "memory", "$f12");
 }
