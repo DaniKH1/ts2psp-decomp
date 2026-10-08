@@ -13,7 +13,7 @@ relative.
 | code | **507,673 / 507,673 instructions identical** |
 | functions recovered | 7,497 |
 | relocations recovered | 66,503 / 66,503 |
-| C functions byte-exact and hand written | 423 |
+| C functions byte-exact and hand written | 429 |
 
 The engine is Maxis' "Elem", the shared engine also used by *The Sims 3* — the
 build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
@@ -23,7 +23,7 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 | directory | |
 | --- | --- |
 | `asm/` | one `.s` per function, as splat produced them.  Assembling and linking this reproduces the original exactly.  Recovered material — see [Legal](#legal). |
-| `src/eboot/` | the hand written decompilation: what each function does, in C.  423 of the 443 files here are verified to compile to the original bytes; the other 21 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
+| `src/eboot/` | the hand written decompilation: what each function does, in C.  429 of the 448 files here are verified to compile to the original bytes; the other 21 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
 | `include/` | the shared types: `f32`, `Vec3f`, and the object layouts the early functions reveal. |
 | `tools/` | everything that produced the above, and the checks that keep it honest.  MIT licensed. |
 | `config/` | the recovered symbol map, the relocation map, and hand recovered names. |
@@ -35,13 +35,13 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 **The assembly is byte-exact and complete.**  `asm/` reproduces every byte of
 the module image.  That part is finished and has been for some time.
 
-**The C is the readable layer, and it is partial.**  423 of 7,497 functions.  The
+**The C is the readable layer, and it is partial.**  429 of 7,497 functions.  The
 original was built with CodeWarrior for PSP (`mwccpsp.exe`), and psp-gcc does
 not reproduce its instruction selection.  Reaching byte-exact C for *all* 7,497
-needs that proprietary compiler; 423 were reached without it, by pinning the
+needs that proprietary compiler; 429 were reached without it, by pinning the
 handful of registers and delay slots where the two compilers disagree.
 
-What those 423 have in common is that the disagreement is small enough to name.
+What those 429 have in common is that the disagreement is small enough to name.
 Both compilers emit the same *instructions* and differ over which register is the
 destination, or when a value is loaded, so pinning the registers makes them agree.
 The pinning is deliberately narrow: an inline `asm` block over the two or three
@@ -157,6 +157,35 @@ Three results from that work are worth knowing before reading the C:
   they are middling** — they came out of the work queue, not out of being the worst of
   anything.  The ratio is not the discriminator either: what makes these need machine
   code is that the compiler spilled where it had registers free.
+* **One family, one member that returns, and the instruction it spends instead.**  The
+  six-member three-float copy family has five void copies that begin with an `addiu`
+  forming a base pointer and one that returns the destination pointer instead.  **Both
+  forms are eight instructions** — this function did not drop the base pointer to make
+  room for the return, it spent the instruction the base pointer would have occupied on
+  the return.  That is the only place in the module where the choice between the two copy
+  spellings is visible *inside a single family*, and `func_00055974` shows the same
+  choice made twice in one body: three words through a formed base, four floats through
+  immediate offsets, twelve instructions apart.  **So the 687 is not a preference the
+  compiler has and sometimes loses — it is a choice it makes in one function and not the
+  other, and what decides it is not established.**
+* **A flag setter the census has no shape for, and a getter it reports as an orphan.**
+  `func_00012F14` clears bit 31 and ORs a boolean into it — two operations, and
+  `flag_accessors.py` models `get`, `set` and `clear` as one each.  Forty bytes away
+  `func_00012F3C` reads the same bit of the same word and *is* found, so the pairing the
+  census reports as half-missing was not half-missing at all.  `boolean_shapes.py` gains
+  a third shape and counts **10 functions**, bounded to eight instructions because
+  "some `or` later" in a 372-byte body pairs the wrong things.  That shape took two wrong
+  versions to get right and both matched **zero** — first by requiring the `or` to write
+  the `and`'s register, then by requiring the `addiu -1` to be adjacent to the `and`.
+* **A fourth code-written address, and a two-line change that found a quarter of the
+  census.**  `func_00102E6C` writes four floats to 0x0EC7E8, **128 bytes past 0x0EC768**
+  which `func_00102C84` writes words to, and **both land in the same nominal function** —
+  `func_000EC5E8` at +0x180 and +0x200.  Two independent initialisers in different
+  translation units writing into one nominal body 128 bytes apart is the strongest
+  evidence yet that these are a data region rather than a patch target, though splat's
+  "distance to the next label" sizes still leave it unproven.  Finding it needed
+  `code_writers.py` to stop ignoring the float opcodes: with `lwc1` and `swc1` added, the
+  census goes from 1,024 functions at 455 bases to **1,458 at 675**.
 * **850 functions form a base pointer once and then run consecutive accesses through
   it, so a function's length here is mostly codegen.**  `tools/base_pointer.py` counts
   687 that run stores through the formed base, 275 that run loads, 112 that do both.

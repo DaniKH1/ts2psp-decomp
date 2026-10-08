@@ -96,7 +96,11 @@ def main() -> int:
     def store_bases(words: list[int]) -> set[int]:
         out = set()
         for w in words:
-            if w >> 26 in (0x20, 0x24, 0x28, 0x21, 0x25, 0x23, 0x2B):
+            # The float opcodes are here as of two revisions ago and were missing
+            # until `func_00102E6C` turned up: a function that writes nothing but
+            # floats to an address inside the code section is invisible without
+            # 0x31/0x39, because no integer load or store ever names the base.
+            if w >> 26 in (0x20, 0x24, 0x28, 0x21, 0x25, 0x23, 0x2B, 0x31, 0x39):
                 out.add((w >> 21) & 0x1F)
         return out
 

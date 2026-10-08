@@ -3199,6 +3199,156 @@ The counter's `lh`/`sh` pair is signed and can go negative, but **the signedness
 real for the increment and irrelevant for the store** - the arithmetic is the same
 modulo 2^16 either way - so a signed load is one instruction wider than needed and
 says only that the field was read as a signed short.
+### One family, one member that returns, and the instruction it spends instead
+
+`func_00150730` copies three floats and returns the destination.  It is the sixth member
+of the three-float copy family, and the only one that returns anything.
+
+**The five void copies use the other spelling of the same copy, and the two forms are
+both eight instructions:**
+
+```
+func_00150988   addiu lwc1 swc1 lwc1 swc1 lwc1 jr swc1
+func_00150730         lwc1 move swc1 lwc1 swc1 lwc1 jr swc1
+```
+
+**So this function did not drop the base pointer to make room for the return - it spent
+the instruction the base pointer would have occupied on the return instead.**  In the
+void five the eighth instruction is the `addiu`; here it is `move $v0, $a0`.
+
+**That is the one place in the module where the choice between the two copy forms is
+visible inside a single family**, which is why it is worth having found, and it is also
+the reason not to read `base_pointer.py`'s 687 as a rule.  The count says which form is
+commoner; this instance is the exception, and `func_00055974` - below - is the case that
+still needs explaining.
+
+### The same function uses both spellings, twelve instructions apart
+
+`func_00055974` copies a three-word node through a formed base (`addiu $t0, $a0, 0xAC`)
+and four floats through immediate offsets (`0x0`, `0x4`, `0x8`, `0xC` of `$a2` into
+`0x68`, `0x6C`, `0x70`, `0x74` of `$a0`).  **One `addiu` and eight accesses against
+eight accesses with immediates is a tie on instruction count, and for the float half the
+compiler took the immediate form.**
+
+So the 687 is not a preference the compiler has and sometimes loses - **it is a choice it
+makes in one function and not the other.**  What decides it is not established, and the
+obvious candidates all fail to explain this instance: the word copy needs a fresh
+register (`$t0`) and the float copy would too, so register pressure is not it; `$a0` is
+needed again for `sb $a1, 0x10A($a0)`, so preserving the object pointer is a reason but
+not a difference between the two halves.  **The observation stands and the mechanism does
+not, and writing down a mechanism here would be inventing one.**
+
+The function also sets two adjacent flag bytes at 0x10A and 0x10B to 1 - a hundred and
+seventy bytes past the end of the float block and sixty-two past the end of the word
+block.  **Two `sb`s and not one `sh`, so it is a pair of flags and not the halfword
+0x0101**, and their offsets being unrelated to either copy says they belong to a third
+thing the function only ever turns on.
+
+### A flag setter the census has no shape for
+
+`func_00012F14` writes a boolean into bit 31 of the word at offset 0x64:
+
+```
+self->word_64 = (self->word_64 & 0x7FFFFFFF) | ((arg & 1) << 31);
+```
+
+**`flag_accessors.py` models `get`, `set` and `clear` - each one operation - and this is
+two, clear then set.**  Its `combined` path looks only for an accessor that also writes a
+float.  So the census does not see it, and **forty bytes away `func_00012F3C` reads the
+same bit of the same word and the census does find that one.**
+
+That is precisely the situation the census's own docstring warns about when it says a
+getter with no setter is evidence the other half was inlined away at every call site.
+**Here the setter exists and the census cannot see it**, so the pairing it reports as
+half-missing was not half-missing at all.  `boolean_shapes.py` gains a third shape and
+counts **10 functions**, with the search bounded to eight instructions and to before any
+branch - `func_00012360` is 372 bytes and contains two of these masks back to back, so
+"some `or` later" would pair the first with something unrelated.
+
+**That shape took two wrong versions to get right**, and both matched zero:
+
+* requiring the `or` to write the same register the `and` did - in `func_00012F14` the
+  `and` clears into `$a2` and the `or` writes a *fresh* `$a1` that reads `$a2`;
+* requiring the `addiu -1` to complete the mask immediately before the `and` - an `andi`
+  sits between them.
+
+**A census shape needs its known member checked against it before it is counted, and both
+versions failed that check in the direction of finding nothing** - which is the safe
+direction to fail in, and still not the direction to fail in twice.
+
+**And `andi $a1, $a1, 0xFF` at the top of the function is dead**: four instructions later
+`andi $a1, $a1, 0x1` masks to bit 0, which subsumes it.  **A sixth dead mask, and a
+third kind** - not the `sltiu`-then-`andi` pair of `func_000FBFD4`, not the all-ones mask
+of `func_0014EAAC`, but a narrowing to a byte immediately followed by a narrowing to a
+bit of that byte.
+
+The clear mask is 0x7FFFFFFF built by `lui 0x8000` + `addiu -1`, where `lui 0x8000` +
+`ori 0xFFFF` would give 0xFFFFFFFF - the *set* mask.  **The choice between `addiu -1` and
+`ori 0xFFFF` is the whole difference between clearing bit 31 and clearing everything**,
+and the compiler did not mix them up, which is worth noting because
+`renderMeshInstances_1060` builds 0xFFFFFFFF the other way.
+
+### A fourth code-written address, and a two-line change that found a quarter of them
+
+`func_00102E6C` copies four floats to **0x0EC7E8**, and the `%hi`/`%lo` pair is split
+across a store's offset field and an `addiu`:
+
+```
+lui   $a1, 0xF
+swc1  $f12, -0x3818($a1)      the low half is the store's offset
+addiu $a1, $a1, -0x3818        and here again, for the remaining three
+```
+
+**0x0EC7E8 is 128 bytes past 0x0EC768, which `func_00102C84` writes three words to, and
+both land in the same nominal function** - `func_000EC5E8`, at +0x180 and +0x200.  **That
+pairing is the strongest evidence this project has for these addresses being a data
+region rather than a patch target**: two independent initialisers, in different
+translation units, writing into one nominal function body a hundred and twenty-eight
+bytes apart.  It is still not proof, and the limit is unchanged - splat's sizes are
+"distance to the next label", there is no label at either address, and
+`func_000EC5E8`'s nominal body may simply be swallowing a data block the symbol map does
+not name.
+
+**Finding it needed `code_writers.py` to look at the float opcodes.**  Its `store_bases`
+listed seven integer load and store opcodes and omitted `lwc1` and `swc1`, so a function
+writing nothing *but* floats named no load or store base at all and was rejected before
+its address was ever considered.  **With two opcodes added the census goes from 1,024
+functions at 455 bases to 1,458 at 675** - a quarter of the total out of a two-line
+change, and the fifth such gap in this tool in as many iterations.
+
+### A Gram-Schmidt step, and the contrast it provides
+
+`func_000C8EC4` is `out = a - (dot(a,b) / dot(b,b)) * b` - the component of `a`
+perpendicular to `b`.  **The division happens once**, not three times: the factor is
+computed into `$f16` and multiplied into each component of `b`, which is the only part
+not forced by the arithmetic.
+
+**The two dot products are interleaved instruction by instruction**, not one after the
+other.  That is load-latency hiding on a single floating-point multiply pipeline, not
+code structure - six `mul.s` in a row would stall, so the two independent chains are
+woven together.  Read as pairs it looks deliberate; no C would produce it.
+
+**`$f0` is used as a general temporary** for `b.z`.  It is the return slot and
+caller-saved, and the function has no return value - it writes through `$a0` and returns
+`$f0` as scratch, which is why nothing restores it.
+
+**There is no frame at all**, which makes this the useful contrast with `func_000C3470`.
+Both are vector arithmetic; that one goes through 0xC0 bytes of stack three times over,
+this one keeps three live values per vector in registers.  **The difference is not the
+arithmetic, and that is the whole reason some float functions in this module can be
+written as readable C and some cannot.**
+
+### `func_000CD708`: two records, contiguous
+
+The two destinations are 0x0C and 0x18 - twelve bytes apart, so **two consecutive
+elements of a twelve-byte-element array**, both copied in one unrolled body.  **The
+second `addiu` reuses `$a0` rather than adding to `$t0`**, which is only possible because
+the first base is dead and the compiler knew it.
+
+**Both halves are `func_00194ADC`'s shape, twice**, and it is a member of
+`base_pointer.py`'s 687 with a longest store run of six.  Nothing checks whether the two
+sources are adjacent, which is the only reason to mention it: written as two copies
+rather than a loop, the aliasing question never arises.
 ## Pipeline
 
 ```

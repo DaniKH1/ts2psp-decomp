@@ -15,7 +15,19 @@ build the mask with `lui`, because every mask it had found was above bit 15.  Bi
 fits an immediate, so `ori $a1, $a1, 0x4` is a setter in four instructions instead of
 five - and the census cannot see it.
 
-    python tools/boolean_shapes.py              # both counts
+    **Shape 3: a flag bit written from a boolean argument - clear then set, in one
+function.**  `func_00012F14` clears bit 31 of the word at offset 0x64 with
+`lui 0x8000` + `addiu -1` + `and` (which is 0x7FFFFFFF) and then ORs in
+`(arg & 1) << 31`.  `tools/flag_accessors.py` finds the *getter* for the same bit at the
+same offset - `func_00012F3C`, forty bytes away - and reports the pair as one orphan,
+because `set`, `clear` and `combined` all describe a single operation and this is two.
+
+The match is: a `lui` + `addiu -1` pair forming a clear mask, an `and` through it, and
+an `or` whose destination is that `and`'s destination.  That is narrow on purpose - the
+function also contains a *dead* `andi 0xFF` before its real `andi 0x1`, so a looser
+test keyed on "masks then stores" would match every accessor twice.
+
+    python tools/boolean_shapes.py              # all three counts
     python tools/boolean_shapes.py --show 3     # examples in full
     python tools/boolean_shapes.py --only sltiu # one shape
 
@@ -61,17 +73,20 @@ from stride_table import load_functions, load_sizes  # noqa: E402
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--show", type=int, default=0)
-    ap.add_argument("--only", choices=("sltiu", "ori", "both"), default="both")
+    ap.add_argument("--only", choices=("sltiu", "ori", "clear_set", "all"),
+                    default="all")
     ns = ap.parse_args()
 
     elf = pspelf.load(str(ELF_PATH))
     funcs, sizes = load_functions(), load_sizes()
 
-    want_sltiu = ns.only in ("sltiu", "both")
-    want_ori = ns.only in ("ori", "both")
+    want_sltiu = ns.only in ("sltiu", "all")
+    want_ori = ns.only in ("ori", "all")
+    want_clear_set = ns.only in ("clear_set", "all")
 
     sltiu: list[tuple[str, int, int]] = []
     ori_set: list[tuple[str, int, int]] = []
+    clear_set: list[tuple[str, int, int]] = []
 
     for name, addr in funcs.items():
         size = sizes.get(name)
@@ -107,6 +122,59 @@ def main() -> int:
                     and prev >> 26 == 0x23 and (prev >> 16) & 0x1F == rt):
                 ori_set.append((name, addr, i))
 
+        # Shape 3: clear-then-set in one function.  A `lui` whose low half arrives as
+        # `addiu -1`, an `and` through it, and an `or` into that same register.
+        if want_clear_set:
+            himask = {}
+            for i, w in enumerate(words):
+                if w >> 26 == 0x0F:
+                    himask[(w >> 16) & 0x1F] = i
+            for i, w in enumerate(words):
+                if w >> 26 == 0x00 and (w & 0x3F) == 0x24:      # and rd, rs, rt
+                    src = (w >> 16) & 0x1F
+                    lo = himask.get(src)
+                    if lo is None or lo >= i:
+                        continue
+                    # The `addiu -1` completes the mask, and it is not necessarily
+                    # adjacent: `func_00012F14` puts an `andi` between it and the
+                    # `and`.  Requiring adjacency was the second version and it
+                    # matched nothing for the same reason the first did.
+                    completed = any(
+                        words[j] >> 26 == 0x09
+                        and (words[j] >> 21) & 0x1F == src
+                        and (words[j] >> 16) & 0x1F == src
+                        and (words[j] & 0xFFFF) == 0xFFFF
+                        for j in range(lo + 1, i))
+                    if not completed:
+                        continue
+                    rd = (w >> 11) & 0x1F
+                    # The `or`'s destination need not be the `and`'s: in
+                    # `func_00012F14` the `and` clears into $a2 and the `or` writes a
+                    # fresh $a1 that *reads* $a2, which is then stored back.  Testing
+                    # that the `or` writes the same register was the first version and
+                    # it matched nothing.
+                    #
+                    # **The search is bounded to eight instructions and to before any
+                    # branch**, because "some `or` later in the function" is not a
+                    # claim: `func_00012360` is 372 bytes and contains two of these
+                    # masks back to back, so an unbounded search pairs the first with
+                    # an unrelated `or` hundreds of instructions away.  It still matches
+                    # that function, and on this evidence correctly - the second `lui
+                    # 0x8000` and `and` show it is doing the same thing again - but the
+                    # bound is what makes the count mean clear-then-set rather than
+                    # clear-and-something-later.
+                    limit = min(len(words), i + 9)
+                    for later in words[i + 2:limit]:
+                        op = later >> 26
+                        if op in (0x04, 0x05, 0x14, 0x15, 0x03):
+                            break
+                        if (later >> 26 == 0x00 and (later & 0x3F) == 0x25
+                                and rd in ((later >> 21) & 0x1F,
+                                           (later >> 16) & 0x1F)):
+                            clear_set.append((name, addr, i))
+                            break
+                    break
+
     if want_sltiu:
         n = len({n for n, _, _ in sltiu})
         print(f"{n} functions contain `sltiu rs, rt, 1` immediately followed by a dead "
@@ -116,9 +184,16 @@ def main() -> int:
         print(f"{n} functions contain `ori rt, rs, MASK` with rt == rs, a flag setter "
               f"whose\nmask fits a halfword and so needs no `lui` and no scratch "
               f"register\n")
+    if want_clear_set:
+        n = len({n for n, _, _ in clear_set})
+        print(f"{n} functions clear a flag bit with `lui` + `addiu -1` + `and` and then "
+              f"OR a value\nback into the same register - clear and set in one "
+              f"function, which `flag_accessors.py`\ndoes not model\n")
 
     if ns.show:
-        shown = (sltiu if want_sltiu else []) + (ori_set if want_ori else [])
+        shown = ((sltiu if want_sltiu else [])
+                 + (ori_set if want_ori else [])
+                 + (clear_set if want_clear_set else []))
         for name, addr, at in shown[:ns.show]:
             size = sizes.get(name)
             print(f"  {name} (0x{addr:x}, {size} bytes), match at +0x{at*4:x}:")
