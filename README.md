@@ -13,7 +13,7 @@ relative.
 | code | **507,673 / 507,673 instructions identical** |
 | functions recovered | 7,497 |
 | relocations recovered | 66,503 / 66,503 |
-| C functions byte-exact and hand written | 410 |
+| C functions byte-exact and hand written | 416 |
 
 The engine is Maxis' "Elem", the shared engine also used by *The Sims 3* — the
 build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
@@ -23,7 +23,7 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 | directory | |
 | --- | --- |
 | `asm/` | one `.s` per function, as splat produced them.  Assembling and linking this reproduces the original exactly.  Recovered material — see [Legal](#legal). |
-| `src/eboot/` | the hand written decompilation: what each function does, in C.  410 of the 431 files here are verified to compile to the original bytes; the other 21 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
+| `src/eboot/` | the hand written decompilation: what each function does, in C.  416 of the 437 files here are verified to compile to the original bytes; the other 21 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
 | `include/` | the shared types: `f32`, `Vec3f`, and the object layouts the early functions reveal. |
 | `tools/` | everything that produced the above, and the checks that keep it honest.  MIT licensed. |
 | `config/` | the recovered symbol map, the relocation map, and hand recovered names. |
@@ -35,13 +35,13 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 **The assembly is byte-exact and complete.**  `asm/` reproduces every byte of
 the module image.  That part is finished and has been for some time.
 
-**The C is the readable layer, and it is partial.**  410 of 7,497 functions.  The
+**The C is the readable layer, and it is partial.**  416 of 7,497 functions.  The
 original was built with CodeWarrior for PSP (`mwccpsp.exe`), and psp-gcc does
 not reproduce its instruction selection.  Reaching byte-exact C for *all* 7,497
-needs that proprietary compiler; 410 were reached without it, by pinning the
+needs that proprietary compiler; 416 were reached without it, by pinning the
 handful of registers and delay slots where the two compilers disagree.
 
-What those 410 have in common is that the disagreement is small enough to name.
+What those 416 have in common is that the disagreement is small enough to name.
 Both compilers emit the same *instructions* and differ over which register is the
 destination, or when a value is loaded, so pinning the registers makes them agree.
 The pinning is deliberately narrow: an inline `asm` block over the two or three
@@ -157,6 +157,37 @@ Three results from that work are worth knowing before reading the C:
   they are middling** — they came out of the work queue, not out of being the worst of
   anything.  The ratio is not the discriminator either: what makes these need machine
   code is that the compiler spilled where it had registers free.
+* **A dead mask in 168 functions, and a flag setter shape the census could not see.**
+  `tools/boolean_shapes.py` counts two shapes that hand-transcribing turned up.
+  `sltiu rt, rs, 1` followed by `andi rd, rs, 0xFF` — where the `sltiu` already yields
+  0 or 1, so the mask is dead — is the module's standard spelling of "is this zero" and
+  it appears in **168 functions** with the mask left in every one.  The second is the
+  mirror of the flag-mask boundary above: `ori rt, rs, MASK` with `rt == rs` is a
+  read-modify-write in one instruction where `lui` plus `or` needs a scratch register,
+  so any mask at or below bit 15 makes the accessor four instructions instead of five.
+  **18 functions use it**, against the eight rows `flag_accessors.py` finds for the wide
+  form — so more than half the immediate-width setters were invisible to the census
+  built to find them.  Both counts were wrong first, and wrong plausibly: testing the
+  REGIMM sub-opcode against the standard MIPS value 9 matches nothing, because in this
+  encoding `sltiu $a0, $a0, 1` is `0x2c840001` with *both* candidate fields equal to
+  4; and requiring the register to be `$a0` matched 192 functions that were the
+  float-constant idiom, `lui 0x3F7D` then `ori 0x70A4`.  **The two functions that
+  prompted this are 1.2 % and 5.6 % of their totals** — transcribing finds instances,
+  counting says how many.
+* **A tool matched only one of the two spellings of an address, and the gap hid a
+  cluster.**  `stride_table.base_of` required the `addiu` to write the register the
+  `lui` wrote; `func_00102D34` uses the other form, `lui $t0, 0xE` then
+  `addiu $a1, $t0, 0x2168`, which keeps the base and copies the address elsewhere.  An
+  `any_dest` flag — off by default, because in a linked image nothing marks which
+  `addiu` completes a symbol — takes `code_writers.py` from 1,024 functions at 455 bases
+  to 1,242 at 515.  The same hunt produced **three wrong turns worth recording**: a
+  hand-computed `lui`/`addiu` pair gave `0x0C768` where the tool said `0x0EC768`; a
+  check for "inside the live body" had its comparison inverted; and a test for
+  relocations at the target passed nothing even for the three already-verified
+  clusters, which is how the docstring's phrase turned out to mean relocations *inside
+  the containing function*.  **What those addresses are is still not established** —
+  they are real symbols with six and nine relocations, but splat's function sizes are
+  "distance to the next label" and there is no label there.
 * **The module keeps writable data inside its code section, and three clusters inside
   live code are written by two dozen live functions.**  `tools/code_writers.py` is
   the census: 12 functions name 0x0E9728, 9 name 0x0E97A8, 3 name 0x0EB850, and each

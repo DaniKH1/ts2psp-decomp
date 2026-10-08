@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 431 (see below) |
-| **C functions that byte-match** | **410** (linked from `src/`) |
+| functions written in C | 437 (see below) |
+| **C functions that byte-match** | **416** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -2913,6 +2913,166 @@ source-level narrowing and not something the compiler introduced.
 `sltiu 1` followed by a dead `andi 0xFF` in `func_000BF49C`, which is the first of the
 four where the redundant mask is a *zero*-extending `andi` rather than a full-word
 `and`.
+### A dead mask in 168 functions, found by transcribing two
+
+`func_000FBFD4` is four arithmetic instructions and twenty-eight bytes:
+
+```
+lw    $a1, 0x208($a0)
+lw    $a0, 0x20C($a0)
+xor   $a0, $a1, $a0
+sltiu $a0, $a0, 0x1
+andi  $v0, $a0, 0xFF        <- dead
+jr    $ra
+sltiu $v0, $v0, 0x1
+```
+
+**`andi ... 0xFF` after `sltiu ..., 1` cannot change anything**: `sltiu` against an
+immediate of one produces exactly 0 or 1.  `func_000BF49C` has the same pair, and the
+two are 0xBF apart in address with nothing else in common.
+
+**`tools/boolean_shapes.py` counts it: 168 functions.**  The examples the tool shows
+are the same shape throughout - `xor`, `sltiu 1`, `andi 0xFF`, then `bnez` or `beqz` -
+which is the module's standard spelling of "is this zero" with the mask left in
+**every one of the 168**.  So this is not a slip in one function but a compiler habit
+visible at scale, and it is only visible at scale: the two instances that prompted it
+were found by hand.
+
+**The calibration is the useful part: those two functions are 1.2 % and 5.6 % of
+their respective totals.**  Transcribing finds instances; counting says how many.
+
+### The flag-accessor census was missing a whole spelling
+
+`func_001A9B78` is `flags_18 |= 4` plus a float store, four instructions:
+
+```
+lw   $a1, 0x18($a0)
+swc1 $f12, 0x34($a0)
+ori  $a1, $a1, 0x4
+jr   $ra
+sw   $a1, 0x18($a0)
+```
+
+**`flag_accessors.py` does not match it**, and the reason is the same threshold that
+last iteration's bit-15 case settled.  The tool's `get`, `set` and `clear` all build
+the mask with `lui`, because every mask it had found was above bit 15.  Bit 2 fits a
+halfword, so the mask is `ori $a1, $a1, 0x4` - and
+
+> `ori rt, rs, imm` computes `rt = rs | imm`, so with `rt == rs` it is a read-modify-write
+> in **one** instruction.  The `lui` spelling needs a *separate* register for the mask
+> (`lui $t0, HI` then `or $a1, $a1, $t0`) because `or rd, rs, rt` has two distinct
+> inputs and neither can be both the destination and the value being preserved.
+
+**So the accessor length tracks the mask width, and the instruction the immediate form
+saves is exactly the scratch register the wide form needed.**  `boolean_shapes.py`
+counts the immediate form at **18 functions**, against the eight rows the census finds
+for the wide form - **so more than half the immediate-width flag setters in the module
+were invisible to the census that exists to find them.**
+
+It also carries a third combination the census does not model: a flag setter that also
+writes a float, but at offset 0x34 from `$f12` rather than -1.0f at 0x1C.
+
+### Two censuses, both wrong first, both plausibly wrong
+
+The counts above were wrong before they were right, and wrong in the way that produces
+a number you would print without hesitating.
+
+**The `sltiu` filter tested the REGIMM sub-opcode field against 9**, which is what the
+standard MIPS table says.  **In this assembler's encoding `sltiu $a0, $a0, 1` is
+0x2c840001, where bits 25-21 and bits 20-16 are both 4** - so no known member can say
+which half carries the sub-opcode, and testing for 9 matches nothing in the module.  It
+reported **zero** for a shape present in 168 functions.  The tool now matches on the
+immediate and the shared register instead, and says in its own docstring that this may
+admit other REGIMM forms with an immediate of 1.
+
+**The `ori` filter required register `$a0` and reported 192 functions**, which were the
+float-constant idiom: `lui $a0, 0x3F7D` then `ori $a0, $a0, 0x70A4` is 0x3F7D70A4 as a
+float, and there are 192 of those in the module.  The register is not reliably `$a0`
+either - `func_001A9B78` loads the flags into `$a1` because `$a0` is the object pointer
+- and the missing condition was that the preserved value must have come from a **load**.
+That left 18.
+
+**And the counts are per function, not per occurrence**: 267 and 31 occurrences sit in
+168 and 18 functions.  Quoting the occurrence count would have made the idiom look
+twice as common as it is in the places a reader would go looking, since a function that
+tests eight fields for zero is one function seen eight times.
+
+### A tool gap that hid a real cluster, and an address I got wrong
+
+`func_00102C84` copies three words to a fixed address built as `lui $a3, 0xF` then
+`addiu $a3, $a3, -0x3898`.  **I computed that as 0x0C768 and went looking for a writer
+of it.  It is 0x0EC768**, and `tools/code_writers.py` already listed it with this
+function as its single writer.  The tool was right and the arithmetic was wrong, for
+the third time in this project that a hand-computed `lui`/`addiu` pair disagreed with
+a tool.  `addiu` sign-extends, so a negative low half subtracts from a *sixteen-digit*
+high half and the result is nearly always a digit longer than intuition expects.
+
+The second half of that investigation found a real gap.  **`base_of` in
+`tools/stride_table.py` only matched `lui $rX` / `addiu $rX, $rX, lo`** - where the
+`addiu`'s destination is the register the `lui` wrote.  `func_00102D34` uses the other
+spelling, `lui $t0, 0xE` then `addiu $a1, $t0, 0x2168`, which keeps the base and
+copies the address elsewhere.  **That form was invisible, and it hides a cluster of
+three writers naming 0x0E2168.**  `base_of` now takes `any_dest`, off by default
+because in a linked image nothing marks which `addiu` completes a symbol, so
+`$base + 4` matches too; `code_writers.py --any-dest` goes from 1,024 functions at 455
+bases to **1,242 at 515**.
+
+**What 0x0EC768 and 0x0E2168 are is not established, and the honest position is
+narrower than it looks.**  Both are real symbols - six and nine relocations target
+them, every one from a `lui`/`addiu` pair, one of which belongs to the writing function
+itself - and both land inside `.text`, before the containing nominal function's own
+last `jr $ra`.  **That is the same test the three clusters in `code_writers.py --real`
+pass, and it is not enough to distinguish a deliberate runtime patch from a data block
+whose label the symbol map lacks.**  splat's function sizes are "distance to the next
+label" and there is no label at either address, so the nominal body cannot be trusted
+there.  At 0x0EC768 the bytes are a `nop` in a delay slot and at 0x0E2168 a `jr $ra`,
+**which looks more like a data block than a patch target - but that is an impression
+and not a measurement**, and the file says so.
+
+### `func_00102D34`: the `lui`s that supply the byte `lwr` does not
+
+Seventeen words copied to 0x0E2168, then sixteen `lwr` to the command buffer.  The
+`lwr` offsets are 1, 5, 9, 13 and then 0x11, 0x15, 0x19, 0x1D - four per row, 0x10
+between rows.  Each is preceded by `lui $t0..$t3, 0x3F00`, and those four constants are
+**not** dead:
+
+> `lwr` loads only from the given address to the next word boundary - three bytes at an
+> offset of 1.  So the **low byte of each register is whatever the `lui` left**, which is
+> `0x00`, and the `lwr` fills bytes 1, 2 and 3.  Each output word is therefore
+> `0x3F00_00xyz`, which read as a float is in [1.0, 1.5) because 0x3F000000 is exactly
+> 1.0f.  **The module decodes 24-bit fractions to floats here**, one word each,
+> sixteen of them.
+
+**This is the first instance in this tree of a "dead" high half quietly supplying part
+of the value**, and it is the opposite of the dead `lui`s recorded elsewhere - there
+the whole register was overwritten, here the high half is dead and the low byte is
+load-bearing.  Omit the four `lui`s and the low byte becomes the previous `lwr`'s
+output, which is a previous row's data.
+
+Whether the values really are three bytes at that spacing is **not** recoverable from
+the bytes: three-byte values at offsets 0, 3, 6, 9 would not be at 1, 5, 9, 13, and the
+fourth read of each row lands inside the fourth four-byte field rather than at the
+start of a fifth value.  What the offsets say is that the reads are deliberately
+unaligned and deliberately strided, and why is not.
+
+### The other three
+
+`func_000F9C78` indexes an array of pointers with `sll 2` and reads one field of the
+element - three dereferences deep.  **The stride is `sll 2`, the same spelling
+`sortAndCullScene_1080` uses for a record of twelve bytes**, and the module has no
+`mult` for any of these.
+
+`func_0018A650` builds a five-word record and **materialises the source offset once** -
+`addiu $a3, $a0, 0x1A0`, then three `lwc1` through it.  That is the same decision
+`func_000C3470` makes at the other end of the module with its stack offsets, and the
+same decision `func_00102D34` makes seventeen times with one `addiu` and sixteen stores
+against a base.  **Forming a base pointer for a run of consecutive accesses is a habit
+here, not a coincidence**, and it is the shape to look for when a function looks longer
+than its arithmetic warrants.
+
+And both of them agree with `func_0010FFF4` last iteration: **neither writes the cursor
+back**, so the caller owns the advance and `func_0010FFF4`'s self-advance is the
+exception rather than the rule.
 ## Pipeline
 
 ```
@@ -2953,6 +3113,7 @@ tools/stride_table.py        addresses several functions materialise; code or co
 tools/code_writers.py       functions that name an address inside the code section
 tools/spill_frame.py         float functions that move values through the frame
 tools/branch_load.py         branch-likely delay slots: loads, or any register write
+tools/boolean_shapes.py     dead zero-test masks, and immediate-width flag setters
 ```
 
 ```

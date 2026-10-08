@@ -51,6 +51,12 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=20)
     ap.add_argument("--real", action="store_true",
                     help="only the clusters checked by disassembly")
+    ap.add_argument("--any-dest", action="store_true",
+                    help="also match `lui $a / addiu $b, $a, lo`, where the addiu "
+                         "copies the address into a different register.  Finds real "
+                         "cases (0x0E2168, built by func_00102D34) at the cost of "
+                         "precision: in a linked image nothing says which addiu "
+                         "completes a symbol, so `$base + 4` matches too")
     ns = ap.parse_args()
 
     elf = pspelf.load(str(ELF_PATH))
@@ -103,7 +109,7 @@ def main() -> int:
                  for i in range(0, size, 4)]
         loads_from = store_bases(words)
         stride = scaled_stride(words)
-        for at, base in base_of(words):
+        for at, base in base_of(words, any_dest=ns.any_dest):
             if not text_lo <= base < text_hi:
                 continue
             env = enclosing(base)

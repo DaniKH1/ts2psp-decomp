@@ -68,13 +68,24 @@ def load_sizes() -> dict[str, int]:
     return out
 
 
-def base_of(words: list[int]) -> list[tuple[int, int]]:
+def base_of(words: list[int], any_dest: bool = False) -> list[tuple[int, int]]:
     """Every address a `lui` + `addiu` pair builds, in order.
 
     The two halves need not be adjacent - three of the cluster put `sw $s3`,
     `ori $count, $zero, N` or a `move` between them - so the rule is simply that
     some later `addiu` adds the low half back into the register the `lui` named.
     Anything else in between is the compiler's business.
+
+    **`any_dest` adds the other spelling, and the two are not the same claim.**
+    By default the `addiu`'s destination must be the register the `lui` wrote, so
+    `lui $t0, 0xE` / `addiu $t0, $t0, 0x2168` matches and
+    `lui $t0, 0xE` / `addiu $a1, $t0, 0x2168` does not.  The second form keeps the
+    `lui`'s register as the *base* and copies the address elsewhere, which is how
+    `func_00102D34` builds 0x0E2168 - and it was invisible until this flag existed.
+    The flag is off by default because it costs precision: in a linked image nothing
+    marks which `addiu` completes a symbol, so `lui $t0, 0xE` followed by
+    `addiu $a0, $t0, 4` matches as address 0x0E0004 when it is really `$base + 4`.
+    Callers that turn it on inherit that and must say so in what they report.
     """
     out = []
     for i, w in enumerate(words):
@@ -83,8 +94,9 @@ def base_of(words: list[int]) -> list[tuple[int, int]]:
         target = (w >> 16) & 0x1F
         for j in range(i + 1, len(words)):
             nxt = words[j]
-            if nxt >> 26 != 0x09 or ((nxt >> 21) & 0x1F) != target \
-                    or ((nxt >> 16) & 0x1F) != target:
+            if nxt >> 26 != 0x09 or ((nxt >> 21) & 0x1F) != target:
+                continue
+            if ((nxt >> 16) & 0x1F) != target and not any_dest:
                 continue
             lo = nxt & 0xFFFF
             if lo >= 0x8000:
