@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 203 (see below) |
-| **C functions that byte-match** | **333** (linked from `src/`) |
+| functions written in C | 399 (see below) |
+| **C functions that byte-match** | **378** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -2041,6 +2041,139 @@ The shift amounts are the only difference between the two functions, and they
 have to be `3`/`29` rather than `2`/`30` for the divide-by-8 case, because the
 sign bit has to land on bit 0 after the shift.
 
+### A `noreorder` region that spans a label grows the function by four bytes
+
+`func_001A9CF8` is the first function here with more than two labels in one asm
+block, and it produced 96 bytes where the original is 92 - with the last four
+bytes being a `nop` *past the symbol's own size*, since `.size` correctly said
+0x5C.  Everything in the block was right; the assembler had added a word.
+
+The cause is how the `.set noreorder` regions line up against the labels.  This
+is a two-instruction region:
+
+```asm
+        .set noreorder
+        4:
+        jr     $ra
+        nop
+        .set reorder
+```
+
+and this one produces the same instructions plus a trailing `nop`:
+
+```asm
+        .set noreorder          # opened several instructions earlier
+        beqz   $a1, 5f
+        nop
+        .set reorder
+        2:
+        ori    $a0, $zero, 0x1
+        5:
+        andi   $v0, $a0, 0xFF
+        4:                     # a label, with noreorder still open across it
+        jr     $ra
+        nop
+        .set reorder
+```
+
+Reopening `.set noreorder` immediately before the last label fixes it and leaves
+the instruction stream identical, so the cost of getting this wrong is invisible
+in a diff - it shows up only as a size mismatch, which is why
+`verify_c.py`'s length check is not optional.
+
+Two things are worth recording beyond the fix.  The failure needed *both* more
+than one branch and a label between them, which is why 378 functions did not hit
+it: every other function in the tree has a single branch or a single label.
+And the symptom is a word outside the symbol, so a tool that compared only the
+symbol's bytes would have reported a match - `try_func.py` did report `MATCH: 0
+differing words` on this function while `verify_c.py` correctly called it
+`size 96 != 92`.
+
+### The accessor layer: a flags word at 0x18 and a sentinel float at 0x1C
+
+`tools/flag_accessors.py` is a census of the C++ boolean accessors, written
+because five of them turned up while transcribing a pair of vector-copy helpers.
+The first attempt matched too loosely and reported nonsense - grouping a
+*clear* of a sixteen-bit range with a *set* of the single bit just above it,
+because "lowest set bit of the mask" is not a grouping key when the mask is a
+complement.  It now matches the exact instruction sequence and groups by
+(offset, mask, direction), and it reports:
+
+```
+    offset          mask     bits   kind  functions
+      0x64    0x80000000       31    get  func_00012F3C
+      0x18       0x20000       17    get  func_001A9ACC
+      0x18      0x100000       20    set  func_001A9D54
+      0x18      0x100000       20  clear  func_001A9D68
+      0x18      0x100000       20    get  func_001A9D80
+      0x18       0x40000       18    set  func_001A9D94
+```
+
+Nine functions in all, of which six are plain and three also write the float at
+0x1C.  Three findings, in order of how much they are worth:
+
+**Bit 20 is the only one whose accessor family survived intact** - getter, setter
+and clearer, twenty bytes apart at 0x1A9D54, 0x1A9D68 and 0x1A9D80.  Bit 17 kept
+only its getter and bit 18 only its setter.  That asymmetry is about the link,
+not about the class: an accessor that was inlined at every call site leaves only
+the out-of-line copies, and which direction that is depends on how each was
+spelled at its call sites.
+
+**Two of the three masks need `lui` and one does not,** which is the only
+difference in instruction count between them and explains why the pair at
+0x1A9ACC/0x1A9D80 is five instructions and not four.  Bits 18 and 20 do not fit a
+signed 16-bit immediate, so they take a shift-by-sixteen first; bit 7 in
+`func_001A9C40` does, so it takes an `ori`.  The mask is not always the same
+shape, and the width of the flag says which.
+
+**`func_001A9CBC` reads `$f12` without writing it,** and that is the
+interesting one.  On this ABI the first floating-point argument arrives in
+`$f12`, so the function takes a float and assigns it to the field at 0x1C -
+the `lui`/`mtc1` pair that materialises the -1.0f sentinel in its two neighbours
+is simply absent, and the caller's value is stored instead.  Nothing in the
+instruction stream says "parameter"; it says "a float register the code did not
+set", and only the ABI turns that into a signature.
+
+The three combined accessors set and clear *different* bits - `func_001A9C98`
+sets bit 12 and clears bit 13, `func_001A9CD4` does the reverse - which is what a
+pair of boolean members initialised to opposite values looks like, and it is why
+the query beside them (`func_001A9CF8`) is a three-way test rather than a
+single-bit test: bit 13 alone is one state, a real float is another, bit 12 alone
+the third, and each of the four reachable combinations is one of the four
+accessors.
+
+### The fixed-point blend at 0xE8EA8, and a rounding idiom that will not compile
+
+`func_000E8EA8` came out of a size check rather than the work queue: the symbol
+recorded 0x60 bytes and the file claimed 0x14, so the C was a transcription of
+the wrong function - of the five instructions the disassembly tool had shown for
+a `lw`/`sra`/`lhu` that is not there at all.  The real 24 instructions are a
+fixed-point blend:
+
+```
+    f + (v - 128) * (128 - |f - 128|) / 128
+```
+
+with `f` in `$a1` and `v` in `$a0`, both narrowed to signed 16 bits by an
+`sll`/`sra` pair, and the result narrowed the same way.  `0x80` appears three
+times, as the centre both inputs are measured from, as the ceiling of the
+distance, and as the scale of the division - a value centred on 128 and
+quantised in eighths.
+
+The division is the part that cannot be written in C.  `sra 7` then `srl 25` is a
+32-bit shift in two pieces, and doing the second half *logically* is what keeps
+the sign: the result is all ones when the product is negative and zero when it is
+positive, truncated to seven bits.  Added before the `sra 7`, that is the standard
+signed division by 128 that rounds towards zero instead of towards negative
+infinity.  Written as one `sra 32` it does not assemble; written as `/ 128` in C
+psp-gcc produces something else entirely, and `-1 / 128` is 0 in C anyway, which
+is the rounding the original deliberately does *not* want for `-128`.
+
+The first `sll`/`sra` pair is a no-op on an already-correct argument and is kept
+because it is in the original.  That is worth saying plainly, because it is the
+kind of instruction a decompilation "should" remove and this project's whole
+premise is that it should not.
+
 ## Pipeline
 
 ```
@@ -2075,6 +2208,7 @@ tools/find_loops.py          find the functions with a backward branch, smallest
 tools/check_symbols.py       every C-linked function reports the size it should
 tools/nid_table.py           the PSP import table: stubs, libraries, NID words
 tools/flag_table.py          decode the packed flag bytes and list their readers
+tools/flag_accessors.py      census the C++ boolean accessors: mask, offset, direction
 ```
 
 ```
@@ -2408,10 +2542,13 @@ capitalised string is a control name rather than the module.
 
 ## Work list
 
-1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 330 are done.  Each shape that works yields several functions
+1. Keep working down `tools/c_shapes.py --done`.  255 real-shape functions were
+   identified and 378 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
-   overwritten register uninitialised") keep the per-function cost down.
+   overwritten register uninitialised", "reopen `.set noreorder` at a label")
+   keep the per-function cost down.  83 of the remaining 95 are in shapes of one
+   or two functions, so this is now mostly one-function-at-a-time work rather
+   than shape work; the shapes are exhausted as a source of leverage.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
    7,497 function bodies as verbatim asm and does - it was built and measured,
    and it verified 7,497/7,497 - but that is a transcription, not a
@@ -2420,10 +2557,20 @@ capitalised string is a control name rather than the module.
    what it does.  `tools/gen_copy_asm.py` stays as a helper for the sixteen-word
    copies, where the pattern is long enough to be error-prone but still has to be
    understood.
-2. **All three kinds of control flow now work.**  Branches (`func_000E8EA8`),
-   unconditional loops (`func_001428E4`) and counted loops with the cursor advanced
-   in the branch's delay slot (`func_000CD5B0`, `func_0009C9B4`) are byte-exact.
-   See *Branches work* and *Loops work* above for the machinery.
+2. **All three kinds of control flow now work, and all three are byte-exact in one
+   function.**  Branches (`func_001A9CF8`, five of them, two of them coprocessor
+   branches), unconditional loops (`func_001428E4`) and counted loops with the
+   cursor advanced in the branch's delay slot (`func_000CD5B0`, `func_0009C9B4`)
+   are all done.  See *Branches work* and *Loops work* above for the machinery.
+   `func_001A9CF8` is also where the label/`noreorder` interaction turned up - see
+   *A `noreorder` region that spans a label grows the function by four bytes*,
+   because the four extra bytes it produced were outside the symbol's own size
+   and would have passed any check that only compared words.
+   **`func_00143A18` is byte-exact too**, which retires the last function that
+   was left undone on the grounds that nobody could say what its source was.  It is
+   a hand-rolled `strstr`: two loops, four forward branches and two backward ones.
+   See *`func_00143A18` is `strstr`, and the open question about it is closed* above
+   for what it turned out to be and why the earlier reading of it was wrong.
    **`func_00143A18` is now byte-exact too**, which retires the last function that
    was left undone on the grounds that nobody could say what its source was.  It is
    a hand-rolled `strstr`: two loops, four forward branches and two backward ones.

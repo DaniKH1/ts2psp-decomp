@@ -13,14 +13,14 @@
  *
  * **Array element store with base at 0xE97A8.**  Index in $a1 is
  * scaled by 4, added to base at 0xE97A8, then value stored.
+ * The third C parameter is not used; the asm overwrites $a2.
  */
 #include "types.h"
 
-__attribute__((noreturn)) void func_000E7F84(void *self, u32 index, u32 value) {
+__attribute__((noreturn)) void func_000E7F84(void *self, u32 index) {
     register void *self_reg asm("$a0") = self;
     register u32 idx asm("$a1") = index;
-    register u32 val asm("$a2") = value;
-    (void)self; (void)index; (void)value;
+    (void)self; (void)index;
     __asm__ __volatile__(
         "lui  $a2, %%hi(sym_000E97A8)\n\t"
         "sll  $a1, $a1, 2\n\t"
@@ -31,7 +31,7 @@ __attribute__((noreturn)) void func_000E7F84(void *self, u32 index, u32 value) {
         "sw   $a0, 0x0($a1)\n\t"
         ".set reorder\n\t"
         :
-        : "r"(self_reg), "r"(idx), "r"(val)
-        : "memory", "$a0", "$a1", "$a2");
+        : "r"(self_reg), "r"(idx)
+        : "memory", "$a2");
     __builtin_unreachable();
 }

@@ -13,7 +13,7 @@ relative.
 | code | **507,673 / 507,673 instructions identical** |
 | functions recovered | 7,497 |
 | relocations recovered | 66,503 / 66,503 |
-| C functions byte-exact and hand written | 331 |
+| C functions byte-exact and hand written | 378 |
 
 The engine is Maxis' "Elem", the shared engine also used by *The Sims 3* — the
 build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
@@ -23,7 +23,7 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 | directory | |
 | --- | --- |
 | `asm/` | one `.s` per function, as splat produced them.  Assembling and linking this reproduces the original exactly.  Recovered material — see [Legal](#legal). |
-| `src/eboot/` | the hand written decompilation: what each function does, in C. 157 of these are verified to compile to the original bytes.  Recovered material — see [Legal](#legal). |
+| `src/eboot/` | the hand written decompilation: what each function does, in C.  378 of the 399 files here are verified to compile to the original bytes; the other 21 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
 | `include/` | the shared types: `f32`, `Vec3f`, and the object layouts the early functions reveal. |
 | `tools/` | everything that produced the above, and the checks that keep it honest.  MIT licensed. |
 | `config/` | the recovered symbol map, the relocation map, and hand recovered names. |
@@ -35,13 +35,13 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 **The assembly is byte-exact and complete.**  `asm/` reproduces every byte of
 the module image.  That part is finished and has been for some time.
 
-**The C is the readable layer, and it is partial.**  331 of 7,497 functions.  The
+**The C is the readable layer, and it is partial.**  378 of 7,497 functions.  The
 original was built with CodeWarrior for PSP (`mwccpsp.exe`), and psp-gcc does
 not reproduce its instruction selection.  Reaching byte-exact C for *all* 7,497
-needs that proprietary compiler; 331 were reached without it, by pinning the
+needs that proprietary compiler; 378 were reached without it, by pinning the
 handful of registers and delay slots where the two compilers disagree.
 
-What those 331 have in common is that the disagreement is small enough to name.
+What those 378 have in common is that the disagreement is small enough to name.
 Both compilers emit the same *instructions* and differ over which register is the
 destination, or when a value is loaded, so pinning the registers makes them agree.
 The pinning is deliberately narrow: an inline `asm` block over the two or three
@@ -57,9 +57,11 @@ Three results from that work are worth knowing before reading the C:
   fixing its register choices.
 * **Control flow is solved, all three kinds.**  A conditional (`func_000E8EA8`),
   an unconditional loop (`func_001428E4`) and counted loops whose cursor advances
-  in the branch's delay slot (`func_000CD5B0`, `func_0009C9B4`) are all byte-exact.
-  A conditional with two long sides, where the compiler has a real block-order
-  choice, is still untested.
+  in the branch's delay slot (`func_000CD5B0`, `func_0009C9B4`) are all byte-exact,
+  and so is `func_001A9CF8`, which has five branches in one block — two of them
+  coprocessor branches, and two paths that merge onto the same `and` with different
+  masks already in the same register.  A conditional with two long sides, where the
+  compiler has a real block-order choice, is still untested.
 * **CodeWarrior peels a loop's first test out and leaves it above the loop's own
   setup.**  `func_0014402C` — a `strlen` — branches to its return *before* the
   instruction that sets the register the return subtracts, so an empty string would
@@ -88,11 +90,25 @@ Three results from that work are worth knowing before reading the C:
   psp-gcc has no `float4` and no operator that lowers to `lv.q`, so
   `src/eboot/syncSkeleton_27D0.c` and `_2808.c` are the machine code with the
   decompilation in the comment, and that departure is recorded rather than disguised.
+* **Nine of the module's functions are C++ boolean accessors, and only one bit kept
+  all three of them.**  `tools/flag_accessors.py` is the census: a flags word at
+  offset 0x18, a `float` at 0x1C whose -1.0f is a sentinel, and accessors for bits
+  17, 18 and 20 of that word.  Bit 20 has a getter, a setter and a clearer
+  twenty bytes apart; bit 17 kept only its getter and bit 18 only its setter — which
+  is about which call sites inlined the accessor, not about the class.  One of the
+  nine, `func_001A9CBC`, **reads `$f12` without writing it**: on this ABI that is the
+  first floating-point argument, so the function assigns a parameter to the field and
+  its `lui`/`mtc1` sentinel pair is simply missing.  The query beside them,
+  `func_001A9CF8`, is a three-way test over bit 13, the sentinel float and bit 12 —
+  because each of the four combinations of two booleans has its own accessor.
 * **The one genuinely ugly piece** is `__attribute__((noreturn))` on a function
   that does return.  It is a lie about control flow that only affects codegen, and
   it does two jobs: it stops GCC appending a return after a hand-written block, and
   it lets the block's own `nop` be counted in the symbol size — which matters more
-  than it looks, and is written up in `progress.md`.
+  than it looks, and is written up in `progress.md`.  A third job turned up recently
+  and is less obvious: a `.set noreorder` region that spans a label boundary makes
+  the assembler append a word *past the end of the symbol*, so the bytes all match
+  and only the length is wrong.
 
 A generator can emit all 7,497 function bodies as verbatim assembly inside C
 files and does verify 7,497/7,497 — but that is a transcription, not a
