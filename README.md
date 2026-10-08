@@ -13,7 +13,7 @@ relative.
 | code | **507,673 / 507,673 instructions identical** |
 | functions recovered | 7,497 |
 | relocations recovered | 66,503 / 66,503 |
-| C functions byte-exact and hand written | 399 |
+| C functions byte-exact and hand written | 405 |
 
 The engine is Maxis' "Elem", the shared engine also used by *The Sims 3* — the
 build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
@@ -23,7 +23,7 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 | directory | |
 | --- | --- |
 | `asm/` | one `.s` per function, as splat produced them.  Assembling and linking this reproduces the original exactly.  Recovered material — see [Legal](#legal). |
-| `src/eboot/` | the hand written decompilation: what each function does, in C.  399 of the 420 files here are verified to compile to the original bytes; the other 21 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
+| `src/eboot/` | the hand written decompilation: what each function does, in C.  405 of the 426 files here are verified to compile to the original bytes; the other 21 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
 | `include/` | the shared types: `f32`, `Vec3f`, and the object layouts the early functions reveal. |
 | `tools/` | everything that produced the above, and the checks that keep it honest.  MIT licensed. |
 | `config/` | the recovered symbol map, the relocation map, and hand recovered names. |
@@ -35,13 +35,13 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 **The assembly is byte-exact and complete.**  `asm/` reproduces every byte of
 the module image.  That part is finished and has been for some time.
 
-**The C is the readable layer, and it is partial.**  399 of 7,497 functions.  The
+**The C is the readable layer, and it is partial.**  405 of 7,497 functions.  The
 original was built with CodeWarrior for PSP (`mwccpsp.exe`), and psp-gcc does
 not reproduce its instruction selection.  Reaching byte-exact C for *all* 7,497
-needs that proprietary compiler; 399 were reached without it, by pinning the
+needs that proprietary compiler; 405 were reached without it, by pinning the
 handful of registers and delay slots where the two compilers disagree.
 
-What those 399 have in common is that the disagreement is small enough to name.
+What those 405 have in common is that the disagreement is small enough to name.
 Both compilers emit the same *instructions* and differ over which register is the
 destination, or when a value is loaded, so pinning the registers makes them agree.
 The pinning is deliberately narrow: an inline `asm` block over the two or three
@@ -118,6 +118,23 @@ Three results from that work are worth knowing before reading the C:
   by ten.  The result is used; it is always zero.  Every other piece of dead code
   found so far computes something that *is* used, so this one is the clearest
   instance yet of byte-exact and correct being different questions.
+* **The module uses branch-likely to make a delay slot conditional, and 616 functions
+  do it.**  `tools/branch_load.py` counts 38,336 `beq`/`bne`/`beql`/`bnel`, of which
+  3,214 are the likely forms — 8.4 % — and 616 functions put a load in a *likely*
+  branch's delay slot.  The 43 that write a literal into the destination first are a
+  `value or sentinel` accessor: `sortAndCullScene_10BC` defaults to `-2`, and
+  `func_00052950` to `0`.  **The likely form is the whole trick** — it runs the delay
+  slot only when taken, so a conditional load costs one branch and no label — and it
+  being *uncommon* is what makes it read as deliberate rather than as a scheduling
+  accident.  What the sentinel means is still not established.
+* **A comment in this repo argued from a missing name to a real fact, and the census
+  caught it.**  `updateNodeGraph_0E48` is a fifth member of the four-member
+  three-float copy family; the first draft claimed the other four shared a translation
+  unit with each other and not with it, because their names are `func_`-prefixed
+  placeholders.  But a missing symbol name is not evidence about a header, and
+  `asm/eboot/` holds one `.s` per function so the build cannot show the boundary
+  either.  What survives: five functions share the shape, and only one of the five
+  came through the link with a name.
 * **236 functions move floats through their stack frame, and the three transcribed
   here are at the mild end of that.**  `tools/spill_frame.py` is the census;
   `func_000C3470` — a 4x4 matrix scale that is 632 bytes for sixteen multiplies,

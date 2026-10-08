@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 420 (see below) |
-| **C functions that byte-match** | **399** (linked from `src/`) |
+| functions written in C | 426 (see below) |
+| **C functions that byte-match** | **405** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -2645,6 +2645,127 @@ against `$sp`.**  `func_000C3470` has forty-eight `swc1`s with `$sp` as the base
 not one `lwc1` with it, because the compiler materialises each frame offset into a
 register once - `addiu $a2, $sp, 0x40` - and loads through that.  Counting `$sp`
 alone gives 48 and 0.
+### Six more byte-exact, and a census that overturned a guess made in a comment
+
+The four functions this iteration added are `func_0009232C`, `updateNodeGraph_0E48`,
+`func_0014EAAC` and `func_00080758`, plus `sortAndCullScene_1080` and
+`sortAndCullScene_10BC`.  Three of them say something the others do not.
+
+**`updateNodeGraph_0E48` is a fifth member of the four-member copy family, and it is
+the odd one out.**  `func_00150988`, `func_00193358`, `func_001965E8` and
+`func_00196608` are all `lwc1`/`swc1` pairs copying a three-float vector, all taking
+the source pointer straight from `$a0`.  This one has the same eight-instruction shape
+but reads `$a0` from offset 8 of `$a0` first and adds `0x1C` to *that* - a member
+vector one dereference deeper.  **So the family is five, and only one of the five came
+through the link with a name**: `updateNodeGraph` is a surviving CodeWarrior symbol, 28
+of them in the module, while the other four are `func_`-prefixed placeholders because
+`tools/orig_names.py` finds no name for them.
+
+**The first draft of that comment drew a conclusion from the missing names, and it
+was backwards.**  It read the split as a header boundary - "the four that share a
+shape share a translation unit, and the one whose header is elsewhere has its own
+unit" - and checked it two ways before trusting it.  `asm/eboot/` holds one `.s` per
+function, so the build cannot show a unit boundary at all; and silence in a symbol
+table is not evidence about a header.  An argument from a missing name to a real fact
+has the direction wrong.  What survives the check is only the narrower sentence above.
+This is the third time in this project that a plausible claim about *why* code has a
+shape failed on contact with how the names were actually obtained.
+
+**`func_0014EAAC` is a byte-stream writer whose mask does nothing.**
+`and $t4, $a3, $t9` masks a 32-bit value by 0xFFFFFFFF and returns it unchanged.  The
+mask itself is built with `lui $v1, 0xFF` then `ori $t9, $v1, 0xFFFF`, where one
+`ori $t9, $zero, -1` would do.
+
+That last sentence nearly became a claim that this was a fourth instance of the
+dead-`lui` pattern already recorded for `func_0009674C` and `renderMeshInstances_1060`.
+**It is not the same pattern, and the file says so.**  In those two the `lui` is
+*discarded* - loaded, then overwritten before anything reads it.  Here the `lui` is
+live: it is an operand of the `ori`.  Counting them together would make the discarded
+pattern look three times commoner than the two functions it actually appears in, and
+"a pattern rather than coincidences" would be an easier sentence to write than the
+truth.
+
+**`func_00080758` contains an instruction pair that looks like a cancelled pair and
+is not.**  `xori $a2, $a2, 0x8` followed by `addiu $a2, $a2, -0x8` reads as
+`x ^ 8 - 8`, which for a nibble is `+1` when bit 3 is clear and `-15` when it is set.
+Dropping the `addiu` would give `+8` for half the inputs.  The subject being
+incremented is not `$a2` but the *nibble* `(a1 >> 4) & 0xF`, which is put back where
+it came from - so it is a per-field counter whose step size depends on its own current
+value, and the three-instruction step is what that takes.  Written down because the
+instance looks exactly like a mistake, and is not.
+
+### The census that mattered: `tools/branch_load.py`
+
+`sortAndCullScene_10BC` builds a value conditionally with the load in the delay slot
+of a branch-likely:
+
+```
+addiu $v0, $zero, -0x2
+bnel  $a1, $zero, . + 4 + (0x1 << 2)
+lw    $v0, 0xEC($a0)
+```
+
+A likely branch runs its delay slot only when taken, so this is a conditional load
+with a default in one branch and no label.  **The comment I wrote for it first claimed
+there was no other function in the module doing this, on the grounds that the next
+symbol in the same translation unit is not one.**  That is a true statement about the
+neighbour and a worthless one about the module, and the census says:
+
+```
+ 38,336  beq / bne / beql / bnel in the module
+  3,214  the likely forms, 8.4 %
+  4,041  loads sit in some branch's delay slot
+    616  functions with a load in a *likely* branch's delay slot
+     43  of those set the destination to a constant first
+```
+
+**43, not 1.**  The 43 are the narrower shape the comment was actually about - a
+literal written into the destination immediately before the branch, so the branch is
+choosing between the literal and the loaded value - which makes it a
+`value or sentinel` accessor.  `func_00052950`, 0x00052950, is one of them and is the
+same three instructions with a different default, `ori $a2, $zero, 0x0` against
+`sortAndCullScene_10BC`'s `addiu $v0, $zero, -0x2`.
+
+**The 8.4 % is what makes the idiom legible rather than a coincidence.**  The likely
+form exists on this ISA to do exactly this - make the delay slot conditional - so if it
+were a scheduling accident it would be common.  It is used in 3,214 branches and not
+more, which fits an idiom only available when the branch's sole purpose is to guard
+its own delay slot.  **What the sentinel means is still not established**: the defaults
+include at least `-2` and `0`, and 43 instances of a shape say the shape is
+deliberate, not what the literal is for.
+
+**Two things the census had to get right, and one of them was wrong first.**
+
+The opcode tables are cross-checked against rabbitizer's own `getOpcodeName()` and
+`isBranchLikely()` - 4 branch opcodes and 7 load opcodes, no mismatches - because a
+wrong opcode produces a plausible count rather than an error.
+
+And `_writes_const` was passing its hand-written checks while being wrong about what
+they covered: given a `lui` followed by an `addu` rather than a load, it reported
+`True`, because it read the register out of whatever word it was handed and never
+checked that the word was a load.  **Six hand-written cases now, including "a non-load
+word", which is the one that was failing.**  The lesson is the same one the `$sp`
+counter in `tools/spill_frame.py` produced earlier: a helper that trusts its caller's
+argument class will answer about the wrong thing without complaining, and the only
+way to notice is a case that is the wrong class.
+
+### A gas trap worth recording
+
+`sortAndCullScene_10BC` was four bytes too long at first.  The cause is the spelling of
+the target:
+
+```
+"bnel  $a1, $zero, . + 4 + (0x1 << 2)\n\t"   <- 28 bytes, a plain bne plus a nop
+"bnel  $a1, $zero, 1f\n\t"                   <- 24 bytes, bnel
+```
+
+**With a computed displacement gas does not recognise the branch as "likely"** and
+expands it to a non-likely branch plus an inserted `nop`, which is four bytes and one
+extra instruction - and the delay slot then holds the `nop` instead of the load, so the
+function is also *wrong*, not merely long.  Writing the target as a local label is what
+makes the likely form survive.  This is a fourth member of the family of places where
+`.set` and pseudo-instruction spelling change the encoding, after the `jr $ra` delay
+slot rules.
 ## Pipeline
 
 ```
@@ -2684,6 +2805,7 @@ tools/check_report.py        names the report writes about that have no src/eboo
 tools/stride_table.py        addresses several functions materialise; code or constant
 tools/code_writers.py       functions that name an address inside the code section
 tools/spill_frame.py         float functions that move values through the frame
+tools/branch_load.py         loads in a likely branch's delay slot
 ```
 
 ```

@@ -58,6 +58,7 @@ func_0007E024
 func_0007E6FC
 func_000804B8
 func_0008073C
+func_00080758
 func_00080D40
 func_00080D4C
 func_00080E14
@@ -85,6 +86,7 @@ func_00091534
 func_0009177C
 func_000918B0
 func_00091B00
+func_0009232C
 func_00093F98
 func_0009674C
 func_00096F40
@@ -290,6 +292,7 @@ func_0014402C
 func_00149920
 func_0014C958
 func_0014CE0C
+func_0014EAAC
 func_0014EBA4
 func_00150988
 func_00150A0C
@@ -398,5 +401,8 @@ func_001AF15C
 func_001AF16C
 renderMeshInstances_1034
 renderMeshInstances_1060
+sortAndCullScene_1080
+sortAndCullScene_10BC
 syncSkeleton_27D0
 syncSkeleton_2808
+updateNodeGraph_0E48
