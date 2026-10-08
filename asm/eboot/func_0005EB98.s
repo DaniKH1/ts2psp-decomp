@@ -19,7 +19,7 @@ glabel func_0005EB98
     /* 5EC24 0005EBB0 A8020434 */   ori       $a0, $zero, 0x2A8
     /* 5EC28 0005EBB4 25804000 */  or         $s0, $v0, $zero
     /* 5EC2C 0005EBB8 05000012 */  beqz       $s0, .Leboot_0005EBD0
-    /* 5EC30 0005EBBC 0700043C */   lui       $a0, 0x0007
+    /* 5EC30 0005EBBC 0700043C */   lui       $a0, %hi(sym_00073318)
     /* 5EC34 0005EBC0 1374010C */  jal        func_0005D04C
     /* 5EC38 0005EBC4 25200002 */   or        $a0, $s0, $zero
     /* 5EC3C 0005EBC8 25880002 */  or         $s1, $s0, $zero

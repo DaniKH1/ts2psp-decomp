@@ -15,7 +15,6 @@ glabel func_000ECE98
     /* ECF10 000ECE9C 0800858C */  lw         $a1, 0x8($a0)
     /* ECF14 000ECEA0 1802B4E7 */  swc1       $f20, 0x218($sp)
     /* ECF18 000ECEA4 1000ACC4 */  lwc1       $f12, 0x10($a1)
-  .globl sym_000ECEA8
   sym_000ECEA8:
     /* ECF1C 000ECEA8 00A08044 */  mtc1       $zero, $f20
     /* ECF20 000ECEAC 2002B1AF */  sw         $s1, 0x220($sp)
@@ -25,7 +24,6 @@ glabel func_000ECE98
     /* ECF30 000ECEBC 2402B2AF */  sw         $s2, 0x224($sp)
     /* ECF34 000ECEC0 2802BFAF */  sw         $ra, 0x228($sp)
     /* ECF38 000ECEC4 08000145 */  bc1t       sym_000ECEE8 /* handwritten instruction */
-  .globl sym_000ECEC8
   sym_000ECEC8:
     /* ECF3C 000ECEC8 25808000 */   or        $s0, $a0, $zero
     /* ECF40 000ECECC 28D7060C */  jal        updateNodeGraph_0420
@@ -35,7 +33,6 @@ glabel func_000ECE98
     /* ECF50 000ECEDC 02000145 */  bc1t       sym_000ECEE8 /* handwritten instruction */
     /* ECF54 000ECEE0 00000000 */   nop
     /* ECF58 000ECEE4 01001134 */  ori        $s1, $zero, 0x1
-  .globl sym_000ECEE8
   sym_000ECEE8:
     /* ECF5C 000ECEE8 54000592 */  lbu        $a1, 0x54($s0)
     /* ECF60 000ECEEC FF002432 */  andi       $a0, $s1, 0xFF
@@ -45,7 +42,6 @@ glabel func_000ECE98
     /* ECF70 000ECEFC 540011A2 */   sb        $s1, 0x54($s0)
     /* ECF74 000ECF00 25288000 */  or         $a1, $a0, $zero
     /* ECF78 000ECF04 0500A014 */  bnez       $a1, .Leboot_000ECF1C
-  .globl sym_000ECF08
   sym_000ECF08:
     /* ECF7C 000ECF08 4800048E */   lw        $a0, 0x48($s0)
     /* ECF80 000ECF0C 2F000010 */  b          .Leboot_000ECFCC
@@ -57,7 +53,6 @@ glabel func_000ECE98
     /* ECF90 000ECF1C AFB7030C */  jal        func_000EDEBC
     /* ECF94 000ECF20 2400058E */   lw        $a1, 0x24($s0)
     /* ECF98 000ECF24 5000048E */  lw         $a0, 0x50($s0)
-  .globl sym_000ECF28
   sym_000ECF28:
     /* ECF9C 000ECF28 2A008014 */  bnez       $a0, .Leboot_000ECFD4
     /* ECFA0 000ECF2C 00000000 */   nop
@@ -76,7 +71,6 @@ glabel func_000ECE98
     /* ECFD0 000ECF5C 1401B127 */   addiu     $s1, $sp, 0x114
     /* ECFD4 000ECF60 25204002 */  or         $a0, $s2, $zero
     /* ECFD8 000ECF64 07008010 */  beqz       $a0, .Leboot_000ECF84
-  .globl sym_000ECF68
   sym_000ECF68:
     /* ECFDC 000ECF68 000040A2 */   sb        $zero, 0x0($s2)
     /* ECFE0 000ECF6C 25288000 */  or         $a1, $a0, $zero
@@ -96,7 +90,6 @@ glabel func_000ECE98
     /* ED010 000ECF9C 03005226 */  addiu      $s2, $s2, 0x3
     /* ED014 000ECFA0 04004012 */  beqz       $s2, .Leboot_000ECFB4
     /* ED018 000ECFA4 25202002 */   or        $a0, $s1, $zero
-  .globl sym_000ECFA8
   sym_000ECFA8:
     /* ED01C 000ECFA8 25284002 */  or         $a1, $s2, $zero
     /* ED020 000ECFAC 6AB2040C */  jal        func_0012C9A8
@@ -107,7 +100,6 @@ glabel func_000ECE98
     /* ED030 000ECFBC 69AD050C */  jal        func_0016B5A4
     /* ED034 000ECFC0 25300000 */   or        $a2, $zero, $zero
     /* ED038 000ECFC4 03000010 */  b          .Leboot_000ECFD4
-  .globl sym_000ECFC8
   sym_000ECFC8:
     /* ED03C 000ECFC8 500002AE */   sw        $v0, 0x50($s0)
   .Leboot_000ECFCC:
@@ -119,7 +111,6 @@ glabel func_000ECE98
     /* ED050 000ECFDC 2002B18F */  lw         $s1, 0x220($sp)
     /* ED054 000ECFE0 2402B28F */  lw         $s2, 0x224($sp)
     /* ED058 000ECFE4 2802BF8F */  lw         $ra, 0x228($sp)
-  .globl sym_000ECFE8
   sym_000ECFE8:
     /* ED05C 000ECFE8 0800E003 */  jr         $ra
     /* ED060 000ECFEC 3002BD27 */   addiu     $sp, $sp, 0x230

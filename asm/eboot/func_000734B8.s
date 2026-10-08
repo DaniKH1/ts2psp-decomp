@@ -17,7 +17,6 @@ glabel func_000734B8
     /* 7353C 000734C8 2580C000 */  or         $s0, $a2, $zero
     /* 73540 000734CC 1800A0A3 */  sb         $zero, 0x18($sp)
     /* 73544 000734D0 2402B1AF */  sw         $s1, 0x224($sp)
-  .globl sym_000734D4
   sym_000734D4:
     /* 73548 000734D4 2802B2AF */  sw         $s2, 0x228($sp)
   .L000734D8:
@@ -25,13 +24,11 @@ glabel func_000734B8
     /* 73550 000734DC 1800B227 */  addiu      $s2, $sp, 0x18
     /* 73554 000734E0 1C01A0A3 */  sb         $zero, 0x11C($sp)
     /* 73558 000734E4 1C01B127 */  addiu      $s1, $sp, 0x11C
-  .globl sym_000734E8
   sym_000734E8:
     /* 7355C 000734E8 25200002 */  or         $a0, $s0, $zero
     /* 73560 000734EC 3002BFAF */  sw         $ra, 0x230($sp)
     /* 73564 000734F0 0E0E050C */  jal        func_00143838
     /* 73568 000734F4 7C75A524 */   addiu     $a1, $a1, %lo(str_UseFullBody)
-  .globl sym_000734F8
   sym_000734F8:
     /* 7356C 000734F8 0B004014 */  bnez       $v0, .Leboot_00073528
     /* 73570 000734FC 00000000 */   nop
@@ -66,7 +63,6 @@ glabel func_000734B8
     /* 735DC 00073568 34741026 */   addiu     $s0, $s0, %lo(str_s_res_7434)
   .Leboot_0007356C:
     /* 735E0 0007356C 25000010 */  b          .Leboot_00073604
-  .globl sym_00073570
   sym_00073570:
     /* 735E4 00073570 25100000 */   or        $v0, $zero, $zero
   .Leboot_00073574:

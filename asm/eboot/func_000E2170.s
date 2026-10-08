@@ -24,7 +24,6 @@ glabel func_000E2170
     /* E2210 000E219C 73758424 */  addiu      $a0, $a0, %lo(D_66727573)
     /* E2214 000E21A0 1000B4E7 */  swc1       $f20, 0x10($sp)
     /* E2218 000E21A4 1400BFAF */  sw         $ra, 0x14($sp)
-  .globl sym_000E21A8
   sym_000E21A8:
     /* E221C 000E21A8 036B0C46 */  div.s      $f12, $f13, $f12
     /* E2220 000E21AC 60A2EEE4 */  swc1       $f14, %lo(sym_001DA260)($a3)
@@ -66,7 +65,6 @@ glabel func_000E2170
     /* E22A0 000E222C 31BA020C */  jal        func_000AE8C4
     /* E22A4 000E2230 D8B6A524 */   addiu     $a1, $a1, %lo(str_Button_Triangle_B6D8)
     /* E22A8 000E2234 1E00043C */  lui        $a0, %hi(sym_001DA27C)
-  .globl sym_000E2238
   sym_000E2238:
     /* E22AC 000E2238 06A30046 */  mov.s      $f12, $f20
     /* E22B0 000E223C 1D00053C */  lui        $a1, %hi(str_Button_X_B6E8)

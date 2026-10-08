@@ -120,7 +120,7 @@ glabel func_00071C98
     /* 71EA0 00071E2C 25280000 */   or        $a1, $zero, $zero
     /* 71EA4 00071E30 1000B48F */  lw         $s4, 0x10($sp)
     /* 71EA8 00071E34 04008012 */  beqz       $s4, .Leboot_00071E48
-    /* 71EAC 00071E38 1C00053C */   lui       $a1, 0x001C
+    /* 71EAC 00071E38 1C00053C */   lui       $a1, %hi(str_collisionTweaks)
     /* 71EB0 00071E3C DDC6040C */  jal        func_00131B74
     /* 71EB4 00071E40 25208002 */   or        $a0, $s4, $zero
     /* 71EB8 00071E44 1C00053C */  lui        $a1, %hi(str_resume_7408)
@@ -184,12 +184,10 @@ glabel func_00071C98
     /* 71F94 00071F20 D400A0A3 */   sb        $zero, 0xD4($sp)
   .Leboot_00071F24:
     /* 71F98 00071F24 03000012 */  beqz       $s0, .Leboot_00071F34
-  .globl sym_00071F28
   sym_00071F28:
     /* 71F9C 00071F28 04000426 */   addiu     $a0, $s0, 0x4
   .L00071F2C:
     /* 71FA0 00071F2C 8BC5020C */  jal        func_000B162C
-  .globl sym_00071F30
   sym_00071F30:
     /* 71FA4 00071F30 02000534 */   ori       $a1, $zero, 0x2
   .Leboot_00071F34:
@@ -210,7 +208,7 @@ glabel func_00071C98
     /* 71FD8 00071F64 25280000 */   or        $a1, $zero, $zero
     /* 71FDC 00071F68 3C00B68F */  lw         $s6, 0x3C($sp)
     /* 71FE0 00071F6C 0400C012 */  beqz       $s6, .Leboot_00071F80
-    /* 71FE4 00071F70 1C00053C */   lui       $a1, 0x001C
+    /* 71FE4 00071F70 1C00053C */   lui       $a1, %hi(str_collisionTweaks)
     /* 71FE8 00071F74 DDC6040C */  jal        func_00131B74
     /* 71FEC 00071F78 2520C002 */   or        $a0, $s6, $zero
     /* 71FF0 00071F7C 1C00053C */  lui        $a1, %hi(str_suspend_7410)
@@ -228,7 +226,6 @@ glabel func_00071C98
     /* 72018 00071FA4 2C21A48E */  lw         $a0, %lo(sym_000E212C)($s5)
     /* 7201C 00071FA8 20008014 */  bnez       $a0, .Leboot_0007202C
     /* 72020 00071FAC 25804000 */   or        $s0, $v0, $zero
-  .globl sym_00071FB0
   sym_00071FB0:
     /* 72024 00071FB0 01000434 */  ori        $a0, $zero, 0x1
     /* 72028 00071FB4 2C21A4AE */  sw         $a0, %lo(sym_000E212C)($s5)
@@ -298,7 +295,7 @@ glabel func_00071C98
     /* 72110 0007209C 25280000 */   or        $a1, $zero, $zero
     /* 72114 000720A0 6800BE8F */  lw         $fp, 0x68($sp)
     /* 72118 000720A4 0400C013 */  beqz       $fp, .Leboot_000720B8
-    /* 7211C 000720A8 1C00053C */   lui       $a1, 0x001C
+    /* 7211C 000720A8 1C00053C */   lui       $a1, %hi(str_collisionTweaks)
     /* 72120 000720AC DDC6040C */  jal        func_00131B74
     /* 72124 000720B0 2520C003 */   or        $a0, $fp, $zero
     /* 72128 000720B4 1C00053C */  lui        $a1, %hi(str_timeDiff)
@@ -383,7 +380,7 @@ glabel func_00071C98
     /* 72248 000721D4 25280000 */   or        $a1, $zero, $zero
     /* 7224C 000721D8 9400A48F */  lw         $a0, 0x94($sp)
     /* 72250 000721DC 04008010 */  beqz       $a0, .Leboot_000721F0
-    /* 72254 000721E0 1C00053C */   lui       $a1, 0x001C
+    /* 72254 000721E0 1C00053C */   lui       $a1, %hi(str_collisionTweaks)
     /* 72258 000721E4 DDC6040C */  jal        func_00131B74
     /* 7225C 000721E8 00000000 */   nop
     /* 72260 000721EC 1C00053C */  lui        $a1, %hi(str_SimTimer)

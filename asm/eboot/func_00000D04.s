@@ -23,7 +23,6 @@ glabel func_00000D04
     /* D9C 00000D28 6000BFAF */  sw         $ra, 0x60($sp)
     /* DA0 00000D2C 1F00C010 */  beqz       $a2, .Leboot_00000DAC
     /* DA4 00000D30 2580A000 */   or        $s0, $a1, $zero
-  .globl sym_00000D34
   sym_00000D34:
     /* DA8 00000D34 3C00248E */  lw         $a0, 0x3C($s1)
     /* DAC 00000D38 2000B227 */  addiu      $s2, $sp, 0x20
@@ -66,7 +65,6 @@ glabel func_00000D04
     /* E3C 00000DC8 25984000 */  or         $s3, $v0, $zero
     /* E40 00000DCC 0000648E */  lw         $a0, 0x0($s3)
     /* E44 00000DD0 0000848C */  lw         $a0, 0x0($a0)
-  .globl sym_00000DD4
   sym_00000DD4:
     /* E48 00000DD4 3C00A4AF */  sw         $a0, 0x3C($sp)
     /* E4C 00000DD8 3C00A48F */  lw         $a0, 0x3C($sp)
@@ -89,7 +87,6 @@ glabel func_00000D04
     /* E8C 00000E18 7000A424 */  addiu      $a0, $a1, 0x70
     /* E90 00000E1C 00008584 */  lh         $a1, 0x0($a0)
     /* E94 00000E20 0400878C */  lw         $a3, 0x4($a0)
-  .globl sym_00000E24
   sym_00000E24:
     /* E98 00000E24 21202502 */  addu       $a0, $s1, $a1
     /* E9C 00000E28 09F8E000 */  jalr       $a3
@@ -97,7 +94,6 @@ glabel func_00000D04
     /* EA4 00000E30 00000CC6 */  lwc1       $f12, 0x0($s0)
     /* EA8 00000E34 00004DC6 */  lwc1       $f13, 0x0($s2)
     /* EAC 00000E38 04000EC6 */  lwc1       $f14, 0x4($s0)
-  .globl sym_00000E3C
   sym_00000E3C:
     /* EB0 00000E3C 00630D46 */  add.s      $f12, $f12, $f13
     /* EB4 00000E40 00000CE6 */  swc1       $f12, 0x0($s0)
@@ -105,7 +101,6 @@ glabel func_00000D04
     /* EBC 00000E48 00730C46 */  add.s      $f12, $f14, $f12
     /* EC0 00000E4C 04000CE6 */  swc1       $f12, 0x4($s0)
     /* EC4 00000E50 1C00A48F */  lw         $a0, 0x1C($sp)
-  .globl sym_00000E54
   sym_00000E54:
     /* EC8 00000E54 0000848C */  lw         $a0, 0x0($a0)
     /* ECC 00000E58 1C00A4AF */  sw         $a0, 0x1C($sp)
@@ -113,7 +108,6 @@ glabel func_00000D04
     /* ED4 00000E60 1C00A48F */  lw         $a0, 0x1C($sp)
     /* ED8 00000E64 4400A5AF */  sw         $a1, 0x44($sp)
     /* EDC 00000E68 4400A58F */  lw         $a1, 0x44($sp)
-  .globl sym_00000E6C
   sym_00000E6C:
     /* EE0 00000E6C 1000A5AF */  sw         $a1, 0x10($sp)
     /* EE4 00000E70 1000A58F */  lw         $a1, 0x10($sp)

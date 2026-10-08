@@ -148,7 +148,7 @@ glabel func_0007E70C
     /* 7E980 0007E90C 32601646 */  c.eq.s     $f12, $f22
     /* 7E984 0007E910 00000000 */  nop
     /* 7E988 0007E914 0C000045 */  bc1f       .Leboot_0007E948 /* handwritten instruction */
-    /* 7E98C 0007E918 0E00043C */   lui       $a0, 0x000E
+    /* 7E98C 0007E918 0E00043C */   lui       $a0, %hi(sym_000E1B68)
     /* 7E990 0007E91C 0700043C */  lui        $a0, %hi(sym_00072330)
     /* 7E994 0007E920 003E8424 */  addiu      $a0, $a0, %lo(sym_00073E00)
     /* 7E998 0007E924 00008CC4 */  lwc1       $f12, 0x0($a0)

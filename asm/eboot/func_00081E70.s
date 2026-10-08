@@ -78,5 +78,5 @@ glabel func_00081E70
     /* 81FCC 00081F58 EAFF2052 */  beql       $s1, $zero, .Leboot_00081F04
     /* 81FD0 00081F5C 64C9028E */   lw        $v0, %lo(sym_0000C964)($s0)
     /* 81FD4 00081F60 AE070208 */  j          sym_00081EB8
-    /* 81FD8 00081F64 1D00023C */   lui       $v0, 0x001D
+    /* 81FD8 00081F64 1D00023C */   lui       $v0, %hi(sym_001D1B00)
 endlabel func_00081E70

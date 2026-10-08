@@ -31,7 +31,7 @@ glabel func_0009C07C
     /* 9C138 0009C0C4 25204000 */  or         $a0, $v0, $zero
     /* 9C13C 0009C0C8 1400A58F */  lw         $a1, 0x14($sp)
     /* 9C140 0009C0CC 05008014 */  bnez       $a0, .Leboot_0009C0E4
-    /* 9C144 0009C0D0 1D00063C */   lui       $a2, 0x001D
+    /* 9C144 0009C0D0 1D00063C */   lui       $a2, %hi(sym_001D1B00)
     /* 9C148 0009C0D4 AB41050C */  jal        func_001506AC
     /* 9C14C 0009C0D8 2520A000 */   or        $a0, $a1, $zero
     /* 9C150 0009C0DC 25204000 */  or         $a0, $v0, $zero

@@ -497,7 +497,6 @@ glabel func_00070910
     /* 710D0 0007105C C401B58F */  lw         $s5, 0x1C4($sp)
     /* 710D4 00071060 C801B68F */  lw         $s6, 0x1C8($sp)
     /* 710D8 00071064 CC01B78F */  lw         $s7, 0x1CC($sp)
-  .globl sym_00071068
   sym_00071068:
     /* 710DC 00071068 D001BE8F */  lw         $fp, 0x1D0($sp)
     /* 710E0 0007106C D401BF8F */  lw         $ra, 0x1D4($sp)

@@ -51,7 +51,7 @@ glabel func_0014A980
     /* 14AA8C 0014AA18 5000BD27 */   addiu     $sp, $sp, 0x50
   .Leboot_0014AA1C:
     /* 14AA90 0014AA1C 0E00E004 */  bltz       $a3, .Leboot_0014AA58
-    /* 14AA94 0014AA20 1E00043C */   lui       $a0, 0x001E
+    /* 14AA94 0014AA20 1E00043C */   lui       $a0, %hi(sym_001E2AA4)
     /* 14AA98 0014AA24 1E00043C */  lui        $a0, %hi(sym_001E2568)
     /* 14AA9C 0014AA28 2C25878C */  lw         $a3, %lo(sym_001E252C)($a0)
     /* 14AAA0 0014AA2C 2825868C */  lw         $a2, %lo(sym_001E2528)($a0)

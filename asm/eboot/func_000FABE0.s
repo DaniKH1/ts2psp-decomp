@@ -19,7 +19,7 @@ glabel func_000FABE0
     /* FAC6C 000FABF8 5C000434 */   ori       $a0, $zero, 0x5C
     /* FAC70 000FABFC 25804000 */  or         $s0, $v0, $zero
     /* FAC74 000FAC00 05000012 */  beqz       $s0, .Leboot_000FAC18
-    /* FAC78 000FAC04 1E00043C */   lui       $a0, 0x001E
+    /* FAC78 000FAC04 1E00043C */   lui       $a0, %hi(sym_001E2AA4)
     /* FAC7C 000FAC08 D4E9030C */  jal        func_000FA750
     /* FAC80 000FAC0C 25200002 */   or        $a0, $s0, $zero
     /* FAC84 000FAC10 25880002 */  or         $s1, $s0, $zero

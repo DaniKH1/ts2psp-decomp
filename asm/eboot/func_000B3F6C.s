@@ -30,7 +30,7 @@ glabel func_000B3F6C
     /* B4024 000B3FB0 25204000 */  or         $a0, $v0, $zero
     /* B4028 000B3FB4 1400A58F */  lw         $a1, 0x14($sp)
     /* B402C 000B3FB8 05008014 */  bnez       $a0, .Leboot_000B3FD0
-    /* B4030 000B3FBC 0E00063C */   lui       $a2, 0x000E
+    /* B4030 000B3FBC 0E00063C */   lui       $a2, %hi(sym_000E1B68)
     /* B4034 000B3FC0 AB41050C */  jal        func_001506AC
     /* B4038 000B3FC4 2520A000 */   or        $a0, $a1, $zero
     /* B403C 000B3FC8 25204000 */  or         $a0, $v0, $zero

@@ -53,10 +53,10 @@ glabel func_001489AC
     /* 148ABC 00148A48 86003012 */  beq        $s1, $s0, .Leboot_00148C64
     /* 148AC0 00148A4C 2B203E02 */   sltu      $a0, $s1, $fp
     /* 148AC4 00148A50 04008010 */  beqz       $a0, .Leboot_00148A64
-    /* 148AC8 00148A54 1E00133C */   lui       $s3, 0x001E
+    /* 148AC8 00148A54 1E00133C */   lui       $s3, %hi(sym_001E2AA4)
     /* 148ACC 00148A58 8200B616 */  bne        $s5, $s6, .Leboot_00148C64
     /* 148AD0 00148A5C 00000000 */   nop
-    /* 148AD4 00148A60 1E00133C */  lui        $s3, 0x001E
+    /* 148AD4 00148A60 1E00133C */  lui        $s3, %hi(sym_001E10A8)
   .Leboot_00148A64:
     /* 148AD8 00148A64 9424648E */  lw         $a0, %lo(sym_001E2494)($s3)
     /* 148ADC 00148A68 1000B2AF */  sw         $s2, 0x10($sp)

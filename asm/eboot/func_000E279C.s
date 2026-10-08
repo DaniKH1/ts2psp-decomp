@@ -99,32 +99,25 @@ glabel func_000E279C
     /* E2950 000E28DC 01000734 */  ori        $a3, $zero, 0x1
     /* E2954 000E28E0 B8008624 */  addiu      $a2, $a0, 0xB8
     /* E2958 000E28E4 0428A700 */  sllv       $a1, $a3, $a1
-  .globl sym_000E28E8
   sym_000E28E8:
     /* E295C 000E28E8 0000C484 */  lh         $a0, 0x0($a2)
   .L000E28EC:
     /* E2960 000E28EC 24284502 */  and        $a1, $s2, $a1
-  .globl sym_000E28F0
   sym_000E28F0:
     /* E2964 000E28F0 2B280500 */  sltu       $a1, $zero, $a1
     /* E2968 000E28F4 0400C68C */  lw         $a2, 0x4($a2)
-  .globl sym_000E28F8
   sym_000E28F8:
     /* E296C 000E28F8 21202402 */  addu       $a0, $s1, $a0
-  .globl sym_000E28FC
   sym_000E28FC:
     /* E2970 000E28FC 09F8C000 */  jalr       $a2
-  .globl sym_000E2900
   sym_000E2900:
     /* E2974 000E2900 FF00A530 */   andi      $a1, $a1, 0xFF
   .Leboot_000E2904:
     /* E2978 000E2904 1E00043C */  lui        $a0, %hi(sym_001DA294)
   .L000E2908:
     /* E297C 000E2908 94A28424 */  addiu      $a0, $a0, %lo(sym_001DA294)
-  .globl sym_000E290C
   sym_000E290C:
     /* E2980 000E290C 1400A58F */  lw         $a1, 0x14($sp)
-  .globl sym_000E2910
   sym_000E2910:
     /* E2984 000E2910 1000A4AF */  sw         $a0, 0x10($sp)
     /* E2988 000E2914 2620A400 */  xor        $a0, $a1, $a0
@@ -151,10 +144,8 @@ glabel func_000E279C
     /* E29D8 000E2964 0400848C */  lw         $a0, 0x4($a0)
   .L000E2968:
     /* E29DC 000E2968 040004AE */  sw         $a0, 0x4($s0)
-  .globl sym_000E296C
   sym_000E296C:
     /* E29E0 000E296C 000090AC */  sw         $s0, 0x0($a0)
-  .globl sym_000E2970
   sym_000E2970:
     /* E29E4 000E2970 0000058E */  lw         $a1, 0x0($s0)
     /* E29E8 000E2974 0E000434 */  ori        $a0, $zero, 0xE

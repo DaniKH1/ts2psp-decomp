@@ -74,7 +74,7 @@ glabel func_0003720C
     /* 37368 000372F4 593F040C */  jal        func_0010FD64
     /* 3736C 000372F8 25284002 */   or        $a1, $s2, $zero
     /* 37370 000372FC 04004014 */  bnez       $v0, .Leboot_00037310
-    /* 37374 00037300 1C00043C */   lui       $a0, 0x001C
+    /* 37374 00037300 1C00043C */   lui       $a0, %hi(str_collisionTweaks)
     /* 37378 00037304 1C00043C */  lui        $a0, %hi(str_true)
     /* 3737C 00037308 02000010 */  b          .Leboot_00037314
     /* 37380 0003730C 4C308424 */   addiu     $a0, $a0, %lo(str_false)

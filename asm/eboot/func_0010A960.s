@@ -24,7 +24,7 @@ glabel func_0010A960
     /* 10AA00 0010A98C 01000534 */   ori       $a1, $zero, 0x1
     /* 10AA04 0010A990 06000434 */  ori        $a0, $zero, 0x6
     /* 10AA08 0010A994 07004414 */  bne        $v0, $a0, .Leboot_0010A9B4
-    /* 10AA0C 0010A998 1D00063C */   lui       $a2, 0x001D
+    /* 10AA0C 0010A998 1D00063C */   lui       $a2, %hi(sym_001D1B00)
     /* 10AA10 0010A99C 25200002 */  or         $a0, $s0, $zero
     /* 10AA14 0010A9A0 B63E040C */  jal        func_0010FAD8
     /* 10AA18 0010A9A4 01000534 */   ori       $a1, $zero, 0x1

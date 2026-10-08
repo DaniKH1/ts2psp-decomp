@@ -25,7 +25,6 @@ glabel func_00073E4C
     /* 73EF0 00073E7C 9C05B6AF */  sw         $s6, 0x59C($sp)
     /* 73EF4 00073E80 A005BFAF */  sw         $ra, 0x5A0($sp)
     /* 73EF8 00073E84 0F00A010 */  beqz       $a1, .Leboot_00073EC4
-  .globl sym_00073E88
   sym_00073E88:
     /* 73EFC 00073E88 25888000 */   or        $s1, $a0, $zero
     /* 73F00 00073E8C 6035458E */  lw         $a1, %lo(sym_00073560)($s2)
@@ -109,13 +108,10 @@ glabel func_00073E4C
     /* 74024 00073FB0 1C00053C */  lui        $a1, %hi(str_s_s_s)
     /* 74028 00073FB4 1C00063C */  lui        $a2, %hi(str_characters_bodyanims)
     /* 7402C 00073FB8 1C00083C */  lui        $t0, %hi(str_res_75D4)
-  .globl sym_00073FBC
   sym_00073FBC:
     /* 74030 00073FBC 4002A0A3 */  sb         $zero, 0x240($sp)
-  .globl sym_00073FC0
   sym_00073FC0:
     /* 74034 00073FC0 25208002 */  or         $a0, $s4, $zero
-  .globl sym_00073FC4
   sym_00073FC4:
     /* 74038 00073FC4 25386002 */  or         $a3, $s3, $zero
   .L00073FC8:
@@ -124,22 +120,17 @@ glabel func_00073E4C
   .L00073FD0:
     /* 74044 00073FD0 6ABD050C */  jal        func_0016F5A8
     /* 74048 00073FD4 D4750825 */   addiu     $t0, $t0, %lo(str_res_75D4)
-  .globl sym_00073FD8
   sym_00073FD8:
     /* 7404C 00073FD8 6C05B327 */  addiu      $s3, $sp, 0x56C
     /* 74050 00073FDC 25200002 */  or         $a0, $s0, $zero
-  .globl sym_00073FE0
   sym_00073FE0:
     /* 74054 00073FE0 25286002 */  or         $a1, $s3, $zero
   .L00073FE4:
     /* 74058 00073FE4 E3FD050C */  jal        func_0017F78C
-  .globl sym_00073FE8
   sym_00073FE8:
     /* 7405C 00073FE8 25308002 */   or        $a2, $s4, $zero
-  .globl sym_00073FEC
   sym_00073FEC:
     /* 74060 00073FEC 0000648E */  lw         $a0, 0x0($s3)
-  .globl sym_00073FF0
   sym_00073FF0:
     /* 74064 00073FF0 7005A593 */  lbu        $a1, 0x570($sp)
     /* 74068 00073FF4 3802A4AF */  sw         $a0, 0x238($sp)
@@ -168,7 +159,6 @@ glabel func_00073E4C
     /* 740C0 0007404C 0000448E */  lw         $a0, 0x0($s2)
     /* 740C4 00074050 7805A593 */  lbu        $a1, 0x578($sp)
     /* 740C8 00074054 4403A4AF */  sw         $a0, 0x344($sp)
-  .globl sym_00074058
   sym_00074058:
     /* 740CC 00074058 4803A5A3 */  sb         $a1, 0x348($sp)
   .Leboot_0007405C:
@@ -200,7 +190,6 @@ glabel func_00073E4C
     /* 74128 000740B4 8405B08F */  lw         $s0, 0x584($sp)
     /* 7412C 000740B8 8805B18F */  lw         $s1, 0x588($sp)
     /* 74130 000740BC 8C05B28F */  lw         $s2, 0x58C($sp)
-  .globl sym_000740C0
   sym_000740C0:
     /* 74134 000740C0 9005B38F */  lw         $s3, 0x590($sp)
     /* 74138 000740C4 9405B48F */  lw         $s4, 0x594($sp)

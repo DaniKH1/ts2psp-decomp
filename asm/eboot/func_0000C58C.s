@@ -122,7 +122,6 @@ glabel func_0000C58C
   .L0000C738:
     /* C7AC 0000C738 0804A524 */   addiu     $a1, $a1, %lo(str_Start_0408)
     /* C7B0 0000C73C 1D00043C */  lui        $a0, %hi(sym_001D1E20)
-  .globl sym_0000C740
   sym_0000C740:
     /* C7B4 0000C740 06A30046 */  mov.s      $f12, $f20
     /* C7B8 0000C744 1C00053C */  lui        $a1, %hi(str_ActiveController_0410)

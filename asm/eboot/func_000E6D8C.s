@@ -55,7 +55,6 @@ glabel func_000E6D8C
     /* E6EA0 000E6E2C 29F2040C */  jal        func_0013C8A4
     /* E6EA4 000E6E30 41B30D46 */   sub.s     $f13, $f22, $f13
     /* E6EA8 000E6E34 803F043C */  lui        $a0, (0x3F800000 >> 16)
-  .globl sym_000E6E38
   sym_000E6E38:
     /* E6EAC 000E6E38 00608444 */  mtc1       $a0, $f12
     /* E6EB0 000E6E3C 41630046 */  sub.s      $f13, $f12, $f0

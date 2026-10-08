@@ -14,17 +14,14 @@ glabel func_0000CEF4
     /* CF6C 0000CEF8 1800B0AF */  sw         $s0, 0x18($sp)
     /* CF70 0000CEFC 25808000 */  or         $s0, $a0, $zero
     /* CF74 0000CF00 2400A48C */  lw         $a0, 0x24($a1)
-  .globl sym_0000CF04
   sym_0000CF04:
     /* CF78 0000CF04 B40006AE */  sw         $a2, 0xB4($s0)
     /* CF7C 0000CF08 B80004AE */  sw         $a0, 0xB8($s0)
     /* CF80 0000CF0C 1400A424 */  addiu      $a0, $a1, 0x14
     /* CF84 0000CF10 00008CC4 */  lwc1       $f12, 0x0($a0)
     /* CF88 0000CF14 C8000CE6 */  swc1       $f12, 0xC8($s0)
-  .globl sym_0000CF18
   sym_0000CF18:
     /* CF8C 0000CF18 04008CC4 */  lwc1       $f12, 0x4($a0)
-  .globl sym_0000CF1C
   sym_0000CF1C:
     /* CF90 0000CF1C CC000CE6 */  swc1       $f12, 0xCC($s0)
     /* CF94 0000CF20 08008CC4 */  lwc1       $f12, 0x8($a0)
@@ -32,10 +29,8 @@ glabel func_0000CEF4
     /* CF9C 0000CF28 00688044 */  mtc1       $zero, $f13
     /* CFA0 0000CF2C 0C008CC4 */  lwc1       $f12, 0xC($a0)
     /* CFA4 0000CF30 0C00ADE7 */  swc1       $f13, 0xC($sp)
-  .globl sym_0000CF34
   sym_0000CF34:
     /* CFA8 0000CF34 D4000CE6 */  swc1       $f12, 0xD4($s0)
-  .globl sym_0000CF38
   sym_0000CF38:
     /* CFAC 0000CF38 5400CCC4 */  lwc1       $f12, 0x54($a2)
     /* CFB0 0000CF3C 1000ADE7 */  swc1       $f13, 0x10($sp)

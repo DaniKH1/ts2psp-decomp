@@ -45,7 +45,7 @@ glabel func_0007D4C8
     /* 7D5BC 0007D548 25204000 */  or         $a0, $v0, $zero
     /* 7D5C0 0007D54C 1400A58F */  lw         $a1, 0x14($sp)
     /* 7D5C4 0007D550 05008014 */  bnez       $a0, .Leboot_0007D568
-    /* 7D5C8 0007D554 1D00063C */   lui       $a2, 0x001D
+    /* 7D5C8 0007D554 1D00063C */   lui       $a2, %hi(sym_001D1B00)
     /* 7D5CC 0007D558 AB41050C */  jal        func_001506AC
     /* 7D5D0 0007D55C 2520A000 */   or        $a0, $a1, $zero
     /* 7D5D4 0007D560 25204000 */  or         $a0, $v0, $zero

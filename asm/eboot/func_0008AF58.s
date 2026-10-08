@@ -39,13 +39,13 @@ glabel func_0008AF58
     /* 8B034 0008AFC0 2C00A4AF */   sw        $a0, 0x2C($sp)
     /* 8B038 0008AFC4 25284000 */  or         $a1, $v0, $zero
     /* 8B03C 0008AFC8 2C00A78F */  lw         $a3, 0x2C($sp)
-    /* 8B040 0008AFCC 0E00043C */  lui        $a0, 0x000E
+    /* 8B040 0008AFCC 0E00043C */  lui        $a0, %hi(sym_000E1B68)
     /* 8B044 0008AFD0 0600A014 */  bnez       $a1, .Leboot_0008AFEC
-    /* 8B048 0008AFD4 0E00063C */   lui       $a2, 0x000E
+    /* 8B048 0008AFD4 0E00063C */   lui       $a2, %hi(sym_000E1B68)
     /* 8B04C 0008AFD8 AB41050C */  jal        func_001506AC
     /* 8B050 0008AFDC 2520E000 */   or        $a0, $a3, $zero
     /* 8B054 0008AFE0 25284000 */  or         $a1, $v0, $zero
-    /* 8B058 0008AFE4 0E00043C */  lui        $a0, 0x000E
+    /* 8B058 0008AFE4 0E00043C */  lui        $a0, %hi(sym_000E1B68)
     /* 8B05C 0008AFE8 0E00063C */  lui        $a2, %hi(sym_000E2388)
   .Leboot_0008AFEC:
     /* 8B060 0008AFEC 8823C5AC */  sw         $a1, %lo(sym_000E2388)($a2)
@@ -74,7 +74,7 @@ glabel func_0008AF58
     /* 8B0BC 0008B048 25304000 */  or         $a2, $v0, $zero
     /* 8B0C0 0008B04C 2800A58F */  lw         $a1, 0x28($sp)
     /* 8B0C4 0008B050 0500C014 */  bnez       $a2, .Leboot_0008B068
-    /* 8B0C8 0008B054 0E00043C */   lui       $a0, 0x000E
+    /* 8B0C8 0008B054 0E00043C */   lui       $a0, %hi(sym_000E1B68)
     /* 8B0CC 0008B058 AB41050C */  jal        func_001506AC
     /* 8B0D0 0008B05C 2520A000 */   or        $a0, $a1, $zero
     /* 8B0D4 0008B060 25304000 */  or         $a2, $v0, $zero
