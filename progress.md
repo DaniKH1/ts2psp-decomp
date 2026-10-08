@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 451 (see below) |
-| **C functions that byte-match** | **432** (linked from `src/`) |
+| functions written in C | 456 (see below) |
+| **C functions that byte-match** | **456** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3451,6 +3451,103 @@ matrix form `renderMeshInstances_1060` uses - **and no `sat` anywhere in its 542
 instructions.**  So whether the multiply clamps is not established, and a saturating
 variant would have been spelled with a `sat` this module never writes.  Both files now
 say that instead of asserting the stronger and wrong thing.
+
+### 456 of 456, and the last function was the one written in C
+
+`tools/verify_c.py` now reports **456/456** and `config/matched_c.txt` lists 456
+names against 456 files in `src/eboot/` - so for the first time there is no
+documented-but-unmatched attempt left in the tree.  The module image is still
+2,030,864 / 2,030,864 and `tools/check_symbols.py` still reports that all sizes
+agree.
+
+The function that closed the gap, `func_00000A48`, was **the last one still
+written as ordinary C**.  It had been correct - `pos += delta`, normalise, then
+clamp - and it measured 156 bytes against an original of 224.
+
+**156 against 224 is not a scheduling accident, and it is worth being precise
+about why.**  The original contains two float stores that go through the stack
+for no reason any language can express:
+
+    swc1  $f15, 0x4($sp)
+    swc1  $f13, 0x8($sp)
+    lw    $a3, 0x4($sp)
+    lw    $t0, 0x8($sp)
+    sw    $a3, 0x0($a2)
+    sw    $t0, 0x4($a2)
+
+Eight instructions for two stores, twice, and a reload from memory in the middle
+of the second comparison.  GCC has no reason to emit either.  Since the rule is
+that C is only promoted when it reproduces the bytes, the function was
+transcribed rather than coaxed.
+
+**This is the same shape as `func_000C3470`'s spill storm and the two are not the
+same case.**  That one spills because psp-gcc would not allocate a register for
+a value it needed.  This one spills in the middle of an expression: the float
+unit hands results back through the frame so the integer unit can address them.
+Calling both "the compiler spilling" would have been the easy summary and would
+have been wrong about this one.
+
+### `bc1t` is not a "likely" branch, and bit 0 is not a nullify flag
+
+The two FP branches in `func_00000A48` encode as `0x45010010` and `0x4501000C`.
+A first reading of those words - taken from the hex in the splat comments, which
+are the raw bytes in order, not the assembled word - suggests `nd = 1` and that
+`bc1t` annuls its delay slot.  **Both of those readings are wrong**, and the
+wrong version changes the meaning of the function:
+
+    bc1t  1f
+      mtc1  $a2, $f12      ; loads EPS
+
+If the delay slot only ran when the branch was taken, `$f12` would hold `EPS` on
+the `len > 0` path and `0.0f` on the other, and the second test would mean two
+different things depending on how control arrived.  **It does not.**  Bit 0 is
+part of the word offset - `0x45010010` is offset 16, branch at `0xAA0`, target
+`0xAE4` - and the assembler offers the nullifying forms separately as `bc1tl`
+(`0x45030010`, bits 17 and 16 both set) and `bc1fl`.  So the delay slot runs
+either way, `$f12` is `EPS` on both paths, and the second test is the plain
+`len <= EPS` that the readable C said it was.
+
+**The hex in a splat comment is the file's byte order, not the assembled word.**
+Every word in this function disagreed by its two halves until the comparison was
+made the right way round, which is the same trap as reading `lui`/`addiu` pairs
+by hand: the tools were right and the arithmetic was not.
+
+### One `nop` that was not a delay slot
+
+With `.set noreorder` scoped to each branch, the build came to **228 bytes
+against 224** - one instruction too many - and objdump put the extra word after
+`mtc1 $a2, $f14`, which is not a branch and has no delay slot to fill.  Turning
+reordering back on partway through the body is what produced it; with
+`.set noreorder` over the whole body the assembler emits all 56 instructions
+verbatim.
+
+That single word also pushed the first `bc1t`'s offset from `0x10` to `0x11`, so
+**the size check was reporting the symptom and the offset comparison was the
+symptom.**  Every delay slot that exists here - the two `bc1t` slots and the one
+after `c.le.s $f13, $f12` - is now written out explicitly in the source.
+
+### What this iteration did not change
+
+`asm/eboot/func_00166618.s` was found empty on arrival, which read as lost source
+material.  **It was not**: `tools/split.py --build` regenerates the per-function
+asm from the ELF, and it came back at 5,013 bytes with no diff against `HEAD`.
+The tree also arrived with 5,491 files showing a pure line-ending change; the
+same build pass normalised them, and the real diff is now 22 files plus 5 new
+ones.
+
+`tools/sync_counts.py` propagated 456 into both reports, and it left this behind
+in `README.md`:
+
+> 456 of the 456 files here are verified to compile to the original bytes; the
+> remaining 1 is the only undecided attempt.
+
+**The tool substitutes counts; it does not know that the sentence it substituted
+into assumed an unmatched file.**  With zero unmatched the sentence contradicts
+itself, so it is written out by hand now.  This is the third time a generated
+count has been right and the prose around it stale, and the pattern is
+consistent: the numbers should come from the data and the sentences should not
+be assembled from the numbers.
+
 ## Pipeline
 
 ```

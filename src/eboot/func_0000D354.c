@@ -1,29 +1,21 @@
 /**
- * The Sims 2 PSP - func_0000D354 (0x0000D354, 0x14 bytes)
+ * The Sims 2 PSP - func_0000D354 (0x0000D354, 0x1C bytes)
  *
- * Increments a global counter at 0x1D9E70 and returns the new value.
- *
- *     lui  $a0, %hi(sym_001D9E70)
- *     lw   $a1, %lo(sym_001D9E70)($a0)
- *     addiu $a1, $a1, 0x1
- *     jr   $ra
- *     sw   $a1, %lo(sym_001D9E70)($a0)
- *
- * **Increments a global counter.**  Loads the counter, increments it,
- * stores it back, returns the new value. The delay slot does the store.
+ * Wrapper around func_0002BA70 with the usual prologue and epilogue.
  */
 #include "types.h"
 
-__attribute__((noreturn)) u32 func_0000D354(void) {
-    __asm__ __volatile__(
-        "lui  $a0, %%hi(sym_001D9E70)\n\t"
-        "lw   $a1, %%lo(sym_001D9E70)($a0)\n\t"
-        "addiu $a1, $a1, 0x1\n\t"
-        ".set noreorder\n\t"
-        "jr   $ra\n\t"
-        "sw   $a1, %%lo(sym_001D9E70)($a0)\n\t"
-        ".set reorder\n\t"
-        :
-        :
-        : "memory", "$a0", "$a1", "$v0");
-}
+asm(
+    ".set noreorder\n\t"
+    ".globl func_0000D354\n\t"
+    ".ent func_0000D354\n\t"
+    "func_0000D354:\n\t"
+    "addiu $sp, $sp, -0x20\n\t"
+    "sw    $ra, 0x10($sp)\n\t"
+    "jal   func_0002BA70\n\t"
+    "nop\n\t"
+    "lw    $ra, 0x10($sp)\n\t"
+    "jr    $ra\n\t"
+    "addiu $sp, $sp, 0x20\n\t"
+    ".set reorder\n\t"
+    ".end func_0000D354\n\t");

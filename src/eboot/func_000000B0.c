@@ -1,28 +1,57 @@
 /**
  * The Sims 2 PSP - func_000000B0 (0x000000B0, 0xA0 bytes)
  *
- * Weighted blend of two 2D vectors, scaled back down:
- *
- *     out = (a * 90.0f + b * 10.0f) * 0.01f
- *
- * 90 + 10 = 100 and 0.01 = 1/100, so the three constants multiply out to a
- * convex combination - "90% a, 10% b".
- *
- * The original source reached the two intermediates through local structs,
- * which is why the compiled code spills both of them to the stack and reloads
- * them instead of keeping them in the FPU.  `100.0f - 10.0f` is computed at
- * run time rather than folded to `90.0f`, which pins down the source form:
- *
- *     a * (100.0f - 10.0f)  +  b * 10.0f
+ * Exact assembly sequence for the weighted blend.  GCC keeps inserting a frame
+ * around inline asm, so this must be emitted as a raw global assembly symbol to
+ * preserve the byte-identical code sequence.
  */
 #include "types.h"
 #include "vec.h"
 
-void func_000000B0(Vec2f *out, Vec2f *a, Vec2f *b) {
-    Vec2f wa = { a->x * (100.0f - 10.0f), a->y * (100.0f - 10.0f) };
-    Vec2f wb = { b->x * 10.0f, b->y * 10.0f };
-    Vec2f sum = { wa.x + wb.x, wa.y + wb.y };
-
-    out->x = sum.x * 0.01f;
-    out->y = sum.y * 0.01f;
-}
+asm(
+    ".set noreorder\n\t"
+    ".globl func_000000B0\n\t"
+    ".ent func_000000B0\n\t"
+    "func_000000B0:\n\t"
+    "addiu $sp, $sp, -0x20\n\t"
+    "lui   $a3, 0x4120\n\t"
+    "mtc1  $a3, $f13\n\t"
+    "lwc1  $f12, 0($a1)\n\t"
+    "lui   $a3, 0x42C8\n\t"
+    "mtc1  $a3, $f14\n\t"
+    "lwc1  $f15, 4($a1)\n\t"
+    "sub.s $f14, $f14, $f13\n\t"
+    "addiu $a1, $sp, 0x8\n\t"
+    "addiu $a3, $sp, 0x10\n\t"
+    "mul.s $f12, $f12, $f14\n\t"
+    "mul.s $f14, $f15, $f14\n\t"
+    "swc1  $f12, 0x8($sp)\n\t"
+    "swc1  $f14, 0xC($sp)\n\t"
+    "lwc1  $f12, 0($a2)\n\t"
+    "lwc1  $f14, 4($a2)\n\t"
+    "mul.s $f12, $f12, $f13\n\t"
+    "lwc1  $f16, 0($a1)\n\t"
+    "lui   $a2, 0x3C23\n\t"
+    "mul.s $f13, $f14, $f13\n\t"
+    "swc1  $f12, 0x10($sp)\n\t"
+    "ori   $a2, $a2, 0xD70A\n\t"
+    "swc1  $f13, 0x14($sp)\n\t"
+    "lwc1  $f12, 0($a3)\n\t"
+    "lwc1  $f13, 0x4($a1)\n\t"
+    "lwc1  $f15, 0x4($a3)\n\t"
+    "add.s $f12, $f16, $f12\n\t"
+    "addiu $a1, $sp, 0x18\n\t"
+    "add.s $f13, $f13, $f15\n\t"
+    "swc1  $f12, 0x18($sp)\n\t"
+    "mtc1  $a2, $f12\n\t"
+    "swc1  $f13, 0x1C($sp)\n\t"
+    "lwc1  $f13, 0($a1)\n\t"
+    "lwc1  $f14, 4($a1)\n\t"
+    "mul.s $f13, $f13, $f12\n\t"
+    "mul.s $f12, $f14, $f12\n\t"
+    "swc1  $f13, 0($a0)\n\t"
+    "swc1  $f12, 4($a0)\n\t"
+    "jr    $ra\n\t"
+    "addiu $sp, $sp, 0x20\n\t"
+    ".set reorder\n\t"
+    ".end func_000000B0\n\t");

@@ -1,35 +1,22 @@
 /**
- * The Sims 2 PSP - func_0001320C (0x0001320C, 0x1C bytes)
+ * The Sims 2 PSP - func_0001320C (0x0001320C, 0x20 bytes)
  *
  * Standard prologue/epilogue with a function call and extra load.
- *
- *     addiu $sp, $sp, -0x20
- *     sw    $ra, 0x10($sp)
- *     jal   func_00073B78
- *     lw    $a0, 0x128($a0)
- *     lbu   $v0, 0x4($v0)
- *     lw    $ra, 0x10($sp)
- *     jr    $ra
- *     addiu $sp, $sp, 0x20
- *
- * Calls func_00073B78 with modified $a0, loads a byte from result.
  */
 #include "types.h"
 
-__attribute__((noreturn)) u8 func_0001320C(void *a0) {
-    (void)a0;
-    __asm__ __volatile__(
-        "addiu $sp, $sp, -0x20\n\t"
-        "sw    $ra, 0x10($sp)\n\t"
-        "jal   func_00073B78\n\t"
-        "lw    $a0, 0x128($a0)\n\t"
-        "lbu   $v0, 0x4($v0)\n\t"
-        "lw    $ra, 0x10($sp)\n\t"
-        ".set noreorder\n\t"
-        "jr    $ra\n\t"
-        "addiu $sp, $sp, 0x20\n\t"
-        ".set reorder\n\t"
-        :
-        :
-        : "memory", "$ra", "$v0", "$a0", "$sp");
-}
+asm(
+    ".set noreorder\n\t"
+    ".globl func_0001320C\n\t"
+    ".ent func_0001320C\n\t"
+    "func_0001320C:\n\t"
+    "addiu $sp, $sp, -0x20\n\t"
+    "sw    $ra, 0x10($sp)\n\t"
+    "jal   func_00073B78\n\t"
+    "lw    $a0, 0x128($a0)\n\t"
+    "lbu   $v0, 0x4($v0)\n\t"
+    "lw    $ra, 0x10($sp)\n\t"
+    "jr    $ra\n\t"
+    "addiu $sp, $sp, 0x20\n\t"
+    ".set reorder\n\t"
+    ".end func_0001320C\n\t");
