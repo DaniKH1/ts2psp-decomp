@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 406 (see below) |
-| **C functions that byte-match** | **385** (linked from `src/`) |
+| functions written in C | 410 (see below) |
+| **C functions that byte-match** | **389** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -2393,7 +2393,97 @@ hoists the `sll`/`sra` pair into the slot and the instruction order changes.
 Together the two are the module's fixed-point layer, and they are why this project
 reads the `sll 16 / sra 16` idiom in this corner of the binary as "make it a `short`"
 rather than as dead code.
-## Pipeline
+
+### A packer with a channel that is dead for every input
+
+`func_000706A8` reduces two channels of a packed word to five bits each, puts the
+upper one at bit 5 and a constant 0x8000 at the top:
+
+```
+    return 0x8000 | ((a0 >> 3) & 0x1F) | (((a0 >> 11) & 0x1F) << 5);
+```
+
+0x8000 in bit 15 is how the PSP's video formats carry "there is an alpha bit here",
+so this is a packer for a two-channel-plus-flag format.
+
+**And one pair of its instructions is dead, provably.**  `andi $a1, $a0, 0xFF` leaves
+eight bits, `srl $a1, $a1, 19` shifts those eight bits clean out of the word, and
+`sll $a1, $a1, 10` shifts zero back.  The result is used; it is always zero.
+
+That is worth a paragraph of its own because **it is a different kind of dead code
+from every other instance found so far.**  The redundant `sll`/`sra` in
+`func_000E8EA8` and the three unused products in `func_000EBC88`'s cross product all
+compute values that are *used* - a compiler proved a redundancy and left the
+arithmetic in place.  This one computes a value that is used and is always zero: the
+compiler chose the mask 0xFF where the source's own mask must have reached bit 19,
+and narrowed the channel out of existence.  The third channel, bits 16 and up,
+therefore never reaches the output.
+
+It is the clearest instance so far of "byte-exact" and "correct" being different
+questions, which is the distinction this project keeps running into.
+
+### Two functions that are one expression, factored
+
+`func_00049B68` computes `a * 0x23E8 + 0x743A8`.  `func_00049BEC`, thirty-six bytes
+further on, computes `a * 0x23E8 + b * 0x80F8 + 0x2108`.  The relation is exact:
+`0x743A8 + 0x2100 == 0x2108`, so the second is the first plus a second term, and its
+four-instruction tail is the first inlined with the difference left over.
+
+Neither constant is a power of two and neither divides 0x800, so this is not an array
+index with a stride.  **What it indexes is not settled here.**  There are three
+callers: `func_00049C30` adds 0x800 to the result before returning, and `func_0006882C`
+passes it to `func_143730` alongside a pointer loaded from `0x0BF1C1C` and the
+constant 0x800.  So the result is an index and 0x800 goes with it - but nothing in
+seventeen instructions says what the index is an index *into*, and that is the honest
+end of it.
+
+Both truncate their products to 32 bits (`mult` then `mflo`), which is why neither can
+be one C expression: `(u32)a * 0x23E8` promotes back to a wider type on the second
+multiply and gives a different answer.
+
+### A static constructor that writes 480 by 272, four times
+
+`func_0014EBA4` is 268 bytes of stores and a three-instruction loop, and it is worth
+more for what it writes than for how it does it.
+
+It fills **four identical 0xFC-byte records** at 0x6C770, 0x6C86C, 0x6C968 and
+0x6CA64, and this is what is non-zero in each:
+
+```
+    +0x00  4        +0x50  0xFFFF
+    +0x10  100      +0x58  1
+    +0x18  1        +0xF8  -1
+    +0x1C  480
+    +0x20  272
+```
+
+**480 by 272 is the PSP's framebuffer**, and that is arithmetic rather than a guess:
+0x1E0 and 0x110 appear in the body and nowhere else, in fields one word apart, and
+again side by side in the 0x48-byte header at 0x6C728.  What the engine *calls* these
+records is not established - display modes, framebuffer descriptors and texture
+formats all fit, and four identical entries are as consistent with "four slots,
+differentiated later" as with "four the same".  The 4 at +0x00 and the 0xFFFF at
++0x50 are the kind of sentinel that says "not set yet", which is the one hint the
+bytes give.
+
+**The record stride is 0xFC and that is settled by the loop, not assumed.**  Two
+cursors step in parallel, `$a1` at the record starts and `$a2` 0xF8 behind them, so
+`$a2`'s store lands on the *last* word of the same record rather than the first word
+of the next.  A stride of 0xF8 would have been the other reading; the `+0xFC` on
+both settles it.
+
+Two scheduling details worth keeping:
+
+* **The constants are hoisted out of the loop into `$t5` through `$t0`,** which is
+  why the loop body contains no `ori` or `addiu` pair at all - twenty-eight stores and
+  nothing else.  A C loop would rematerialise each constant unless GCC proved the
+  loop-invariant hoist itself, which it does; writing them out is what makes that
+  visible.
+* **The loop label goes before the counter decrement, not after it.**  The branch
+  targets the `addiu $v1, $v1, -1`, so the decrement is the first instruction of the
+  body and runs four times.  Putting the label after it - the obvious arrangement -
+  runs the body five times and shifts the branch by one instruction.  That was the one
+  wrong word in this function's first attempt.## Pipeline
 
 ```
 tools/iso9660.py             ISO9660 reader for the UMD image

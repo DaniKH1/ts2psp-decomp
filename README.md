@@ -13,7 +13,7 @@ relative.
 | code | **507,673 / 507,673 instructions identical** |
 | functions recovered | 7,497 |
 | relocations recovered | 66,503 / 66,503 |
-| C functions byte-exact and hand written | 385 |
+| C functions byte-exact and hand written | 389 |
 
 The engine is Maxis' "Elem", the shared engine also used by *The Sims 3* — the
 build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
@@ -23,7 +23,7 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 | directory | |
 | --- | --- |
 | `asm/` | one `.s` per function, as splat produced them.  Assembling and linking this reproduces the original exactly.  Recovered material — see [Legal](#legal). |
-| `src/eboot/` | the hand written decompilation: what each function does, in C.  385 of the 406 files here are verified to compile to the original bytes; the other 21 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
+| `src/eboot/` | the hand written decompilation: what each function does, in C.  389 of the 410 files here are verified to compile to the original bytes; the other 21 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
 | `include/` | the shared types: `f32`, `Vec3f`, and the object layouts the early functions reveal. |
 | `tools/` | everything that produced the above, and the checks that keep it honest.  MIT licensed. |
 | `config/` | the recovered symbol map, the relocation map, and hand recovered names. |
@@ -35,13 +35,13 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 **The assembly is byte-exact and complete.**  `asm/` reproduces every byte of
 the module image.  That part is finished and has been for some time.
 
-**The C is the readable layer, and it is partial.**  385 of 7,497 functions.  The
+**The C is the readable layer, and it is partial.**  389 of 7,497 functions.  The
 original was built with CodeWarrior for PSP (`mwccpsp.exe`), and psp-gcc does
 not reproduce its instruction selection.  Reaching byte-exact C for *all* 7,497
-needs that proprietary compiler; 385 were reached without it, by pinning the
+needs that proprietary compiler; 389 were reached without it, by pinning the
 handful of registers and delay slots where the two compilers disagree.
 
-What those 385 have in common is that the disagreement is small enough to name.
+What those 389 have in common is that the disagreement is small enough to name.
 Both compilers emit the same *instructions* and differ over which register is the
 destination, or when a value is loaded, so pinning the registers makes them agree.
 The pinning is deliberately narrow: an inline `asm` block over the two or three
@@ -105,6 +105,19 @@ Three results from that work are worth knowing before reading the C:
   its `lui`/`mtc1` sentinel pair is simply missing.  The query beside them,
   `func_001A9CF8`, is a three-way test over bit 13, the sentinel float and bit 12 —
   because each of the four combinations of two booleans has its own accessor.
+* **The module writes its own display geometry into memory at startup.**
+  `func_0014EBA4` fills four identical 0xFC-byte records at 0x6C770, and each has
+  **480 by 272** in it — the PSP framebuffer, in two fields a word apart.  What the
+  engine calls those records is not established; the 4 and the 0xFFFF beside them
+  look like sentinels saying "not set yet".  It is also the only static constructor
+  here where the *record stride* is the interesting part: two cursors step in
+  parallel, one 0xF8 behind the other, so the second one's store lands on the last
+  word of the same record rather than the first word of the next.
+* **One packer has a channel that is dead for every input.**  `func_000706A8` masks
+  to eight bits, shifts right 19 — which empties the word — and shifts the zero back
+  by ten.  The result is used; it is always zero.  Every other piece of dead code
+  found so far computes something that *is* used, so this one is the clearest
+  instance yet of byte-exact and correct being different questions.
 * **Nine functions in the module write into its own code section.**  `tools/stride_table.py`
   is the census: nine functions build the address 0x0EB850 and index it with a
   28-byte stride, and 0x0EB850 is sixteen bytes into `func_000EB840`'s prologue,
