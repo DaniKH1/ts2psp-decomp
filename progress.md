@@ -13,7 +13,7 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
 | functions written in C | 203 (see below) |
-| **C functions that byte-match** | **199** (linked from `src/`) |
+| **C functions that byte-match** | **213** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -101,7 +101,7 @@ therefore stays byte exact no matter how far the C gets.
 The four signals above are about *code generation*, not about a hard
 impossibility.  Where a function leaves no freedom - a load, an add, a store,
 a return, with no branches - psp-gcc emits the same instruction sequence as
-CodeWarrior and only the *register choice* differs.  One hundred and ninety-nine
+CodeWarrior and only the *register choice* differs.  One hundred and thirteen
 now byte exact this way:
 
 ```
@@ -281,6 +281,20 @@ func_0000BEDC  u32            store 0.0f via $t0, return 1
 func_0005E66C  u32            set byte 0x2A0=1, return 1
 func_0005E758  u32            set byte 0x144=1, return 1
 func_0005E6FC  u32            check word at 0x140 != 0
+func_0001FA3C  Vec3*           store 0 byte + 0.0f at 0x57FC/0x57F4, return self
+func_0001FCA8  Vec3*           store 0.0f at 0x18C and 0x200, return self
+func_0002F438  u8*            store byte to global 0x1D3624, return addr
+func_00036D90  u32            return global word at 0x1D3828
+func_00049A84  u32            return global word at 0x0743A0
+func_00054510  u32            load half-word at 0x4, mask to 16 bits
+func_00058FEC  u32            load word at 0xC, increment, return
+func_0006B6B8  void*           return global addr 0x0E2240
+func_0006BEE4  void*           return global addr 0x0E2260
+func_00080D40  u8             return global byte at 0x1D4930
+func_00080D4C  u32            store byte to global 0x1D4930, return 0
+func_00080E14  u8             return global byte at 0x1D4931
+func_00082180  void*           return global addr 0x0E2340
+func_00085424  char*           return string addr "default_category"
 func_00128F50  Elapsed*        start - now
 func_00140A58  u32             flags[index] & 0x07, packed flag bytes
 func_00140A74  u32             ... the same, mask 0x04
@@ -1046,7 +1060,7 @@ The vtable accessors are the first sign of the class hierarchy coming back:
 which is where the controllers that register `Start` and `ActiveController`
 keep their type information.
 
-The rule of thumb from the one hundred and ninety-nine that work: if the function has no
+The rule of thumb from the two hundred and thirteen that work: if the function has no
 branches, or only branches that rejoin immediately, the arithmetic is what both
 compilers already agree on, and only the registers are in question.
 
@@ -2395,7 +2409,7 @@ capitalised string is a control name rather than the module.
 ## Work list
 
 1. Keep working down `tools/c_shapes.py --done`.  254 real-shape functions were
-   identified and 199 are done.  Each shape that works yields several functions
+   identified and 213 are done.  Each shape that works yields several functions
    at once, and the established rules ("load in asm, store in C", "leave an
    overwritten register uninitialised") keep the per-function cost down.
 2. The work is hand transcription, deliberately.  A generator *can* emit all
