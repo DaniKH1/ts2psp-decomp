@@ -7,12 +7,9 @@
  *     jr   $ra
  *     addiu $v0, $v0, 0x2340
  *
- * **Returns a global address.**  Same pattern as func_0006B6B8,
- * different global (0x0E2340).
+ * **Returns a global address.**  0x0E2340 is the address.
  */
 #include "types.h"
-
-/* 0x0E2340 - global address */
 
 __attribute__((noreturn)) void *func_00082180(void) {
     __asm__ __volatile__(

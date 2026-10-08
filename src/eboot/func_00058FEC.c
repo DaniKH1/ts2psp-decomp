@@ -24,6 +24,7 @@ __attribute__((noreturn)) u32 func_00058FEC(Counter *self) {
         "jr     $ra\n\t"
         "addiu  $v0, $v0, 0x1\n\t"
         ".set reorder\n\t"
-        : : [c] "r"(self)
+        : [c] "+r"(c)
+        :
         : "memory", "$v0");
 }

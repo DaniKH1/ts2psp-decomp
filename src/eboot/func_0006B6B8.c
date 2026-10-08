@@ -12,8 +12,6 @@
  */
 #include "types.h"
 
-/* 0x0E2240 - global address */
-
 __attribute__((noreturn)) void *func_0006B6B8(void) {
     __asm__ __volatile__(
         "lui  $v0, 0x0E\n\t"

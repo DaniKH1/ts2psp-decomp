@@ -11,8 +11,6 @@
  */
 #include "types.h"
 
-/* 0x1D4930 - global byte */
-
 __attribute__((noreturn)) u8 func_00080D40(void) {
     __asm__ __volatile__(
         "lui  $a0, 0x1D\n\t"

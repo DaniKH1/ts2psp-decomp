@@ -17,10 +17,7 @@
 #include "types.h"
 
 __attribute__((noreturn)) void func_000E7F84(void *self, u32 index, u32 value) {
-    register void *self_reg asm("$a0") = self;
-    register u32 idx asm("$a1") = index;
-    register u32 val asm("$a2") = value;
-    (void)self; (void)index; (void)val;
+    (void)self; (void)index; (void)value;
     __asm__ __volatile__(
         "lui  $a2, %%hi(sym_000E97A8)\n\t"
         "sll  $a1, $a1, 2\n\t"
@@ -31,6 +28,6 @@ __attribute__((noreturn)) void func_000E7F84(void *self, u32 index, u32 value) {
         "sw   $a0, 0x0($a1)\n\t"
         ".set reorder\n\t"
         :
-        : "r"(self), "r"(index), "r"(val)
-        : "memory");
+        : "r"(self), "r"(index), "r"(value)
+        : "memory", "$a0", "$a1", "$a2");
 }

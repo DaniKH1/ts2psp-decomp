@@ -1,7 +1,7 @@
 /**
  * The Sims 2 PSP - func_00054510 (0x00054510, 0x0C bytes)
  *
- * Loads the half-word at offset 0x4, returns it zero-extended to 16 bits.
+ * Loads a half-word from offset 0x4, returns it zero-extended to 16 bits.
  *
  *     lw   $v0, 0x4($a0)
  *     jr   $ra
@@ -25,6 +25,7 @@ __attribute__((noreturn)) u32 func_00054510(Target *self) {
         "jr   $ra\n\t"
         "andi $v0, $v0, 0xFFFF\n\t"
         ".set reorder\n\t"
-        : : [t] "r"(self)
+        : [t] "+r"(t)
+        :
         : "memory", "$v0");
 }

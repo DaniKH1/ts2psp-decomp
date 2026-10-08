@@ -8,11 +8,9 @@
  *     addiu $v0, $v0, 0x2260
  *
  * **Returns a global address.**  Same pattern as func_0006B6B8,
- * different global.
+ * different global (0x0E2260).
  */
 #include "types.h"
-
-/* 0x0E2260 - global address */
 
 __attribute__((noreturn)) void *func_0006BEE4(void) {
     __asm__ __volatile__(

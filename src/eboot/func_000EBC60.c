@@ -1,7 +1,7 @@
 /**
  * The Sims 2 PSP - func_000EBC60 (0x000EBC60, 0x0C bytes)
  *
- * Loads a word from offset 0x2C, returns it minus 1.
+ * Loads a word from offset 0x2C, decrements it by 1, returns it.
  *
  *     lw   $v0, 0x2C($a0)
  *     jr   $ra

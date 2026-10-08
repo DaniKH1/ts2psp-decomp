@@ -1,4 +1,6 @@
-/**
+import pathlib
+
+content = r'''/**
  * The Sims 2 PSP - func_000908BC (0x000908BC, 0x0C bytes)
  *
  * Clears a word through second argument, returns 0.
@@ -25,3 +27,7 @@ __attribute__((noreturn)) u32 func_000908BC(void *a0, void *a1) {
         :
         : "memory", "$v0");
 }
+'''
+
+pathlib.Path('src/eboot/func_000908BC.c').write_text(content, encoding='utf-8')
+print('Done')

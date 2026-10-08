@@ -12,7 +12,7 @@
 #include "types.h"
 
 __attribute__((noreturn)) void func_000E7244(void *a0, void *a1, void *a2, void *a3) {
-    (void)a0; (void)a1; (void)a2; (void)a2;
+    (void)a0; (void)a1; (void)a2; (void)a3;
     __asm__ __volatile__(
         "addu $a0, $a1, $a3\n\t"
         ".set noreorder\n\t"

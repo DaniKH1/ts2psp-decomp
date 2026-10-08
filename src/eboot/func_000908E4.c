@@ -7,7 +7,7 @@
  *     jr   $ra
  *     or   $v0, $zero, $zero
  *
- * **Clears a word through the second argument, returns 0.**
+ * **Clears a word through second argument, returns 0.**
  * Same pattern as func_000908BC, different address in the disassembly
  * (but same logical operation).
  */

@@ -13,7 +13,7 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
 | functions written in C | 203 (see below) |
-| **C functions that byte-match** | **295** (linked from `src/`) |
+| **C functions that byte-match** | **333** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
