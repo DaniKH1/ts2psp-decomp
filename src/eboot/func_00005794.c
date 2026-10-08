@@ -1,9 +1,6 @@
 /**
  * The Sims 2 PSP - func_00005794 (0x00005794, 0x3C bytes)
  *
- * Loads a float from a nested structure, compares it with $f12,
- * and conditionally computes a reciprocal or division.
- *
  *     lw    $a1, 0xC($a0)
  *     lw    $a1, 0x128($a1)
  *     lwc1  $f13, 0x484($a1)
@@ -17,18 +14,14 @@
  *       swc1 $f12, 0x18($a0)
  *   .Leboot_000057C0:
  *     div.s $f12, $f12, $f13
- *     swc1 $f12, 0x18($a0)
+ *     swc1  $f12, 0x18($a0)
  *   .Leboot_000057C8:
  *     jr    $ra
  *     nop
  *
- * This function:
- * 1. Loads a float from a nested structure (a0->0xC->0x128->0x484)
- * 2. Compares it with $f12 (passed in)
- * 3. If equal (bc1fl = branch on condition false likely), loads another float
- *    from offset 0x47C and sets $f12 = 1.0f
- * 4. Otherwise, divides $f12 by the loaded value
- * 5. Stores result at a0+0x18
+ * This function compares $f12 with a float loaded from a nested
+ * structure. If equal, it loads 1.0f and stores it. Otherwise,
+ * it divides $f12 by the loaded value and stores the result.
  */
 #include "types.h"
 
