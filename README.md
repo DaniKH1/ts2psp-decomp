@@ -13,7 +13,7 @@ relative.
 | code | **507,673 / 507,673 instructions identical** |
 | functions recovered | 7,497 |
 | relocations recovered | 66,503 / 66,503 |
-| C functions byte-exact and hand written | 383 |
+| C functions byte-exact and hand written | 385 |
 
 The engine is Maxis' "Elem", the shared engine also used by *The Sims 3* — the
 build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
@@ -23,7 +23,7 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 | directory | |
 | --- | --- |
 | `asm/` | one `.s` per function, as splat produced them.  Assembling and linking this reproduces the original exactly.  Recovered material — see [Legal](#legal). |
-| `src/eboot/` | the hand written decompilation: what each function does, in C.  383 of the 404 files here are verified to compile to the original bytes; the other 21 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
+| `src/eboot/` | the hand written decompilation: what each function does, in C.  385 of the 406 files here are verified to compile to the original bytes; the other 21 are attempts that are documented but do not yet match.  Recovered material — see [Legal](#legal). |
 | `include/` | the shared types: `f32`, `Vec3f`, and the object layouts the early functions reveal. |
 | `tools/` | everything that produced the above, and the checks that keep it honest.  MIT licensed. |
 | `config/` | the recovered symbol map, the relocation map, and hand recovered names. |
@@ -35,13 +35,13 @@ build path baked into the binary is `c:/ad_clean/sims_psp/src/elem/…`.
 **The assembly is byte-exact and complete.**  `asm/` reproduces every byte of
 the module image.  That part is finished and has been for some time.
 
-**The C is the readable layer, and it is partial.**  383 of 7,497 functions.  The
+**The C is the readable layer, and it is partial.**  385 of 7,497 functions.  The
 original was built with CodeWarrior for PSP (`mwccpsp.exe`), and psp-gcc does
 not reproduce its instruction selection.  Reaching byte-exact C for *all* 7,497
-needs that proprietary compiler; 383 were reached without it, by pinning the
+needs that proprietary compiler; 385 were reached without it, by pinning the
 handful of registers and delay slots where the two compilers disagree.
 
-What those 383 have in common is that the disagreement is small enough to name.
+What those 385 have in common is that the disagreement is small enough to name.
 Both compilers emit the same *instructions* and differ over which register is the
 destination, or when a value is loaded, so pinning the registers makes them agree.
 The pinning is deliberately narrow: an inline `asm` block over the two or three
@@ -105,6 +105,16 @@ Three results from that work are worth knowing before reading the C:
   its `lui`/`mtc1` sentinel pair is simply missing.  The query beside them,
   `func_001A9CF8`, is a three-way test over bit 13, the sentinel float and bit 12 —
   because each of the four combinations of two booleans has its own accessor.
+* **Nine functions in the module write into its own code section.**  `tools/stride_table.py`
+  is the census: nine functions build the address 0x0EB850 and index it with a
+  28-byte stride, and 0x0EB850 is sixteen bytes into `func_000EB840`'s prologue,
+  with two `jal` relocations inside it.  One of the nine has a real caller, passing
+  an unmasked byte out of its object as the index.  What that means is recorded and
+  **not** resolved — three readings fit the bytes and none can be settled from inside
+  the functions — but it is a fact about the shipped image, and the tool also
+  reports which of its 1,203 shared constants are just immediates: the largest are the
+  chunk tags, `surf` 137 times and `gshd` 108, which is `tools/tags.py` confirmed from
+  a direction it does not otherwise use.
 * **The one genuinely ugly piece** is `__attribute__((noreturn))` on a function
   that does return.  It is a lie about control flow that only affects codegen, and
   it does two jobs: it stops GCC appending a return after a hand-written block, and

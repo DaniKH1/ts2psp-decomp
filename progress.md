@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 404 (see below) |
-| **C functions that byte-match** | **383** (linked from `src/`) |
+| functions written in C | 406 (see below) |
+| **C functions that byte-match** | **385** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -2298,6 +2298,101 @@ differs from its `setjmp` half: the `jr $ra` has to branch to the address *loade
 from offset 0x28*, not to the one the function was called with, so the block ends
 with its own `jr $ra`.
 
+### Nine live functions write into the code section
+
+`func_000F93E8` computes `0x0EB850 + 28 * index` and stores to it.  The stride is
+`index << 5 - index << 2`, which is 28, and the base is a bare `lui 0xF` /
+`addiu -0x47B0` pair with R_MIPS_HI16 and R_MIPS_LO16 relocations on both halves
+against the same target.  Nothing about that is odd.  What the address *is* is.
+
+**It is not data.**  0x0EB850 is sixteen bytes into `func_000EB840`'s prologue - the
+instruction there is `move $s1, $a1` - and the words that follow carry two
+R_MIPS_26 relocations at 0x0EB85C and 0x0EB884, which is to say two `jal`s.  A
+record at index 1 would land on `sw $ra, 0x34($sp)` and index 4 exactly on
+`func_000EB8A4`'s entry point, so the structure cannot be one.
+
+**Nine functions do it.**  `tools/stride_table.py` is the census, and it reports:
+
+```
+0xeb850: 9 functions materialise it; verdict code.
+
+  func_000F924C func_000F9274 func_000F92A0 func_000F92F0 func_000F93E8
+  func_000F9414 func_000F9438 func_000F9544 func_000F9590
+```
+
+All nine index or walk it with stride 28, and `func_000F924C` zeroes 32 records of
+it in a loop with `addiu $p, $p, 0x1C` in the branch's delay slot.
+
+**And this one is reached.**  There is a real `jal func_0F93E8` at 0x0EAAA8, its
+delay slot fed by `lbu $a0, 0x7E($a0)` - a byte out of the object, 0 to 255, with
+nothing masking it.
+
+So the module contains nine live functions writing into its own code section at an
+address derived from a byte field a caller supplies.  **That is recorded, not
+resolved.**  Three readings fit the bytes and cannot be told apart from inside any
+one of these functions: the accessors are unreachable in practice; the structure was
+optimised away and its storage reused; or the original link laid a data object over
+code.  The last is the least likely.  The first is not provable either.  What *is*
+provable is the arithmetic, and that is what `src/eboot/func_000F93E8.c` transcribes.
+
+### The census behind that, and what it turned up instead
+
+`tools/stride_table.py` asks a narrower question than the one that found the cluster:
+**which functions materialise the same address**, and is that address code or data.
+It reports 5,357 function uses over 1,203 addresses that two or more functions build.
+
+Two things about how it got there are worth recording, because the first is the same
+mistake this project has already made twice.
+
+* **Filtering on the instruction *shape* does not work.**  The first version matched
+  a shift pair, or an `addiu $p, $p, k` sitting in a delay slot, and found **1,231
+  functions over 819 addresses**.  That is "addressing is common", not a family -
+  the same error as `tools/flag_table.py`, and the lesson is again that the *filter*
+  was wrong rather than the count being too low.
+* **Most of what it finds is not an address.**  A `lui`/`addiu` pair whose result
+  lands inside no section is a 32-bit constant.  Deciding that per group is what
+  makes the tool's largest entries legible, and they are the module's
+  four-character chunk tags:
+
+  ```
+  0x66727573  137 uses  "surf"
+  0x64687367  108 uses  "gshd"
+  0x65766177  107 uses  "wave"
+  0x20626d78  105 uses  " xml"
+  0x20686d78  105 uses  " hmx"
+  0x20736d78  105 uses  " smx"
+  0x61746473  105 uses  "std"
+  ```
+
+  That is an independent confirmation of `tools/tags.py` from a different direction.
+  The tags are not in a table; they are immediates, and this says which ones the
+  module leans on most - `surf` a hundred and thirty-seven times over.
+
+### `func_000E8F08`: the other half of the fixed-point layer
+
+`func_000E8EA8` - written up above - blends a value against a fraction centred on
+128 and scaled by 128.  Sixty bytes after it, `func_000E8F08` multiplies three signed
+16-bit fixed-point values together:
+
+```
+    return (s16)((u32)((u32)(s16)a * (s32)(s16)b * (s32)(s16)c) >> 23);
+```
+
+Two `mult`/`mflo` pairs, and **each multiply truncates to 32 bits** - the second sees
+the low word of the first, not the full 64-bit product.  That is why it cannot be one
+C expression: `(u32)a * (u32)b * (u32)c` promotes back to a wider type and gives a
+different answer, and only `(u32)a * (u32)b` keeps the truncation in the source.
+
+The shift is 23, which is 32 - 9, so a value of about 4096 stands for 1.0: the low
+word of a Q12 product has to come down by nine bits to put the binary point back.
+And there are **two `nop`s** between the first `mflo` and the second `mult` - the
+multiply latency being spent narrowing the third argument rather than waiting.  Under
+`.set noreorder` they have to be written out; under `.set reorder` the assembler
+hoists the `sll`/`sra` pair into the slot and the instruction order changes.
+
+Together the two are the module's fixed-point layer, and they are why this project
+reads the `sll 16 / sra 16` idiom in this corner of the binary as "make it a `short`"
+rather than as dead code.
 ## Pipeline
 
 ```
@@ -2334,6 +2429,7 @@ tools/nid_table.py           the PSP import table: stubs, libraries, NID words
 tools/flag_table.py          decode the packed flag bytes and list their readers
 tools/flag_accessors.py      census the C++ boolean accessors: mask, offset, direction
 tools/check_report.py        names the report writes about that have no src/eboot file
+tools/stride_table.py        addresses several functions materialise; code or constant
 ```
 
 ```
