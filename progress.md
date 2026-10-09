@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 567 (see below) |
-| **C functions that byte-match** | **567** (linked from `src/`) |
+| functions written in C | 571 (see below) |
+| **C functions that byte-match** | **571** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 567 of the 567 files here are verified to compile to the original bytes; the
+> 571 of the 571 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -3966,6 +3966,64 @@ all.
 whole body that only ever holds 0.0f.  **The accumulator is a constant**: it is
 staged through 0x10($sp) and written into the float array at `0x8($s0) + $s6`,
 so the array is being defaulted, not summed.
+
+#### The sentinel appears three more times, and the table resolves into an interface
+
+Finishing the four real bodies (`func_000B9F88` at +0x38 and `func_000BA16C` at
++0x40) made one thing clear enough to state: **the sentinel-1 "not interned yet"
+test is in every real method in the table, three times.**
+
+    func_000B9D3C  bnel $a1, $a2 / addu $s2, $a0, $a1
+    func_000B9E2C  bnel $a1, $a2 / addu $s3, $a0, $a1
+    func_000B9F88  bnel $a3, $a0 / addu $a1, $a2, $a3
+    func_000BA16C  bnel $a3, $s3 / addu $a1, $a2, $a3      (twice)
+
+Read as an interface, the twenty-three shared slots now name a coherent thing:
+
+    +0x08  construct
+    +0x10  is-yes   (constant true)
+    +0x18  is-yes   (constant true)
+    +0x20  walk entries, callback per index          func_000B9D3C
+    +0x28  walk entries, copy to a buffer           func_000B9E2C
+    +0x30  (the one slot the three siblings override)
+    +0x38  look a name up, return index or -1       func_000B9F88
+    +0x40  look a name up, copy 0x28 bytes of it    func_000BA16C
+    +0x48  void                                     func_0018F668
+    +0x50 .. +0xC8  sixteen constant-false queries
+
+**It is a symbol-table interface**: intern, enumerate, and resolve, over a table
+whose entries carry a `char[0x28]` name.  `func_000BA16C` copies exactly **0x28 =
+40 bytes** - twice, in two delay slots - and that is where the name length comes
+from.  Its two failure paths each write a single `sb $zero`, not 40 zero bytes:
+**the buffer is assumed to already hold its old contents and clearing one byte is
+what marks it empty.**
+
+`func_000B9F88` returns **-1** on failure and has *three* separate sites writing
+it, which means three distinct ways to give up: the table pointer was null, the
+loop ran out, and the early bail.  Its inner loop is worth noting because it is a
+mistake in the original rather than an idiom: on a failed comparison it jumps back
+to the **table header** (`beqz $v0, .Leboot_000BA030`), restarting the whole
+lookup, instead of continuing the search.  A comparison that fails mid-scan
+restarts the scan.
+
+#### The three overrides are unrelated to each other
+
+The slot +0x30 methods are `func_000BBD84` (0x44), `func_000BBDC8` (0xB0) and
+`func_000BBE78` (0x260).  Two of them are now transcribed and **they share no
+shape at all** - one is a single call, the other reads two 12-byte records and
+writes back three floats - which is why the three classes look independent even
+though their vtables differ in one slot.
+
+`func_000BBD84` passes `0x8($a0)`, `0x14($a0)`, `0x40($a0)` and `0x44($a0)` to
+`func_00125410`, plus a boolean taken from **bit 16 of the incoming index**
+(`lui $t0, 0x1` / `and $a1, $a1, $t0` is a sign mask that keeps one high bit, not
+a 16-bit truncation).  The object holding state at 0x8 and again at 0x40 and 0x44
+means **0x34 bytes of other fields sit between them**.
+
+`func_000BBDC8` reloads `lw $a0, 0x8($s0)` three times while copying results out -
+`lwc1` / `lw` / `swc1` three times over.  Nothing in that sequence clobbers `$a0`,
+so **the reloads are redundant in any ordinary reading** and are recorded as
+such rather than explained away.
 
 ## Pipeline
 
