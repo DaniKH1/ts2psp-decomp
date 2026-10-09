@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 634 (see below) |
-| **C functions that byte-match** | **634** (linked from `src/`) |
+| functions written in C | 639 (see below) |
+| **C functions that byte-match** | **639** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 634 of the 634 files here are verified to compile to the original bytes; the
+> 639 of the 639 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -4529,6 +4529,70 @@ paragraph was wrong about the size, the uniqueness and the padding, and
 and only the prose was wrong.**  A tool cannot catch that, so the rule
 is the one already in this report: read the recorded size from the
 splat, not off a table of neighbours.
+
+#### Slot +0x034 is a record copy, and the destination is far larger than the getter suggests
+
+Slot +0x034 is the last of the seven varying slots.  Five of its eleven
+members are byte-exact so far; the remaining four run from 212 to 384
+bytes and are the two `updateNodeGraph` pairs.
+
+**The slot's common shape is a hand-unrolled record copy**, four words
+per field:
+
+    lw    $a0, 0x8($s0)      the source
+    lw    $a1, 0x24($s0)     the destination
+    lwc1  $f12, <src>($a0)
+    swc1  $f12, <dst>($a1)
+
+so **a member's length is `9 + 4 * (number of fields)`**: 13 words for
+one, 17 for two, 21 for three.  `func_000BD898` copies one float,
+`func_000BD9FC` two, `func_000BDB70` three, and **`func_000BD9FC` is
+identical to `func_000BD724` word for word** - the third member of the
+slot duplicates the first.
+
+**`func_000BDB70` reads its source fields out of order**: the loads are
+`0x1C`, `0x14`, `0x18` while the stores are `0xB0`, `0xB4`, `0xB8` in
+sequence.  So this one was written by hand in a different order than the
+two-field members and the compiler preserved it - **and it is why the
+slot cannot be called a copy loop.**
+
+**`func_000BDCF4` and `func_000BDF18` differ in six immediates and all
+six move the same way: every destination offset is 4 higher in the
+second.**  Same three 12-byte blocks at `0x18`/`0x24`/`0x30` going to
+`0xF8`/`0x104`/`0x110`, same two-word copy, same float, same
+instruction for instruction everywhere else.  **The two classes store an
+identical record layout one word apart in the destination** - whether
+that is a differing header or two consecutive array elements is not
+decidable from the offsets.
+
+**Both contain a clamp, and the `l` in `bc1tl` is the whole of it.**
+`$f12` is loaded with `mtc1 $zero`, so it is 0.0f; `c.le.s $f13, $f12`
+asks whether the loaded value is at most zero; and `bc1tl` is the
+*nullifying* branch, so:
+
+    f13 <= 0.0  ->  branch taken,  delay slot nullified, $f13 unchanged
+    f13 >  0.0  ->  branch clear,  delay slot runs,     $f13 = 0.0
+
+**So the stored value is `min(x, 0.0f)` - a clamp from above.**  Written
+as plain `bc1t` the same source would clamp from below, and the nullify
+bit is the only difference between the two.
+
+**The size of the object at `0x24($s0)` keeps growing, and this is now
+measurable three ways from this one slot:**
+
+| member | highest offset written | object is at least |
+| --- | --- | --- |
+| `func_000BDB70` | 0xB8 | 0xBC bytes |
+| `func_000BDCF4` | 0x128 | 0x12C bytes |
+| `func_000BDF18` | 0x12C | 0x130 bytes |
+
+**0x130 bytes is 0x10C past the 0x24 offset of the getter that returns
+it.**  The earlier note that `func_000BD724` implies 0xB8 was right but
+was the smallest of these; the same field is now pinned at more than
+three times that by its other users.  **A 0x24 accessor in this class
+family describes nothing whatsoever about the size of what it hands
+out** - and this is the fourth independent function in the cluster to
+disagree with that getter about the size.
 
 **There is a second vtable family, and it has the same shape.**  The three
 `sym_001EA3E8` / `sym_001EA4B8` / `sym_001EA588` records found earlier are
