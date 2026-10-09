@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 604 (see below) |
-| **C functions that byte-match** | **604** (linked from `src/`) |
+| functions written in C | 607 (see below) |
+| **C functions that byte-match** | **607** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 604 of the 604 files here are verified to compile to the original bytes; the
+> 607 of the 607 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -4172,6 +4172,71 @@ idiom here.  **A rewrite of it to match the surrounding files' style would have
 made it worse**, so it was reverted rather than kept.  `func_001A9ABC` and
 `func_00112148` are the same boolean-cast shape, and `func_001A9ABC`'s file is
 the most explicit about why the cast exists at all.
+
+#### The thirteen 0x24 getters are not a class - it is one type instantiated eleven times
+
+The claim above that the 0x24 run is "one class's accessor block" is **wrong,
+and this pass is what showed it.**  Listing what sits *between* consecutive
+getters gives the real structure:
+
+    func_000BD5F4  (8)   then 56, 160, 80, 68   before the next getter
+    func_000BD768  (8)   then 56, 160, 80, 52
+    func_000BD8CC  (8)   then 56, 160, 80, 68
+    ...
+    func_000C1490  (8)   then  8              (adjacent)
+    func_000C1498  (8)
+
+**The 8-byte getter is not a block member at all - it is the first slot of a
+five-function group, and there are eleven of those groups.**  The spacing is the
+gap between groups, not the length of a block.  `func_000BEBDC` and
+`func_000BED6C` are not accessors of a different offset in the middle of a
+class's block; **they are the first slots of groups seven and eight.**
+
+What the groups share is a shape, not an object:
+
+    group 1   8, 56, 160, 80, 68
+    group 2   8, 56, 160, 80, 52
+    group 3   8, 56, 160, 80, 68
+    group 4   8, 56, 160, 80, 84
+    group 5   8, 56, 160, 80, 240
+    group 6   8, 56, 160, 84, 240
+    group 7   8, 60, 160, 80, 108, 240
+    group 8   8, 60, 160, 80, 108, 240
+
+And the members are near-identical, differing in the global they name:
+
+    func_000BD5FC  vs func_000BD8D4   14 words each, ONE word differs
+    func_000BD724  vs func_000BD9FC   17 words each, IDENTICAL
+
+The one word that differs in the 56-byte member is the `addiu` immediate -
+`0xAA78` against `0xAC28` - resolving `sym_001EAA78` against `sym_001EAC28`.
+The 160-byte member differs in two words: its own global, and one `jal`
+target.  **Its other three `lui`s are the same in every group -
+`sym_001E9E30`, `sym_001E9478`, `sym_001E9300`.**
+
+**So this is one chunk type instantiated eleven times**, each instance owning a
+global for its own data (`sym_001EAA78`, `sym_001EAC28`, `sym_001EAB50`,
+`sym_001EAD00`, `sym_001EADD8`, `sym_001EAEB0`, `sym_001EAF88`,
+`sym_001EB060`, `sym_001EB138`, ...) and sharing three common ones.  The
+repeated `jal`s are the three tag registrations, and the varying tail is the
+per-instance work.  **The same reading as the four 180.0f reciprocal caches:
+pasted per class, not shared** - and here the paste is eleven deep.
+
+Three members of group one are now transcribed.  `func_000BD5FC` calls
+func_000A7A8C and stores `sym_001EAA78` at 0x18 of the object while clearing
+0x24 - **which is why the getter at the head of the group reads 0x24, and
+the group's own initialiser is what makes that field meaningful.**
+
+`func_000BD724` copies two floats from 0x14 and 0x18 of the object at `0x8($s0)`
+to 0xB0 and 0xB4 of the object at `0x24($s0)`.  **The destination object is at
+least 0xB8 bytes, which is 0x94 more than the getter's 0x24 offset suggests** -
+a concrete instance of a getter saying nothing about the size of what it hands
+out.  It also reloads `$s0` in the epilogue even though `$s0` has been dead
+since the last `swc1`; omitting that makes the function four bytes short, which
+is **a different kind of necessity** from the redundant data reloads beside it,
+and both are in the file.
+
+## Pipeline
 
 #### `addiu $v0, $a0, 0x8` is the other half of the thunk idiom
 
