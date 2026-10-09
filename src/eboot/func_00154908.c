@@ -6,32 +6,29 @@
  *
  * A virtual method whose default does nothing and returns nothing.
  *
- * **This is the most widely shared function in the module's object
- * model.**  It appears in **52 of the 289 vtables** found in `.data`,
- * and three of its neighbours - `func_00154910`, `func_00154920` and
- * `func_00154928` - are the same two instructions and appear in 53, 47
- * and 47 tables.  **Four byte-identical void defaults, together in four
- * hundred vtable slots.**
+ * **It recurs at fixed depths across the module's object model.**  The
+ * vtable entries here are eight bytes - a 32-bit adjustment word and a
+ * function pointer - and this function sits at entry indices **1 and 6**
+ * in whichever tables use it.  Those two positions repeat in tables that
+ * have nothing else in common, **which is what a shared base class looks
+ * like even though no scan can count the tables themselves**: they are
+ * laid out back to back and nothing marks where one ends.
  *
- * That they are separate functions rather than one shared function is
- * the interesting part.  A single `f(){}` in the base class would have
- * one address in every table; **four separate addresses means four
- * distinct inlined copies**, which is what happens when the compiler
- * emits each class's override of an empty method rather than pointing at
- * a shared definition.
+ * **There is more than one copy of it.**  `func_00154908`,
+ * `func_00154910`, `func_00154920` and `func_00154928` are all
+ * `jr $ra` / `nop` at four different addresses, and `func_00154930` -
+ * `return 0` - sits among them.  A single inherited empty method would
+ * have one address in every table; four distinct addresses means **the
+ * compiler emitted a copy at each override site and the linker merged
+ * none of them.**
  *
- * The cluster around them is the shared base of the whole hierarchy:
- *
- *   func_00154908  8 bytes  void         52 tables
- *   func_00154910  8 bytes  void         53 tables
- *   func_00154920  8 bytes  void         47 tables
- *   func_00154928  8 bytes  void         47 tables
- *   func_00154930  8 bytes  returns 0    47 tables
- *   func_00154938 12 bytes  returns a string  21 tables
- *
- * and **`func_00154938` is the one that names the type system**: it
- * returns the address of `"gameObjectBehavior"`.
+ * The adjustment word of every entry measured in `.data` is zero, so
+ * these tables have the layout of multiple-inheritance thunk arrays and
+ * the behaviour of plain vtables - the same `{adjust, fnptr}` shape that
+ * `func_0019D11C`, `func_000BE138` and `func_000BD3A4` read out of the
+ * +0xD0 thunk arrays, with nothing to adjust.
  */
+
 #include "types.h"
 
 __attribute__((noreturn)) void func_00154908(void) {

@@ -5,20 +5,24 @@
  *       nop
  *
  * A void default, byte-identical to `func_00154908`, `func_00154910`
- * and `func_00154928`, and present in **47 of the 289 vtables**.
+ * and `func_00154928`.
  *
- * It is the third of the four, and its slot positions are what give the
- * group away.  Measured across the tables that use it, these defaults
- * land at slots 10 through 40 in **every one** - `func_00154908` at
- * slots 12, 14, 18, 24; `func_00154910` at 10, 12, 16, 22;
- * `func_00154920` at 16, 18, 22, 28; `func_00154928` at 18, 20, 24, 30.
- * **The same four addresses recur at overlapping slot ranges in
- * unrelated tables, which is the signature of one base class with four
- * empty methods in a row rather than four unrelated coincidences.**
+ * **It appears in far fewer tables than its neighbours** - five runs,
+ * against thirty-two for `func_00154908` and twenty-nine for
+ * `func_00154928` - and that difference is the useful part.  The four
+ * are four distinct overrides of four distinct base methods, not four
+ * spellings of one: **the two that most classes inherit unchanged are
+ * the two the compiler emitted copies of at nearly every site, and this
+ * one is a method most derived classes replaced.**
  *
- * The nearest non-default in the group is `func_00154930`, also eight
- * bytes, which returns 0 and shares the same 47-table membership.
+ * Its entry indices run 2 and 45 where it appears, so it is not confined
+ * to the base class's own slots either.
+ *
+ * `func_00154930`, sixteen bytes further on, is `return 0` and is
+ * equally rare; `func_00154938`, twelve bytes past that, returns the
+ * class name `"gameObjectBehavior"`.
  */
+
 #include "types.h"
 
 __attribute__((noreturn)) void func_00154920(void) {

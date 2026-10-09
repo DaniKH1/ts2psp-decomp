@@ -5,20 +5,21 @@
  *       nop
  *
  * A void default, byte-identical to `func_00154908`, `func_00154910`
- * and `func_00154920`, and present in **47 of the 289 vtables**.
+ * and `func_00154920`, and the second most widely shared of the four -
+ * **it recurs at entry indices 2 and 7 across the module's tables**,
+ * where `func_00154908` takes indices 1 and 6.
  *
- * **All four are the same two instructions at four different
- * addresses.**  That is not how a single inherited method looks - one
- * shared empty definition would have one address in every table.  Four
- * addresses means the compiler emitted a copy at each override site,
- * so the "empty method" exists four times in the binary and the linker
- * deduplicated none of them.
+ * **Those two indices, one apart, repeating in tables with nothing else
+ * in common, is the signature of one base class declaring two consecutive
+ * empty methods.**  Nothing in the bytes separates one table from the
+ * next - they are laid out back to back - so the count of tables cannot
+ * be measured, but the fixed positions can, and they do not vary.
  *
- * Between this and `func_00154930` (returns 0, also in 47 tables) sits
- * the boundary of the shared base: **47 of 289 classes inherit these and
- * change nothing, and the other 242 have at least one method that is
- * not one of this run.**
+ * All four copies are the same two instructions at four different
+ * addresses, so **the compiler emitted a copy at each override site and
+ * the linker merged none of them.**
  */
+
 #include "types.h"
 
 __attribute__((noreturn)) void func_00154928(void) {

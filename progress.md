@@ -4677,105 +4677,98 @@ one reading would be a guess dressed as a finding.  What *is* decidable
 is that the 0x24 accessor in this family carries no size information at
 all, and now that eleven separate functions have demonstrated it.
 
-#### 289 vtables, a shared base of empty methods, and the type-name registry
+#### The vtables are eight-byte thunk entries, and a table is not a run
 
-With the eleven closed, the next question was how big the rest of the
-object model is.  Scanning `.rodata` and `.data` for runs of pointers
-that are **genuine function starts** - not merely values inside
-`.text` - gives **289 candidate vtables**: 287 in `.data`, 2 in
-`.rodata`, from 5 to 377 slots, median 13.  **1,301 distinct functions
-appear in them.**
+The eleven are closed, so the next question was how big the rest of the
+object model is.  Answering that took four attempts, **and the first
+three produced numbers that were wrong.**  What survives is in
+`tools/vtables.py`, with the reasoning in its docstring.
 
-**A shared base of 47 to 53 classes, and it is almost entirely empty.**
-Four functions - `func_00154908`, `func_00154910`, `func_00154920` and
-`func_00154928` - are all `jr $ra` / `nop`, and appear in 52, 53, 47 and
-47 vtables.  `func_00154930` is `return 0` and shares the same 47.
+**The entries are eight bytes, not four.**  Each one is
 
-**They are four separate addresses, not one.**  A single empty base
-method would appear at one address in every table that inherited it.
-Four distinct addresses, four hundred slots between them, means **the
-compiler emitted a copy at each override site and the linker merged
-none of them.**  The four also recur at overlapping slot ranges -
-`func_00154908` at slots 12, 14, 18, 24; `func_00154910` at 10, 12, 16,
-22; `func_00154920` at 16, 18, 22, 28; `func_00154928` at 18, 20, 24, 30
-- **the same addresses at the same depths in unrelated tables, which is
-one base class with four empty methods in a row.**
+    +0x00  i32  adjustment
+    +0x04  i32  function pointer
 
-The void variants are the more widely shared of the two shapes (52, 53,
-47, 47 against 47 for the boolean), **and that ordering is forced**: a
-subclass that replaces a `false`-returning method with a void body is
-legal, and the reverse is not.
+and the eleven records are `8 + 26 * 8 = 216` exactly - an eight-byte
+zero header followed by 26 entries.  **Scanning for four-byte pointers
+sees 26 live words among 54 and rejects the table**, which is why that
+version found almost nothing once the zero adjustment words stopped
+counting as pointers.
 
-#### `func_00154938` returns a class name, and the strings after it are the registry
+**The adjustment word is the multiple-inheritance thunk, and it is zero
+everywhere.**  This is the same `{i16 adjust; void (*fn)()}` structure
+`func_0019D11C`, `func_000BE138` and `func_000BD3A4` read out of the
++0xD0 thunk arrays - **except that in every table measured here the
+adjustment is 0.**  So these tables have the layout of thunk arrays and
+the behaviour of plain vtables, which is why every offset in the eleven
+was a multiple of 8.
 
-The twelfth byte past `func_00154930` is the interesting one:
+**The honest numbers.**  Scanning `.rodata` and `.data` for runs of
+conforming eight-byte entries gives **82 runs** in `.data`, none in
+`.rodata`, 5 to 820 entries, median 16, with **435 distinct functions**
+used as entries.  **Every adjustment in all of them is zero** -
+`tables with any non-zero adjustment: 0`.
 
-    lui   $v0, %hi(str_gameObjectBehavior)
-    jr    $ra
-      addiu $v0, $v0, %lo(str_gameObjectBehavior)
+**And a run is not a table, which is the correction that matters.**  The
+largest run is **820 entries covering 0x1EA3E8 to 0x1EBD88**, and it
+contains **both** families already known by hand: it starts at
+`sym_001EA3E8` and reaches past `sym_001EAA78`, 0x690 bytes further on.
+**Nothing in the bytes marks where one table ends and the next begins**,
+so a scan cannot count classes - it counts runs, and 26 of the 82 are
+longer than 32 entries and are each almost certainly several tables.
+**Any membership count is therefore a lower bound**, and for a method
+shared by two adjacent tables it undercounts by one.
 
-**A virtual method returning a class name, at the end of the base class
-that fifty classes inherit unchanged - that is how the game's
-serialisation or reflection system finds out what an object is.**
+#### The shared base, with counts that survive the correction
 
-And the `.rodata` region at `0x1C1D60` is that system's registry:
-**115 consecutive name-like strings and not one engine term among
-them.**
+The four `jr $ra` / `nop` stubs and the `return 0` are real, and their
+*membership counts are much smaller than I reported last pass**:
 
-    complex  character  player  mplayer  fplayer
-    oscardelfuego  anniehowell  hoothowell  virginyafeng
-    virginyafeng_vamp  nightbeast  circebeaker  lokibeaker
-    pt9  lazlocurious  dennisphilips  emilyemory  bulldratch
-    bedsinglemoderate  magicmirror  carmagazine  plumbobcar
-    moneytree  cowthulustage  cow  loading  g_hud  ring  date
+| function | size | shape | runs containing it |
+| --- | --- | --- | --- |
+| `func_00154908` | 8 | void | 32 |
+| `func_00154928` | 8 | void | 29 |
+| `func_00154920` | 8 | void | 5 |
+| `func_00154910` | 8 | void | 1 |
+| `func_00154930` | 8 | returns 0 | 1 |
 
-Five abstract names - `complex`, `character`, `player`, and `mplayer` /
-`fplayer`, the male and female player classes - then a run of **Sims and
-NPCs**, then a run of **props and objects**.  **Searching the block for
-`texture`, `mesh`, `skin`, `bone`, `anim`, `sound`, `font`, `shader`,
-`camera`, `light`, `node`, `graph`, `geom` or `vert` returns nothing**,
-so the registry names game content types exclusively: **the rendering
-and geometry types are named somewhere else, or not by string at
-all.**
+The claim last pass that four *separate* empty-method copies exist
+**survives** - it is visible in the raw pointers and does not depend on
+the scan - but the "52, 53, 47 and 47 vtables" figures did not, and the
+"289 vtables" and "1,301 functions" figures were never right at all.
+**`func_00154908` appears at slots 1 and 6 across the whole module**,
+which is the more useful statement: the same two addresses recur at
+fixed depths in unrelated tables, and that is what a shared base looks
+like even when the tables themselves cannot be counted.
 
-**`str_gameObjectBehavior` exists twice** - at `0x1BF9FC`, which is what
-`func_00154938` returns, and again as the registry's first entry at
-`0x1C1D60`.  Two copies of one string in `.rodata` means the linker did
-not merge them, so **the getter's result and the registry's first entry
-are different pointers to equal text, and a pointer comparison between
-them would fail.**  Which of the two is authoritative is not decidable
-here, but the duplication itself is.
+#### Three wrong measurements, and the check that catches each
 
-#### Two tooling mistakes of my own, both caught by a sanity check
+**I counted per slot instead of per table.**  A vtable listing the same
+function twice was counted twice; the output claimed one function was in
+**56 tables** when the scan had found **39**, which is impossible.  The
+check is the obvious one - *the maximum count over all functions cannot
+exceed the number of tables found* - and it is now an assertion in the
+script rather than a habit.
 
-Getting these numbers took three attempts and two of them were wrong in
-ways that produced plausible output.
+**I guessed where `.text` ended.**  `0 < w < 0x1B0128` accepts `0x1`,
+`0x2` and `0x5` as code addresses, so integers appeared in a dozen tables
+each and only 235 of 1,710 entries resolved to a real `func_` symbol.
+The right test is not an address range at all; it is **membership in the
+set of known function starts**, which the symbol map supplies.
 
-**First: I counted tables per *slot*, not per table.**  A vtable that
-lists the same function twice - and several do, since a base class can
-be inherited twice - was counted twice.  The output said one function
-appeared in **56 tables** when the scan had found only **39**, which is
-impossible.  The fix is to accumulate addresses into a `set`, and the
-correctness check is the obvious one: **the maximum count over all
-functions cannot exceed the number of tables found.**  That single
-assertion would have caught it immediately, and it is now part of the
-script.
+**Then I mis-divided an array.**  Entries are eight bytes, but the scan
+indexed `words` - which is one word per four bytes - and counted
+`len(words) // 8` entries instead of `len(words) // 2`, so the scan
+walked a third of the data and never reached the eleven.  That one
+produced **zero tables**, which is at least a number that cannot be
+mistaken for a real measurement.
 
-**Second: I guessed where `.text` ended and guessed it wrong.**  Using
-`0 < w < 0x1B0128` accepted small integers as code addresses, so `0x1`,
-`0x2`, `0x5` appeared as "functions" in a dozen tables each, and only
-**235 of 1,710** entries resolved to a real `func_` symbol.  The section
-headers give the real bounds - `.text` 0x0 to 0x1B0128, `.rodata`
-0x1BF880 to 0x1D1ABC, `.data` 0x1D1B00 to 0x1EDF88 - but even those are
-not enough: **the right test is not an address range at all, it is
-membership in the set of known function starts**, which the symbol map
-gives directly.  With that filter every entry is a function and the
-numbers become sane: 289 tables, 1,301 functions, 47 the widest
-membership.
-
-**The general lesson is that both errors were caught by checking whether
-the output was self-consistent, not by looking at it.**  Neither
-produced an obviously wrong number in isolation.
+**The general lesson is the same as the two before: none of these was
+caught by looking at the output, and all three were caught by asking
+whether the output could possibly be true.**  The self-consistent check
+- the maximum membership cannot exceed the run count - is the only one of
+the four that would have caught the first, and it is the one now written
+into the tool.
 
 **There is a second vtable family, and it has the same shape.**  The three
 `sym_001EA3E8` / `sym_001EA4B8` / `sym_001EA588` records found earlier are
