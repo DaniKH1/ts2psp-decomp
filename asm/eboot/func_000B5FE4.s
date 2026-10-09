@@ -32,7 +32,7 @@ glabel func_000B5FE4
     /* B60A4 000B6030 C73E040C */  jal        func_0010FB1C
     /* B60A8 000B6034 01000534 */   ori       $a1, $zero, 0x1
     /* B60AC 000B6038 06004010 */  beqz       $v0, .Leboot_000B6054
-    /* B60B0 000B603C 0700043C */   lui       $a0, %hi(sym_00073318)
+    /* B60B0 000B603C 0700043C */   lui       $a0, 0x0007
     /* B60B4 000B6040 25200002 */  or         $a0, $s0, $zero
     /* B60B8 000B6044 2F3F040C */  jal        func_0010FCBC
     /* B60BC 000B6048 01000534 */   ori       $a1, $zero, 0x1

@@ -44,6 +44,7 @@ glabel func_0007FF74
     /* 80060 0007FFEC 25284000 */   or        $a1, $v0, $zero
     /* 80064 0007FFF0 65000010 */  b          .Leboot_00080188
     /* 80068 0007FFF4 00000000 */   nop
+  .globl .Leboot_0007FFF8
   .Leboot_0007FFF8:
     /* 8006C 0007FFF8 1D00043C */  lui        $a0, %hi(str_visible)
   alabel D_eboot_0007FFFC

@@ -62,7 +62,7 @@ glabel func_0010AD8C
     /* 10AEC0 0010AE4C 25300000 */   or        $a2, $zero, $zero
     /* 10AEC4 0010AE50 00002482 */  lb         $a0, 0x0($s1)
     /* 10AEC8 0010AE54 30008014 */  bnez       $a0, .Leboot_0010AF18
-    /* 10AECC 0010AE58 1D00053C */   lui       $a1, %hi(sym_001D1B00)
+    /* 10AECC 0010AE58 1D00053C */   lui       $a1, 0x001D
     /* 10AED0 0010AE5C 87000010 */  b          .Leboot_0010B07C
     /* 10AED4 0010AE60 00000000 */   nop
   .Leboot_0010AE64:

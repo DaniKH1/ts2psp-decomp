@@ -15,8 +15,10 @@ glabel func_000EC9F4
     /* ECA6C 000EC9F8 2C00B0AF */  sw         $s0, 0x2C($sp)
     /* ECA70 000EC9FC 3800B3AF */  sw         $s3, 0x38($sp)
     /* ECA74 000ECA00 25808000 */  or         $s0, $a0, $zero
+  .globl sym_000ECA04
   sym_000ECA04:
     /* ECA78 000ECA04 2598A000 */  or         $s3, $a1, $zero
+  .globl sym_000ECA08
   sym_000ECA08:
     /* ECA7C 000ECA08 2000B4E7 */  swc1       $f20, 0x20($sp)
     /* ECA80 000ECA0C 2400B6E7 */  swc1       $f22, 0x24($sp)
@@ -26,6 +28,7 @@ glabel func_000EC9F4
     /* ECA90 000ECA1C 3C00B4AF */  sw         $s4, 0x3C($sp)
     /* ECA94 000ECA20 4000B5AF */  sw         $s5, 0x40($sp)
     /* ECA98 000ECA24 4400B6AF */  sw         $s6, 0x44($sp)
+  .globl sym_000ECA28
   sym_000ECA28:
     /* ECA9C 000ECA28 4800B7AF */  sw         $s7, 0x48($sp)
     /* ECAA0 000ECA2C 4C00BEAF */  sw         $fp, 0x4C($sp)
@@ -35,6 +38,7 @@ glabel func_000EC9F4
     /* ECAB0 000ECA3C 2800328E */   lw        $s2, 0x28($s1)
     /* ECAB4 000ECA40 CBEB030C */  jal        func_000FAF2C
     /* ECAB8 000ECA44 25206002 */   or        $a0, $s3, $zero
+  .globl sym_000ECA48
   sym_000ECA48:
     /* ECABC 000ECA48 240002AE */  sw         $v0, 0x24($s0)
     /* ECAC0 000ECA4C 0800048E */  lw         $a0, 0x8($s0)
@@ -53,6 +57,7 @@ glabel func_000EC9F4
     /* ECAF0 000ECA7C 00A08044 */  mtc1       $zero, $f20
     /* ECAF4 000ECA80 00B08444 */  mtc1       $a0, $f22
     /* ECAF8 000ECA84 1000B627 */  addiu      $s6, $sp, 0x10
+  .globl sym_000ECA88
   sym_000ECA88:
     /* ECAFC 000ECA88 4041043C */  lui        $a0, (0x41400000 >> 16)
     /* ECB00 000ECA8C 2C003726 */  addiu      $s7, $s1, 0x2C
@@ -63,6 +68,7 @@ glabel func_000EC9F4
     /* ECB10 000ECA9C 70EB030C */  jal        func_000FADC0
     /* ECB14 000ECAA0 2400148E */   lw        $s4, 0x24($s0)
     /* ECB18 000ECAA4 ACEB030C */  jal        func_000FAEB0
+  .globl sym_000ECAA8
   sym_000ECAA8:
     /* ECB1C 000ECAA8 25208002 */   or        $a0, $s4, $zero
     /* ECB20 000ECAAC 0800A426 */  addiu      $a0, $s5, 0x8
@@ -72,6 +78,7 @@ glabel func_000EC9F4
     /* ECB30 000ECABC 0000ACC4 */  lwc1       $f12, 0x0($a1)
     /* ECB34 000ECAC0 25A04000 */  or         $s4, $v0, $zero
     /* ECB38 000ECAC4 00000434 */  ori        $a0, $zero, 0x0
+  .globl sym_000ECAC8
   sym_000ECAC8:
     /* ECB3C 000ECAC8 32601446 */  c.eq.s     $f12, $f20
     /* ECB40 000ECACC 00000000 */  nop
@@ -82,6 +89,7 @@ glabel func_000EC9F4
     /* ECB50 000ECADC 0C0084A2 */  sb         $a0, 0xC($s4)
     /* ECB54 000ECAE0 0A00A426 */  addiu      $a0, $s5, 0xA
     /* ECB58 000ECAE4 0800058E */  lw         $a1, 0x8($s0)
+  .globl sym_000ECAE8
   sym_000ECAE8:
     /* ECB5C 000ECAE8 80200400 */  sll        $a0, $a0, 2
     /* ECB60 000ECAEC 2120A400 */  addu       $a0, $a1, $a0
@@ -91,6 +99,7 @@ glabel func_000EC9F4
     /* ECB70 000ECAFC 0B00A426 */  addiu      $a0, $s5, 0xB
     /* ECB74 000ECB00 0800058E */  lw         $a1, 0x8($s0)
     /* ECB78 000ECB04 80200400 */  sll        $a0, $a0, 2
+  .globl sym_000ECB08
   sym_000ECB08:
     /* ECB7C 000ECB08 2120A400 */  addu       $a0, $a1, $a0
     /* ECB80 000ECB0C 00008CC4 */  lwc1       $f12, 0x0($a0)
@@ -100,6 +109,7 @@ glabel func_000EC9F4
     /* ECB90 000ECB1C 0800058E */  lw         $a1, 0x8($s0)
     /* ECB94 000ECB20 80200400 */  sll        $a0, $a0, 2
     /* ECB98 000ECB24 2120A400 */  addu       $a0, $a1, $a0
+  .globl sym_000ECB28
   sym_000ECB28:
     /* ECB9C 000ECB28 00008CC4 */  lwc1       $f12, 0x0($a0)
     /* ECBA0 000ECB2C 03631646 */  div.s      $f12, $f12, $f22
@@ -109,6 +119,7 @@ glabel func_000EC9F4
     /* ECBB0 000ECB3C 0800058E */  lw         $a1, 0x8($s0)
     /* ECBB4 000ECB40 80200400 */  sll        $a0, $a0, 2
     /* ECBB8 000ECB44 0E00A626 */  addiu      $a2, $s5, 0xE
+  .globl sym_000ECB48
   sym_000ECB48:
     /* ECBBC 000ECB48 2120A400 */  addu       $a0, $a1, $a0
     /* ECBC0 000ECB4C 80300600 */  sll        $a2, $a2, 2
@@ -118,6 +129,7 @@ glabel func_000EC9F4
     /* ECBD0 000ECB5C 80200400 */  sll        $a0, $a0, 2
     /* ECBD4 000ECB60 0000CDC4 */  lwc1       $f13, 0x0($a2)
     /* ECBD8 000ECB64 0F00A626 */  addiu      $a2, $s5, 0xF
+  .globl sym_000ECB68
   sym_000ECB68:
     /* ECBDC 000ECB68 2120A400 */  addu       $a0, $a1, $a0
     /* ECBE0 000ECB6C 80300600 */  sll        $a2, $a2, 2
@@ -127,6 +139,7 @@ glabel func_000EC9F4
     /* ECBF0 000ECB7C 1000ACE7 */  swc1       $f12, 0x10($sp)
     /* ECBF4 000ECB80 1400ADE7 */  swc1       $f13, 0x14($sp)
     /* ECBF8 000ECB84 1800AEE7 */  swc1       $f14, 0x18($sp)
+  .globl sym_000ECB88
   sym_000ECB88:
     /* ECBFC 000ECB88 1C00AFE7 */  swc1       $f15, 0x1C($sp)
     /* ECC00 000ECB8C 25208002 */  or         $a0, $s4, $zero
@@ -136,6 +149,7 @@ glabel func_000EC9F4
     /* ECC10 000ECB9C 0800058E */  lw         $a1, 0x8($s0)
     /* ECC14 000ECBA0 80200400 */  sll        $a0, $a0, 2
     /* ECC18 000ECBA4 2128A400 */  addu       $a1, $a1, $a0
+  .globl sym_000ECBA8
   sym_000ECBA8:
     /* ECC1C 000ECBA8 0000ACC4 */  lwc1       $f12, 0x0($a1)
     /* ECC20 000ECBAC 00000434 */  ori        $a0, $zero, 0x0
@@ -146,6 +160,7 @@ glabel func_000EC9F4
   .Leboot_000ECBC0:
     /* ECC34 000ECBC0 FF008430 */  andi       $a0, $a0, 0xFF
     /* ECC38 000ECBC4 2C0084A2 */  sb         $a0, 0x2C($s4)
+  .globl sym_000ECBC8
   sym_000ECBC8:
     /* ECC3C 000ECBC8 1800A426 */  addiu      $a0, $s5, 0x18
     /* ECC40 000ECBCC 0800058E */  lw         $a1, 0x8($s0)
@@ -155,6 +170,7 @@ glabel func_000EC9F4
     /* ECC50 000ECBDC 00000434 */  ori        $a0, $zero, 0x0
     /* ECC54 000ECBE0 32601446 */  c.eq.s     $f12, $f20
     /* ECC58 000ECBE4 00000000 */  nop
+  .globl sym_000ECBE8
   sym_000ECBE8:
     /* ECC5C 000ECBE8 01000245 */  bc1fl      .Leboot_000ECBF0 /* handwritten instruction */
     /* ECC60 000ECBEC 01000434 */   ori       $a0, $zero, 0x1
@@ -165,6 +181,7 @@ glabel func_000EC9F4
     /* ECC70 000ECBFC 0800058E */  lw         $a1, 0x8($s0)
     /* ECC74 000ECC00 80200400 */  sll        $a0, $a0, 2
     /* ECC78 000ECC04 2120A400 */  addu       $a0, $a1, $a0
+  .globl sym_000ECC08
   sym_000ECC08:
     /* ECC7C 000ECC08 00008CC4 */  lwc1       $f12, 0x0($a0)
     /* ECC80 000ECC0C 03631846 */  div.s      $f12, $f12, $f24
@@ -174,6 +191,7 @@ glabel func_000EC9F4
     /* ECC90 000ECC1C 0800058E */  lw         $a1, 0x8($s0)
     /* ECC94 000ECC20 80200400 */  sll        $a0, $a0, 2
     /* ECC98 000ECC24 2120A400 */  addu       $a0, $a1, $a0
+  .globl sym_000ECC28
   sym_000ECC28:
     /* ECC9C 000ECC28 00008CC4 */  lwc1       $f12, 0x0($a0)
     /* ECCA0 000ECC2C 03631846 */  div.s      $f12, $f12, $f24
@@ -183,6 +201,7 @@ glabel func_000EC9F4
     /* ECCB0 000ECC3C 0800058E */  lw         $a1, 0x8($s0)
     /* ECCB4 000ECC40 80200400 */  sll        $a0, $a0, 2
     /* ECCB8 000ECC44 2128A400 */  addu       $a1, $a1, $a0
+  .globl sym_000ECC48
   sym_000ECC48:
     /* ECCBC 000ECC48 0000ACC4 */  lwc1       $f12, 0x0($a1)
     /* ECCC0 000ECC4C 00000434 */  ori        $a0, $zero, 0x0
@@ -193,6 +212,7 @@ glabel func_000EC9F4
   .Leboot_000ECC60:
     /* ECCD4 000ECC60 FF008430 */  andi       $a0, $a0, 0xFF
     /* ECCD8 000ECC64 380084A2 */  sb         $a0, 0x38($s4)
+  .globl sym_000ECC68
   sym_000ECC68:
     /* ECCDC 000ECC68 38008592 */  lbu        $a1, 0x38($s4)
     /* ECCE0 000ECC6C 2000A010 */  beqz       $a1, .Leboot_000ECCF0
@@ -202,6 +222,7 @@ glabel func_000EC9F4
     /* ECCF0 000ECC7C 21208500 */  addu       $a0, $a0, $a1
     /* ECCF4 000ECC80 00008CC4 */  lwc1       $f12, 0x0($a0)
     /* ECCF8 000ECC84 FAE5030C */  jal        func_000F97E8
+  .globl sym_000ECC88
   sym_000ECC88:
     /* ECCFC 000ECC88 25208002 */   or        $a0, $s4, $zero
     /* ECD00 000ECC8C 1400A426 */  addiu      $a0, $s5, 0x14
@@ -211,6 +232,7 @@ glabel func_000EC9F4
     /* ECD10 000ECC9C 00008CC4 */  lwc1       $f12, 0x0($a0)
     /* ECD14 000ECCA0 18E6030C */  jal        func_000F9860
     /* ECD18 000ECCA4 25208002 */   or        $a0, $s4, $zero
+  .globl sym_000ECCA8
   sym_000ECCA8:
     /* ECD1C 000ECCA8 1200A426 */  addiu      $a0, $s5, 0x12
     /* ECD20 000ECCAC 0800058E */  lw         $a1, 0x8($s0)
@@ -220,6 +242,7 @@ glabel func_000EC9F4
     /* ECD30 000ECCBC 36E6030C */  jal        func_000F98D8
     /* ECD34 000ECCC0 25208002 */   or        $a0, $s4, $zero
     /* ECD38 000ECCC4 1300A426 */  addiu      $a0, $s5, 0x13
+  .globl sym_000ECCC8
   sym_000ECCC8:
     /* ECD3C 000ECCC8 0800058E */  lw         $a1, 0x8($s0)
     /* ECD40 000ECCCC 80200400 */  sll        $a0, $a0, 2
@@ -229,6 +252,7 @@ glabel func_000EC9F4
     /* ECD50 000ECCDC 25208002 */   or        $a0, $s4, $zero
     /* ECD54 000ECCE0 2C00248E */  lw         $a0, 0x2C($s1)
     /* ECD58 000ECCE4 2120E402 */  addu       $a0, $s7, $a0
+  .globl sym_000ECCE8
   sym_000ECCE8:
     /* ECD5C 000ECCE8 0A000010 */  b          .Leboot_000ECD14
     /* ECD60 000ECCEC 21209E00 */   addu      $a0, $a0, $fp
@@ -239,6 +263,7 @@ glabel func_000EC9F4
     /* ECD70 000ECCFC 00008CC4 */  lwc1       $f12, 0x0($a0)
     /* ECD74 000ECD00 83E6030C */  jal        func_000F9A0C
     /* ECD78 000ECD04 25208002 */   or        $a0, $s4, $zero
+  .globl sym_000ECD08
   sym_000ECD08:
     /* ECD7C 000ECD08 2C00248E */  lw         $a0, 0x2C($s1)
     /* ECD80 000ECD0C 2120E402 */  addu       $a0, $s7, $a0
@@ -249,6 +274,7 @@ glabel func_000EC9F4
     /* ECD90 000ECD1C 21208600 */  addu       $a0, $a0, $a2
     /* ECD94 000ECD20 69AD050C */  jal        func_0016B5A4
     /* ECD98 000ECD24 25300000 */   or        $a2, $zero, $zero
+  .globl sym_000ECD28
   sym_000ECD28:
     /* ECD9C 000ECD28 25208002 */  or         $a0, $s4, $zero
     /* ECDA0 000ECD2C 85E5030C */  jal        func_000F9614
@@ -259,6 +285,7 @@ glabel func_000EC9F4
     /* ECDB4 000ECD40 0400DE27 */   addiu     $fp, $fp, 0x4
   .Leboot_000ECD44:
     /* ECDB8 000ECD44 2000B4C7 */  lwc1       $f20, 0x20($sp)
+  .globl sym_000ECD48
   sym_000ECD48:
     /* ECDBC 000ECD48 2400B6C7 */  lwc1       $f22, 0x24($sp)
     /* ECDC0 000ECD4C 2800B8C7 */  lwc1       $f24, 0x28($sp)
@@ -268,6 +295,7 @@ glabel func_000EC9F4
     /* ECDD0 000ECD5C 3800B38F */  lw         $s3, 0x38($sp)
     /* ECDD4 000ECD60 3C00B48F */  lw         $s4, 0x3C($sp)
     /* ECDD8 000ECD64 4000B58F */  lw         $s5, 0x40($sp)
+  .globl sym_000ECD68
   sym_000ECD68:
     /* ECDDC 000ECD68 4400B68F */  lw         $s6, 0x44($sp)
     /* ECDE0 000ECD6C 4800B78F */  lw         $s7, 0x48($sp)

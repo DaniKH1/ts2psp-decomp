@@ -22,6 +22,7 @@ glabel func_00071078
     /* 71110 0007109C 6400B6AF */  sw         $s6, 0x64($sp)
     /* 71114 000710A0 6800B7AF */  sw         $s7, 0x68($sp)
     /* 71118 000710A4 6C00BEAF */  sw         $fp, 0x6C($sp)
+  .globl sym_000710A8
   sym_000710A8:
     /* 7111C 000710A8 7000BFAF */  sw         $ra, 0x70($sp)
     /* 71120 000710AC DECE010C */  jal        func_00073B78
@@ -40,6 +41,7 @@ glabel func_00071078
   .Leboot_000710E0:
     /* 71154 000710E0 EA000010 */  b          .Leboot_0007148C
     /* 71158 000710E4 00000000 */   nop
+  .globl sym_000710E8
   sym_000710E8:
     /* 7115C 000710E8 21288600 */  addu       $a1, $a0, $a2
   .Leboot_000710EC:

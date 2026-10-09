@@ -57,7 +57,7 @@ glabel func_000F2C4C
     /* F2D6C 000F2CF8 00000000 */   nop
   .Leboot_000F2CFC:
     /* F2D70 000F2CFC 2600C012 */  beqz       $s6, .Leboot_000F2D98
-    /* F2D74 000F2D00 1A00073C */   lui       $a3, %hi(func_00199CF8)
+    /* F2D74 000F2D00 1A00073C */   lui       $a3, 0x001A
     /* F2D78 000F2D04 4806148E */  lw         $s4, 0x648($s0)
     /* F2D7C 000F2D08 4C06128E */  lw         $s2, 0x64C($s0)
     /* F2D80 000F2D0C 18009212 */  beq        $s4, $s2, .Leboot_000F2D70
@@ -91,12 +91,12 @@ glabel func_000F2C4C
     /* F2DE0 000F2D6C 00000000 */   nop
   .Leboot_000F2D70:
     /* F2DE4 000F2D70 0900C012 */  beqz       $s6, .Leboot_000F2D98
-    /* F2DE8 000F2D74 1A00073C */   lui       $a3, %hi(func_00199CF8)
+    /* F2DE8 000F2D74 1A00073C */   lui       $a3, 0x001A
     /* F2DEC 000F2D78 4806048E */  lw         $a0, 0x648($s0)
     /* F2DF0 000F2D7C 06008010 */  beqz       $a0, .Leboot_000F2D98
-    /* F2DF4 000F2D80 1A00073C */   lui       $a3, %hi(func_00199CF8)
+    /* F2DF4 000F2D80 1A00073C */   lui       $a3, 0x001A
     /* F2DF8 000F2D84 04008010 */  beqz       $a0, .Leboot_000F2D98
-    /* F2DFC 000F2D88 1A00073C */   lui       $a3, %hi(func_00199CF8)
+    /* F2DFC 000F2D88 1A00073C */   lui       $a3, 0x001A
     /* F2E00 000F2D8C DDC6040C */  jal        func_00131B74
     /* F2E04 000F2D90 00000000 */   nop
     /* F2E08 000F2D94 1A00073C */  lui        $a3, %hi(func_001A150C)

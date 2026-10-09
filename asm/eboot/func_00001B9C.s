@@ -59,6 +59,7 @@ glabel func_00001B9C
     /* 1CBC 00001C48 E95A010C */  jal        func_00056BA4
     /* 1CC0 00001C4C 1C000434 */   ori       $a0, $zero, 0x1C
     /* 1CC4 00001C50 3B000010 */  b          .Leboot_00001D40
+  .globl sym_00001C54
   sym_00001C54:
     /* 1CC8 00001C54 00000000 */   nop
   .Leboot_00001C58:
@@ -98,11 +99,13 @@ glabel func_00001B9C
     /* 1D4C 00001CD8 00000000 */   nop
     /* 1D50 00001CDC 8C00248E */  lw         $a0, 0x8C($s1)
     /* 1D54 00001CE0 2000B327 */  addiu      $s3, $sp, 0x20
+  .globl sym_00001CE4
   sym_00001CE4:
     /* 1D58 00001CE4 38008524 */  addiu      $a1, $a0, 0x38
     /* 1D5C 00001CE8 0000A484 */  lh         $a0, 0x0($a1)
     /* 1D60 00001CEC 0400A68C */  lw         $a2, 0x4($a1)
     /* 1D64 00001CF0 90001226 */  addiu      $s2, $s0, 0x90
+  .globl sym_00001CF4
   sym_00001CF4:
     /* 1D68 00001CF4 21202402 */  addu       $a0, $s1, $a0
     /* 1D6C 00001CF8 09F8C000 */  jalr       $a2

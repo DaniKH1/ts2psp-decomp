@@ -12,10 +12,13 @@ nonmatching func_0000B064, 0xA74
 
 glabel func_0000B064
     /* B0D8 0000B064 A0FEBD27 */  addiu      $sp, $sp, -0x160
+  .globl sym_0000B068
   sym_0000B068:
     /* B0DC 0000B068 3C01B0AF */  sw         $s0, 0x13C($sp)
+  .globl sym_0000B06C
   sym_0000B06C:
     /* B0E0 0000B06C 25808000 */  or         $s0, $a0, $zero
+  .globl sym_0000B070
   sym_0000B070:
     /* B0E4 0000B070 3401B4E7 */  swc1       $f20, 0x134($sp)
     /* B0E8 0000B074 06650046 */  mov.s      $f20, $f12
@@ -105,7 +108,7 @@ glabel func_0000B064
     /* B230 0000B1BC 3E680E46 */  c.le.s     $f13, $f14
     /* B234 0000B1C0 00000000 */  nop
     /* B238 0000B1C4 0A000045 */  bc1f       .Leboot_0000B1F0 /* handwritten instruction */
-    /* B23C 0000B1C8 1D00043C */   lui       $a0, %hi(sym_001D1B00)
+    /* B23C 0000B1C8 1D00043C */   lui       $a0, 0x001D
     /* B240 0000B1CC 1D00043C */  lui        $a0, %hi(sym_001D1D38)
     /* B244 0000B1D0 381D8DC4 */  lwc1       $f13, %lo(sym_001D1D38)($a0)
     /* B248 0000B1D4 32600D46 */  c.eq.s     $f12, $f13
@@ -412,12 +415,14 @@ glabel func_0000B064
     /* B6D8 0000B664 01000434 */  ori        $a0, $zero, 0x1
     /* B6DC 0000B668 11010010 */  b          .Leboot_0000BAB0
     /* B6E0 0000B66C 2C5824A2 */   sb        $a0, 0x582C($s1)
+  .globl sym_0000B670
   sym_0000B670:
     /* B6E4 0000B670 60002012 */  beqz       $s1, .Leboot_0000B7F4
     /* B6E8 0000B674 00000000 */   nop
     /* B6EC 0000B678 2858248E */  lw         $a0, 0x5828($s1)
     /* B6F0 0000B67C 01000534 */  ori        $a1, $zero, 0x1
     /* B6F4 0000B680 5C008514 */  bne        $a0, $a1, .Leboot_0000B7F4
+  .globl sym_0000B684
   sym_0000B684:
     /* B6F8 0000B684 00000000 */   nop
     /* B6FC 0000B688 20004CC6 */  lwc1       $f12, 0x20($s2)
@@ -438,26 +443,35 @@ glabel func_0000B064
     /* B734 0000B6C0 20004CC6 */  lwc1       $f12, 0x20($s2)
     /* B738 0000B6C4 00688044 */  mtc1       $zero, $f13
     /* B73C 0000B6C8 32600D46 */  c.eq.s     $f12, $f13
+  .globl sym_0000B6CC
   sym_0000B6CC:
     /* B740 0000B6CC 00000000 */  nop
     /* B744 0000B6D0 04000145 */  bc1t       sym_0000B6E4 /* handwritten instruction */
     /* B748 0000B6D4 00000000 */   nop
     /* B74C 0000B6D8 803F043C */  lui        $a0, (0x3F800000 >> 16)
     /* B750 0000B6DC 09000010 */  b          .Leboot_0000B704
+  .globl sym_0000B6E0
   sym_0000B6E0:
     /* B754 0000B6E0 00B08444 */   mtc1      $a0, $f22
+  .globl sym_0000B6E4
   sym_0000B6E4:
     /* B758 0000B6E4 24004CC6 */  lwc1       $f12, 0x24($s2)
+  .globl sym_0000B6E8
   sym_0000B6E8:
     /* B75C 0000B6E8 00688044 */  mtc1       $zero, $f13
+  .globl sym_0000B6EC
   sym_0000B6EC:
     /* B760 0000B6EC 32600D46 */  c.eq.s     $f12, $f13
+  .globl sym_0000B6F0
   sym_0000B6F0:
     /* B764 0000B6F0 00000000 */  nop
+  .globl sym_0000B6F4
   sym_0000B6F4:
     /* B768 0000B6F4 03000145 */  bc1t       .Leboot_0000B704 /* handwritten instruction */
+  .globl sym_0000B6F8
   sym_0000B6F8:
     /* B76C 0000B6F8 00000000 */   nop
+  .globl sym_0000B6FC
   sym_0000B6FC:
     /* B770 0000B6FC 80BF043C */  lui        $a0, (0xBF800000 >> 16)
     /* B774 0000B700 00B08444 */  mtc1       $a0, $f22
@@ -468,6 +482,7 @@ glabel func_0000B064
     /* B784 0000B710 1E000145 */  bc1t       .Leboot_0000B78C /* handwritten instruction */
     /* B788 0000B714 00000000 */   nop
     /* B78C 0000B718 8C00248E */  lw         $a0, 0x8C($s1)
+  .globl sym_0000B71C
   sym_0000B71C:
     /* B790 0000B71C 1801B027 */  addiu      $s0, $sp, 0x118
     /* B794 0000B720 38008424 */  addiu      $a0, $a0, 0x38

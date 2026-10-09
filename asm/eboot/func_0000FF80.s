@@ -45,10 +45,12 @@ glabel func_0000FF80
     /* 1006C 0000FFF8 03000010 */  b          .Leboot_00010008
   sym_0000FFFC:
     /* 10070 0000FFFC 25204002 */   or        $a0, $s2, $zero
+  .globl .Leboot_00010000
   .Leboot_00010000:
     /* 10074 00010000 1000A0A3 */  sb         $zero, 0x10($sp)
   alabel D_00010004
     /* 10078 00010004 25204002 */  or         $a0, $s2, $zero
+  .globl .Leboot_00010008
   .Leboot_00010008:
     /* 1007C 00010008 25282002 */  or         $a1, $s1, $zero
     /* 10080 0001000C 25306002 */  or         $a2, $s3, $zero

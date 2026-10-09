@@ -61,6 +61,7 @@ glabel func_000EC470
     /* EC590 000EC51C 0C00A010 */  beqz       $a1, .Leboot_000EC550
     /* EC594 000EC520 00000000 */   nop
     /* EC598 000EC524 08008CC4 */  lwc1       $f12, 0x8($a0)
+  .globl sym_000EC528
   sym_000EC528:
     /* EC59C 000EC528 32601446 */  c.eq.s     $f12, $f20
   .L000EC52C:

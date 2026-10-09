@@ -28,7 +28,7 @@ glabel func_0012B974
     /* 12BA24 0012B9B0 25204000 */  or         $a0, $v0, $zero
     /* 12BA28 0012B9B4 1400A58F */  lw         $a1, 0x14($sp)
     /* 12BA2C 0012B9B8 05008014 */  bnez       $a0, .Leboot_0012B9D0
-    /* 12BA30 0012B9BC 0600063C */   lui       $a2, %hi(func_0005C45C)
+    /* 12BA30 0012B9BC 0600063C */   lui       $a2, 0x0006
     /* 12BA34 0012B9C0 AB41050C */  jal        func_001506AC
     /* 12BA38 0012B9C4 2520A000 */   or        $a0, $a1, $zero
     /* 12BA3C 0012B9C8 25204000 */  or         $a0, $v0, $zero

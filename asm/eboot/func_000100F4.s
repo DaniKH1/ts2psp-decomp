@@ -26,6 +26,7 @@ glabel func_000100F4
     /* 10194 00010120 B43D000C */  jal        func_0000F6D0
   alabel D_00010124
     /* 10198 00010124 01000934 */   ori       $t1, $zero, 0x1
+  .globl .Leboot_00010128
   .Leboot_00010128:
     /* 1019C 00010128 2000BF8F */  lw         $ra, 0x20($sp)
   alabel D_0001012C

@@ -85,20 +85,20 @@ glabel func_0014F83C
     /* 14F9B4 0014F940 DA3E050C */  jal        func_0014FB68
     /* 14F9B8 0014F944 21202002 */   addu      $a0, $s1, $zero
     /* 14F9BC 0014F948 493E0508 */  j          sym_0014F924
-    /* 14F9C0 0014F94C 0700033C */   lui       $v1, %hi(sym_00073318)
+    /* 14F9C0 0014F94C 0700033C */   lui       $v1, 0x0007
   .Leboot_0014F950:
     /* 14F9C4 0014F950 F4FF4051 */  beql       $t2, $zero, .Leboot_0014F924
-    /* 14F9C8 0014F954 0700033C */   lui       $v1, %hi(sym_00073318)
+    /* 14F9C8 0014F954 0700033C */   lui       $v1, 0x0007
     /* 14F9CC 0014F958 0700023C */  lui        $v0, %hi(sym_00073280)
     /* 14F9D0 0014F95C 8032458C */  lw         $a1, %lo(sym_00073280)($v0)
     /* 14F9D4 0014F960 853F050C */  jal        func_0014FE14
     /* 14F9D8 0014F964 21202002 */   addu      $a0, $s1, $zero
     /* 14F9DC 0014F968 493E0508 */  j          sym_0014F924
-    /* 14F9E0 0014F96C 0700033C */   lui       $v1, %hi(sym_00073318)
+    /* 14F9E0 0014F96C 0700033C */   lui       $v1, 0x0007
   .Leboot_0014F970:
     /* 14F9E4 0014F970 44000B8E */  lw         $t3, 0x44($s0)
     /* 14F9E8 0014F974 EBFF6051 */  beql       $t3, $zero, .Leboot_0014F924
-    /* 14F9EC 0014F978 0700033C */   lui       $v1, %hi(sym_00073318)
+    /* 14F9EC 0014F978 0700033C */   lui       $v1, 0x0007
     /* 14F9F0 0014F97C 07000C3C */  lui        $t4, %hi(sym_00073280)
     /* 14F9F4 0014F980 8032838D */  lw         $v1, %lo(sym_00073280)($t4)
     /* 14F9F8 0014F984 21200000 */  addu       $a0, $zero, $zero
@@ -132,7 +132,7 @@ glabel func_0014F83C
     /* 14FA60 0014F9EC 893E050C */  jal        func_0014FA24
     /* 14FA64 0014F9F0 21387202 */   addu      $a3, $s3, $s2
     /* 14FA68 0014F9F4 493E0508 */  j          sym_0014F924
-    /* 14FA6C 0014F9F8 0700033C */   lui       $v1, %hi(sym_00073318)
+    /* 14FA6C 0014F9F8 0700033C */   lui       $v1, 0x0007
   .Leboot_0014F9FC:
     /* 14FA70 0014F9FC 4400568E */  lw         $s6, 0x44($s2)
     /* 14FA74 0014FA00 8032258F */  lw         $a1, %lo(sym_00073280)($t9)
@@ -143,5 +143,5 @@ glabel func_0014F83C
     /* 14FA88 0014FA14 C2FF4054 */  bnel       $v0, $zero, .Leboot_0014F920
     /* 14FA8C 0014FA18 1C0040AE */   sw        $zero, 0x1C($s2)
     /* 14FA90 0014FA1C 493E0508 */  j          sym_0014F924
-    /* 14FA94 0014FA20 0700033C */   lui       $v1, %hi(sym_00073318)
+    /* 14FA94 0014FA20 0700033C */   lui       $v1, 0x0007
 endlabel func_0014F83C

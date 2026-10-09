@@ -19,6 +19,7 @@ glabel func_000E1C7C
     /* E1D08 000E1C94 1E00073C */  lui        $a3, %hi(sym_001DA24C)
     /* E1D0C 000E1C98 7266043C */  lui        $a0, %hi(D_66727573)
     /* E1D10 000E1C9C 1E00083C */  lui        $t0, %hi(sym_001DA250)
+  .globl sym_000E1CA0
   sym_000E1CA0:
     /* E1D14 000E1CA0 3A000534 */  ori        $a1, $zero, 0x3A
     /* E1D18 000E1CA4 80000634 */  ori        $a2, $zero, 0x80

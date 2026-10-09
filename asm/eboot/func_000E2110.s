@@ -14,18 +14,24 @@ glabel func_000E2110
     /* E2188 000E2114 1400868C */  lw         $a2, 0x14($a0)
     /* E218C 000E2118 4000C624 */  addiu      $a2, $a2, 0x40
     /* E2190 000E211C 0000C784 */  lh         $a3, 0x0($a2)
+  .globl sym_000E2120
   sym_000E2120:
     /* E2194 000E2120 0400C88C */  lw         $t0, 0x4($a2)
     /* E2198 000E2124 21208700 */  addu       $a0, $a0, $a3
     /* E219C 000E2128 1000BFAF */  sw         $ra, 0x10($sp)
+  .globl sym_000E212C
   sym_000E212C:
     /* E21A0 000E212C 09F80001 */  jalr       $t0
+  .globl sym_000E2130
   sym_000E2130:
     /* E21A4 000E2130 25300000 */   or        $a2, $zero, $zero
+  .globl sym_000E2134
   sym_000E2134:
     /* E21A8 000E2134 1000BF8F */  lw         $ra, 0x10($sp)
+  .globl sym_000E2138
   sym_000E2138:
     /* E21AC 000E2138 0800E003 */  jr         $ra
+  .globl sym_000E213C
   sym_000E213C:
     /* E21B0 000E213C 2000BD27 */   addiu     $sp, $sp, 0x20
 endlabel func_000E2110

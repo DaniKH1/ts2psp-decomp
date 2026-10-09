@@ -190,7 +190,7 @@ glabel sortAndCullScene_112C
     /* 1B5040 001B4FCC 04008524 */  addiu      $a1, $a0, 0x4
     /* 1B5044 001B4FD0 0000A58C */  lw         $a1, 0x0($a1)
     /* 1B5048 001B4FD4 1000A050 */  beql       $a1, $zero, .Leboot_001B5018
-    /* 1B504C 001B4FD8 1E00053C */   lui       $a1, %hi(sym_001E2AA4)
+    /* 1B504C 001B4FD8 1E00053C */   lui       $a1, 0x001E
     /* 1B5050 001B4FDC 8C00A0A3 */  sb         $zero, 0x8C($sp)
   .Leboot_001B4FE0:
     /* 1B5054 001B4FE0 1000A68C */  lw         $a2, 0x10($a1)
@@ -212,7 +212,7 @@ glabel sortAndCullScene_112C
   .Leboot_001B5018:
     /* 1B508C 001B5018 E499A58C */  lw         $a1, %lo(sym_001D99E4)($a1)
     /* 1B5090 001B501C 09008550 */  beql       $a0, $a1, .Leboot_001B5044
-    /* 1B5094 001B5020 1E00043C */   lui       $a0, %hi(sym_001E2AA4)
+    /* 1B5094 001B5020 1E00043C */   lui       $a0, 0x001E
     /* 1B5098 001B5024 8D00A0A3 */  sb         $zero, 0x8D($sp)
     /* 1B509C 001B5028 5800458E */  lw         $a1, 0x58($s2)
     /* 1B50A0 001B502C 1000868C */  lw         $a2, 0x10($a0)
@@ -263,7 +263,7 @@ glabel sortAndCullScene_112C
     /* 1B514C 001B50D8 0C00E724 */   addiu     $a3, $a3, 0xC
     /* 1B5150 001B50DC 25904000 */  or         $s2, $v0, $zero
     /* 1B5154 001B50E0 04004012 */  beqz       $s2, .Leboot_001B50F4
-    /* 1B5158 001B50E4 1E00043C */   lui       $a0, %hi(sym_001E2AA4)
+    /* 1B5158 001B50E4 1E00043C */   lui       $a0, 0x001E
     /* 1B515C 001B50E8 DDC6040C */  jal        func_00131B74
     /* 1B5160 001B50EC 25204002 */   or        $a0, $s2, $zero
     /* 1B5164 001B50F0 1E00043C */  lui        $a0, %hi(sym_001D99E4)

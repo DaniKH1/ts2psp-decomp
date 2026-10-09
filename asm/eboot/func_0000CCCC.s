@@ -105,6 +105,7 @@ glabel func_0000CCCC
     /* CEB0 0000CE3C 611B040C */  jal        elem_register_chunk_tag
     /* CEB4 0000CE40 786D8424 */   addiu     $a0, $a0, %lo(D_20626D78)
     /* CEB8 0000CE44 7320043C */  lui        $a0, %hi(D_20736D78)
+  .globl sym_0000CE48
   sym_0000CE48:
     /* CEBC 0000CE48 25280000 */  or         $a1, $zero, $zero
     /* CEC0 0000CE4C 40000634 */  ori        $a2, $zero, 0x40
@@ -139,6 +140,7 @@ glabel func_0000CCCC
     /* CF34 0000CEC0 D0000534 */  ori        $a1, $zero, 0xD0
     /* CF38 0000CEC4 20000634 */  ori        $a2, $zero, 0x20
     /* CF3C 0000CEC8 611B040C */  jal        elem_register_chunk_tag
+  .globl sym_0000CECC
   sym_0000CECC:
     /* CF40 0000CECC 6E6F8424 */   addiu     $a0, $a0, %lo(D_65646F6E)
     /* CF44 0000CED0 766C043C */  lui        $a0, %hi(D_6C76656C)

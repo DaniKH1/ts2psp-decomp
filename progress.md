@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 505 (see below) |
-| **C functions that byte-match** | **505** (linked from `src/`) |
+| functions written in C | 518 (see below) |
+| **C functions that byte-match** | **518** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 505 of the 505 files here are verified to compile to the original bytes; the
+> 518 of the 518 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -3686,6 +3686,55 @@ next to a stale one and the tool saw nothing wrong.  Both that line and
 hazard instead of correcting it.**  `sync_counts.py` is a good tool with a known
 limit, and a number written into prose by hand is going to keep needing a human
 to notice.  Saying where the number lives is more useful than restating it.
+
+#### What thirteen more functions cost, and one that could not be promoted
+
+The batch added `func_00000058`, `func_00000150`, `func_00000B58`, `func_00000F6C`,
+`func_000026B8`, `func_00004F90`, `func_000061A0`, `func_000061E0`,
+`func_00009448`, `func_0000946C`, `func_0000D478`, `func_00010134` and
+`func_00010220`.  Most are the two-line prologue plus one `jal` shape, and they are
+readable for what they say: **`func_000061A0` and `func_000061E0` are the same
+constructor**, the first calling `func_000550E0` and the second storing the same
+two global pointers before branching on a flag bit.  `func_00009448` and
+`func_0000946C` are sisters differing only in the constant handed to
+`func_00086574` - 0x1F against 0x20, which is 31 against 32 and reads as an index
+into a fixed table.
+
+**`func_000100F4` verified byte-exact and still could not be promoted.**  Its
+inline `asm` reproduces all 0x40 bytes, `verify_c.py` says MATCH - and the link
+then fails, because `asm/eboot/renderCommon_0580.s` reaches *into* the middle of
+it:
+
+    /* 1BCF58 001BCEE4 0100123C */  lui   $s2, %hi(.Leboot_00010128)
+    /* 1BCF5C 001BCEE8 28015226 */  addiu $s2, $s2, %lo(.Leboot_00010128)
+
+**`.Leboot_00010128` is a label inside `func_000100F4` that another translation
+unit takes the address of**, and the original carries it in the `glabel` list for
+exactly that reason.  A `__asm__` block inside a C file cannot export it: the
+symbol is local to the emitted fragment, so `psp-ld` reports
+`undefined reference to '.Leboot_00010128'` from the referring object.
+
+**So the byte-exactness is not the binding constraint - the addressability is.**
+That is worth stating plainly because it is the first case here where a function
+was verified correct and still had to be rejected, and the honest reason is that
+promoting it would delete a symbol the rest of the module links against.  The file
+stays in `asm/`.  `func_00010134`, its near-identical neighbour that nothing
+points into, promoted without difficulty.
+
+**Two of the batch were dropped after failing**, and both failures are the size
+guard doing its job rather than a near miss:
+
+* `func_0000150C` (140 bytes) assembles 136.  Its `beqz` targets `.Leboot_00001578`
+  and every other word matches; the missing four bytes are the second `swc1` pair
+  in the vector copy, which GCC merges into the pair of `lw`s that reload from the
+  stack.  **Not promoted: 136 is not 140.**
+* `func_00000204` (168 bytes) came out at 164 after two attempts, the copy loop
+  losing one instruction each time to register reuse.  **Not promoted.**
+
+`func_00009378` was a third: correct instruction for instruction, but the `jal` to
+`func_00009490` resolves to zero when the file is compiled standalone, so the
+verified section was 100 bytes where the original is 104.  **The size guard caught
+it and the file was deleted rather than kept as a "close enough" candidate.**
 
 ## Pipeline
 

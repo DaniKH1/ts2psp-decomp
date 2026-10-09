@@ -12,6 +12,7 @@ nonmatching func_00011860, 0x9C
 glabel func_00011860
     /* 118D4 00011860 D0FFBD27 */  addiu      $sp, $sp, -0x30
     /* 118D8 00011864 1400B0AF */  sw         $s0, 0x14($sp)
+  .globl sym_00011868
   sym_00011868:
     /* 118DC 00011868 25808000 */  or         $s0, $a0, $zero
     /* 118E0 0001186C 1C00B2AF */  sw         $s2, 0x1C($sp)

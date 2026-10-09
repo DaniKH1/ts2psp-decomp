@@ -30,7 +30,7 @@ glabel func_000A7784
     /* A783C 000A77C8 25204000 */  or         $a0, $v0, $zero
     /* A7840 000A77CC 1400A58F */  lw         $a1, 0x14($sp)
     /* A7844 000A77D0 05008014 */  bnez       $a0, .Leboot_000A77E8
-    /* A7848 000A77D4 1D00063C */   lui       $a2, %hi(sym_001D1B00)
+    /* A7848 000A77D4 1D00063C */   lui       $a2, 0x001D
     /* A784C 000A77D8 AB41050C */  jal        func_001506AC
     /* A7850 000A77DC 2520A000 */   or        $a0, $a1, $zero
     /* A7854 000A77E0 25204000 */  or         $a0, $v0, $zero

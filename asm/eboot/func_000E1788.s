@@ -284,6 +284,7 @@ glabel func_000E1788
     /* E1BE0 000E1B6C 1000053C */  lui        $a1, %hi(func_000F89C4)
     /* E1BE4 000E1B70 3F000634 */  ori        $a2, $zero, 0x3F
     /* E1BE8 000E1B74 00100734 */  ori        $a3, $zero, 0x1000
+  .globl sym_000E1B78
   sym_000E1B78:
     /* E1BEC 000E1B78 00400834 */  ori        $t0, $zero, 0x4000
     /* E1BF0 000E1B7C 25480000 */  or         $t1, $zero, $zero

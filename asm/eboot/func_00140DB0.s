@@ -19,7 +19,7 @@ glabel func_00140DB0
     /* 140E3C 00140DC8 25808000 */   or        $s0, $a0, $zero
     /* 140E40 00140DCC 5400048E */  lw         $a0, 0x54($s0)
     /* 140E44 00140DD0 0E008050 */  beql       $a0, $zero, .Leboot_00140E0C
-    /* 140E48 00140DD4 1E00043C */   lui       $a0, %hi(sym_001E2AA4)
+    /* 140E48 00140DD4 1E00043C */   lui       $a0, 0x001E
     /* 140E4C 00140DD8 0F000010 */  b          .Leboot_00140E18
     /* 140E50 00140DDC 3800858C */   lw        $a1, 0x38($a0)
   .Leboot_00140DE0:

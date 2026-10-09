@@ -45,6 +45,7 @@ glabel func_00064724
     /* 64810 0006479C 1C00B18F */  lw         $s1, 0x1C($sp)
     /* 64814 000647A0 2000BF8F */  lw         $ra, 0x20($sp)
     /* 64818 000647A4 0800E003 */  jr         $ra
+  .globl sym_000647A8
   sym_000647A8:
     /* 6481C 000647A8 3000BD27 */   addiu     $sp, $sp, 0x30
 endlabel func_00064724
