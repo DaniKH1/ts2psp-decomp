@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 657 (see below) |
-| **C functions that byte-match** | **657** (linked from `src/`) |
+| functions written in C | 659 (see below) |
+| **C functions that byte-match** | **659** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 657 of the 657 files here are verified to compile to the original bytes; the
+> 659 of the 659 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -5036,6 +5036,98 @@ unsigned-to-float conversions in `func_000BE540`.  **All four are
 artefacts of the compiler being unable to fold something it had already
 resolved**, which is a different thing from a bug and shows up the same
 way in the disassembly.
+
+#### Five phases out of the object's own vtable, and the geometry census
+
+`func_00085B3C` is the third of the three functions present in all
+sixteen of the regular 0xA8-byte class records, and at 384 bytes it is by
+far the largest.  It is the update step of the object those records
+describe.
+
+**Two float fields are advanced by a time delta, then five virtual phases
+run.**  `jal func_0008541C` returns something whose `0x1C` is a float, and
+that float is added to `0x20($s0)` and `0x24($s0)` - two coordinates or
+two timers, advanced together by one delta.
+
+**The five phases are the class's own virtual methods, called
+non-virtually, in an order that is not the table's.**  Each is the same
+eight words - `lw $a1, 0x38($s0)`, add a constant, `lh` the adjustment,
+`lw` the pointer, `jalr` with `$a0 = this + adjustment` - at offsets
+
+    +0x40    +0x50    +0x28    +0x30    +0x38
+
+which are entries 8, 10, 5, 6 and 7 of the primary table.  **Entry 7 and
+entry 8 of the primary table at `0x1E5D60` are `func_00154920` and
+`func_00154928`, both `jr $ra` / `nop`** - so for a class that overrides
+nothing, two of the five phases reach empty bodies and the update does
+three fifths of what it is written to do.
+
+**The opening `beqz` splits the function in two, and the half I first
+omitted turned out to be the interesting half.**  `0x30($s0)` is a
+one-byte flag; when it is set, the code stores the constant **3** into
+`0x18($s0)` - the state field - runs phase +0x40, and clears the flag
+with `sb $zero, 0x30($s0)`.  **So a non-zero `0x30` means "reset me into
+state 3 and run one phase", and the flag is self-clearing, and 3 is
+written to the state field in exactly one place in the function.**
+
+**The state machine is the same field.**  `0x18($s0)` is tested against
+3, then 1, 4 and 5; state 3 enters the retry loop at
+`.Leboot_00085BF0`, the other three jump to `.Leboot_00085C88`; and every
+path returns `0x18($s0)`.  **The state is both the input and the output**,
+which is what a re-entered state machine looks like when its caller feeds
+the result back.
+
+`0x2C($s0)` is a counter and `0x28($s0)` its limit - the loop increments,
+compares, and retries while smaller.  `0x30` and `0x31` are one-byte
+flags, and `0x31` is tested, cleared, and then used to gate a phase.
+
+#### Two delay slots, and the second one is not a nop
+
+The chain of three comparisons against 1, 4 and 5 has an unusual shape:
+
+    ori   $a2, $zero, 0x1
+    beq   $a0, $a2, .Leboot_00085C88
+      lbu   $a1, 0x30($s0)     <- the flag is read in a delay slot
+    ori   $a2, $zero, 0x4
+    beq   $a0, $a2, .Leboot_00085C88
+      ori   $a2, $zero, 0x5    <- the NEXT comparison's operand
+    beq   $a0, $a2, .Leboot_00085C88
+      nop
+
+**The delay slot of the comparison against 4 holds the operand for the
+comparison against 5**, so it executes whether or not that branch is
+taken.  Writing a `nop` there - which is what four of the other
+promoted functions do - assembles to one word too many and the size
+guard catches it at 388 against 384.  **A chain of equality tests against
+successive constants is cheapest when each test loads the next constant in
+the previous test's delay slot**, and that is the only reason these three
+branches are not four words each.
+
+#### The geometry sections, counted
+
+The linker's own naming answers the question of which code is geometry:
+seven sections named after the source directories that produced them.
+
+| section | address | bytes | functions |
+| --- | --- | --- | --- |
+| `.text.collision` | 0x1B0820 | 13,308 | 32 |
+| `.text.sortAndCullScene` | 0x1B3C1C | 7,268 | 46 |
+| `.text.updateNodeGraph` | 0x1B5880 | 12,700 | 42 |
+| `.text.syncSkeleton` | 0x1B8A1C | 10,304 | 21 |
+| `.text.drawing` | 0x1BB280 | 3,952 | 14 |
+| `.text.renderCommon` | 0x1BC200 | 6,100 | 18 |
+| `.text.renderMeshInstances` | 0x1BDA00 | 5,788 | 16 |
+
+**124 functions, 59 KB, and they are named `collision_0000`,
+`sortAndCullScene_069C`, `updateNodeGraph_0E6C` rather than
+`func_...`** - which is why they were invisible to every census in this
+report so far, all of which counted `func_` symbols.  A handful were
+already promoted; the smallest unmade are a row of eight-byte accessors,
+including `sortAndCullScene_1078`, which returns an **unsigned byte at
+`0xE9`** of its argument, and `sortAndCullScene_1124`, which returns a
+**float at `0xE0`** of the same record - **a float and a one-byte flag
+nine bytes apart, which is the shape of a per-object draw record rather
+than a vertex.**
 
 **There is a second vtable family, and it has the same shape.**  The three
 `sym_001EA3E8` / `sym_001EA4B8` / `sym_001EA588` records found earlier are

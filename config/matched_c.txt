@@ -143,6 +143,7 @@ func_00084E48
 func_00085424
 func_00085AE4
 func_00085B10
+func_00085B3C
 func_00088E40
 func_0008ABEC
 func_0008ABFC
@@ -652,6 +653,7 @@ func_001AF15C
 func_001AF16C
 renderMeshInstances_1034
 renderMeshInstances_1060
+sortAndCullScene_1078
 sortAndCullScene_1080
 sortAndCullScene_10BC
 syncSkeleton_22B8
