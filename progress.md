@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 546 (see below) |
-| **C functions that byte-match** | **546** (linked from `src/`) |
+| functions written in C | 567 (see below) |
+| **C functions that byte-match** | **567** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 546 of the 546 files here are verified to compile to the original bytes; the
+> 567 of the 567 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -3911,6 +3911,61 @@ it writes `sym_001EDC30` into 0x0($a0) and then overwrites it with
 `sym_00001C54` one instruction later.  **The second `beqz $a0` is also
 unreachable** - the first branch already proved `$a0` non-zero.  Both artefacts
 are in the shipped code, not in any reading of it.
+
+#### Twenty-one functions: the shared vtable, read in full
+
+With the vtables identified, the next step was to promote the methods they point
+at - all twenty-three shared slots - and that turns the table from an address
+list into something readable.
+
+**The twenty-three shared slots are almost entirely constant answers:**
+
+| slots | count | body |
+| --- | --- | --- |
+| +0x10, +0x18 | 2 | return 1 |
+| +0x48 .. +0xC8 | 16 | return 0 |
+| +0x48 | 1 | returns nothing at all |
+| +0x20, +0x28, +0x38, +0x40 | 4 | real bodies, 224-348 bytes |
+
+**`func_0018F668` is the one method that leaves `$v0` untouched** - the delay slot
+is a `nop`, not an `or`.  Of 26 slots, then, twenty return a constant, one returns
+nothing, four do real work, and the twenty-fifth (`+0x30`) is the single method
+the three siblings override.
+
+So the base class offers **a predicate interface that answers "no" to sixteen
+questions and "yes" to two**, and none of these three classes touches any of them.
+That is the shape of a set of capability flags where the defaults are almost all
+negative - and it is a stronger claim than "the classes are similar", because it
+says *they use the same interface and implement none of it*.
+
+#### The two real shared methods, and a sentinel worth naming
+
+`func_000B9D3C` (slot +0x20, 240 bytes) and `func_000B9E2C` (slot +0x28, 348 bytes)
+open with the **same two-stage interning lookup**, and both use `bnel`, whose
+nullification is the test itself:
+
+    lw    $a1, 0x0($a0)         ; a tag at +0xC of the table header
+    ori   $a2, $zero, 0x1
+    bnel  $a1, $a2, .Lnext       ; if the tag is not 1, skip
+      addu  $s2, $a0, $a1       ; else  s2 = header + tag
+
+**So the constant 1 is a sentinel meaning "not interned yet".**  The arithmetic in
+the delay slot runs only on the path the sentinel selects, which is the whole point
+of using `bnel` rather than a branch plus a manual test.
+
+The two then diverge.  `func_000B9D3C` calls `func_001224E0` once per index with a
+fixed 4 as the third argument and strides by 4 - a callback-per-entry walk.
+`func_000B9E2C` instead **contains a hand-written overlap-safe `memmove`**: the
+`sltiu $a3, $a2, 0x4` / `bnel` pair chooses direction, and `sltu $a2, $a2, $a0`
+after `addu $a0, $a2, $a0` is a pointer-arithmetic overflow test.  **The
+destination register is only set after that check passes**, which is what makes the
+copy correct on wrapped addresses - a naive `memcpy` would not have the check at
+all.
+
+`func_000B9E2C` also keeps a float register `$f20` saved and restored across the
+whole body that only ever holds 0.0f.  **The accumulator is a constant**: it is
+staged through 0x10($sp) and written into the float array at `0x8($s0) + $s6`,
+so the array is being defaulted, not summed.
 
 ## Pipeline
 
