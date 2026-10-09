@@ -1,0 +1,15 @@
+# Normalise line endings so that history stays readable.
+#
+# core.autocrlf=true is set on this machine, which makes git convert LF to
+# CRLF on every checkout.  Scripts that rewrite a file in place therefore
+# rewrite the *whole* file with a line-ending change, and the diff for a
+# one-paragraph edit reads as "5563 insertions, 5415 deletions" when it is
+# really 57.
+#
+# The repository stores LF.  Declare it, so that a tool that writes CRLF
+# does not turn a paragraph edit into a whole-file diff.
+* text=auto eol=lf
+
+*.bin binary
+*.elf binary
+*.prx binary
