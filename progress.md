@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 608 (see below) |
-| **C functions that byte-match** | **608** (linked from `src/`) |
+| functions written in C | 612 (see below) |
+| **C functions that byte-match** | **612** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 608 of the 608 files here are verified to compile to the original bytes; the
+> 612 of the 612 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -4300,36 +4300,75 @@ per-class.
 
 **Slot by slot, the eleven vtables differ in seven entries:**
 
-| slot | differs | what |
+| slot | distinct | membership |
 | --- | --- | --- |
-| +0x0C | 11 distinct | each class's own `func_000BD7A8`-shape |
-| +0x014 | 11 distinct | each class's own |
-| +0x01C | 5 distinct | five behaviours across eleven classes |
-| +0x034 | 11 distinct | each class's own |
-| +0x04C | 2 distinct | `func_000C00AC` or `func_0018F668` |
-| +0x064 | 2 distinct | `func_000AF58C` or `func_00198140` |
-| +0x0D4 | 10 distinct | ten of eleven set it |
+| +0x0C | 11 | each class's own `func_000BD7A8`-shape |
+| +0x014 | 11 | each class's own |
+| +0x01C | **5** | 7 leave the default, 4 override, no two of the 4 shared |
+| +0x034 | 11 | each class's own |
+| +0x04C | 2 | **10** leave the void default, **1** implements it |
+| +0x064 | 2 | **10** return `this`, **1** returns 0 |
+| +0x0D4 | 10 | ten of eleven set it |
 
-and the other 19 are identical across all eleven.  **The two slots that differ
-in exactly two variants, +0x04C and +0x064, are the only binary choices in the
-whole interface** - everything else is either per-class or invariant.
+and the other 19 are identical across all eleven.
+
+**The membership counts turn this from a slot census into a taxonomy of the
+family, and the answer is 7 / 3 / 1.**  Seven of the eleven classes
+(`sym_001EAA78`, `001EAB50`, `001EAC28`, `001EAD00`, `001EADD8`, `001EAEB0`,
+`001EB2E8`) **override nothing at all** - they take every inherited pointer.
+Three (`sym_001EAF88`, `001EB060`, `001EB138`) **override slot +0x01C and
+nothing else.**  One, `sym_001EB560`, **overrides all three** of +0x01C,
++0x04C and +0x064.
+
+So this is one interface with three levels of engagement among its
+implementors, and `sym_001EB560` is the only class in the family that is not
+merely re-declaring it.  The two slots I had called "the only binary choices"
+are in fact **10-against-1 both times, and the same record is on the minority
+side in each**.
+
+**Three of the four bodies at +0x01C contain a branch that can never be
+taken.**  They call `func_000B9D34` - the default that is
+`ori $v0, $zero, 0x1` and nothing else - and then test `beqz $v0` on the
+result.  It is never zero, so the label each branch targets is unreachable,
+and in `func_000BE4D4` and `func_000BE75C` that label is the path returning
+0.  Only the fourth, `func_000BFEB8`, has a real test in it (`bne $a0,
+$a3`).  **Two independent copies of the same dead branch 0x280 bytes apart
+is what makes this a property of the source rather than a coincidence.**
+
+`func_000BE4D4` and `func_000BE75C` are 25 of 27 words identical; the only
+difference is two `ori $a1, $zero, <imm>` immediates, `0x7, 0x8` against
+`0x8, 0x9`.  One body, two consecutive argument pairs through
+`func_000BA26C`.  Both are now byte-exact, along with `func_000B9D34`,
+`func_000C00AC`, `func_000AF58C` and `func_00198140` - **every function this
+family's vtables name at those four slots is now promoted.**
+
+**A correction worth recording, because the error was structural rather than
+arithmetic.**  I first put the +0x01C split at 5-6 and the two binary slots
+at an even split.  Both were wrong.  The 5 was a count of *distinct values*,
+not of how many classes use the majority one, and reading it as the latter
+turned a taxonomy into a flat five-way choice; the "2 distinct" cells hide a
+10-against-1 split completely.  **A cell that records only how many distinct
+values a slot has cannot support any claim about how the classes are
+distributed - the membership list has to be printed.**
 
 **There is a second vtable family, and it has the same shape.**  The three
 `sym_001EA3E8` / `sym_001EA4B8` / `sym_001EA588` records found earlier are
-26 slots at a 0xD0 stride with two differing entries; these eleven are 27 slots
-at a 0xD0... **0xD8** stride with seven.  **Both put a constructor at slot +0x0C**
-- `func_0019D4AC`-shaped in one family, `func_000BD7A8`-shaped in the other - and
-both are built out of the same run of `func_0018F6xx` default stubs, so the two
-families share a base class.  **Slot +0x0C is the constructor in every vtable
-found in this module so far**, and `func_000BD634` - the function transcribed
-last - is itself one of these constructors.
+26 slots at a 0xD0 stride with two differing entries; these eleven are 27
+slots at a **0xD8** stride with seven.  **Both put a constructor at slot
++0x0C** - `func_0019D4AC`-shaped in one family, `func_000BD7A8`-shaped in the
+other - and both are built out of the same run of `func_0018F6xx` default
+stubs, so the two families share a base class.  **Slot +0x0C is the
+constructor in every vtable found in this module so far**, and
+`func_000BD634` - the function transcribed two passes ago - is itself one of
+these constructors.
 
-`+0x04C`'s two variants are worth a note: one is `func_0018F668`, **the void
-default** already promoted from the first family.  **The same stub is reused
-across both vtable families**, which is what a shared base class looks like
-once the inheritance is flat.
-
-## Pipeline
+`func_00198140` settles that relationship on its own.  It is slot **+0x60**
+of the three-record family, where it is invariant across all three classes,
+and slot **+0x064** of the eleven, where that same slot index **splits**.
+Both are the twelfth slot.  **A slot that is invariant in one family and
+variable in the other is a virtual the first declined to override and the
+second did**, in some of its leaves - the flat-inheritance signature, and it
+is visible without resolving a single base-class pointer.
 
 #### `addiu $v0, $a0, 0x8` is the other half of the thunk idiom
 

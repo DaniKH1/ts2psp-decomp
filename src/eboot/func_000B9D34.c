@@ -16,6 +16,26 @@
  * Whether the pair are related to each other - a "is X / is not X" pair
  * around one query, or two independent flags - is not decided by these
  * eight bytes.
+ *
+ * **It is also slot +0x01C of the second vtable family** - the eleven
+ * records at a 0xD8 stride from `sym_001EAA78` to `sym_001EB560` - and
+ * there **seven of the eleven put nothing else in that slot.**  Each of
+ * the other four records has its own body, so the slot has five
+ * distinct values in total: this one, `func_000BE138` (0xE8 bytes),
+ * `func_000BE4D4` (0x6C), `func_000BE75C` (0x6C) and `func_000BFEB8`
+ * (0x7C).  No two of the four are shared.
+ *
+ * **Three of those four call this function before branching on the
+ * result**, and since this function returns 1 unconditionally, the
+ * `beqz $v0` that follows is never taken.  The label it targets is
+ * therefore unreachable.  Only `func_000BFEB8` does not call it, and it
+ * is the one body with a real test in it (`bne $a0, $a3`) rather than a
+ * call.
+ *
+ * So the five-way choice at +0x01C is **seven classes declining to
+ * override, three classes overriding with a dead default call, and one
+ * class overriding with an actual test** - and the distinction between
+ * those last two groups is exactly the distinction the bytes make.
  */
 #include "types.h"
 
