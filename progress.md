@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 572 (see below) |
-| **C functions that byte-match** | **572** (linked from `src/`) |
+| functions written in C | 597 (see below) |
+| **C functions that byte-match** | **597** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 572 of the 572 files here are verified to compile to the original bytes; the
+> 597 of the 597 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -4068,6 +4068,54 @@ these were same-size, one-word differences, which is the case the byte compare
 exists for.**  Trusting the splat's label *name* over the address it sits at is
 the specific mistake; the fix was to read `tools/disasm_range.py` for the branch
 target rather than inferring it.
+
+#### The accessor census: 1,249 functions under 40 bytes, and what they are
+
+Grouping every function of 0x30 bytes or less by its instruction shape gives a
+census that is worth more than the individual files.  **1,249 of the 6,925
+remaining functions are under 40 bytes**, and they are not miscellaneous - they
+are six shapes:
+
+| count | body |
+| --- | --- |
+| 379 | `jr $ra` / `nop` - void, returns nothing |
+| 93 | `jr $ra` / `or $v0, $zero, $zero` |
+| 33 | `jr $ra` / `or $v0, $a0, $zero` - return `this` |
+| 33 | `jr $ra` / `ori $v0, $zero, 0x1` |
+| 13 | `jr $ra` / `lw $v0, 0x24($a0)` |
+| 9 | `jr $ra` / `lw $v0, 0x4($a0)` |
+| 8 | `jr $ra` / `lw $v0, 0x0($a0)` |
+| 6 | `jr $ra` / `lw $v0, 0x1C($a0)` |
+| 6 | `jr $ra` / `mtc1 $zero, $f0` |
+
+**So the module's smallest tier is almost entirely accessor and constant-return
+boilerplate**, and the 123 single-field accessors are the part that carries
+information: each one is a `(operation, offset)` pair, and the offsets are
+field numbers.
+
+Twenty-five of them are now transcribed, and **the address spacing separates
+two different things** that look the same in the flat list:
+
+* **Identical pairs 8 bytes apart are one inlined getter emitted twice** -
+  func_0004E5CC/func_0004E5D4, func_00058078/func_00058080,
+  func_00080288/func_00080290.  Three pairs, all at offset 0.
+* **Adjacent getters with *different* offsets are one class's accessor
+  block** - func_00194AA8, func_00194AB0, func_00194AB8, func_00194AC0 read
+  0x00, 0x04, 0x18 and 0x1C, and func_00194AFC four functions later does
+  `sw $a1, 0x14($a0)`.
+
+That second group is a class layout: **fields at 0x00, 0x04, 0x18 and 0x1C are
+read-only, 0x14 is read-write, and 0x08 to 0x10 are reached by no accessor at
+all.**  A getter with no setter beside it is a field the class exposes for
+reading only - the closest these eight bytes come to saying what a field is
+for.
+
+The 13 at offset 0x24 are the largest single-offset group and they sit in one
+consecutive run from 0x000BD5F4 to 0x000BE8B8, then 0x000BEE9C, then a gap to
+0x000C1490 and func_000C1498.  **`func_000BEBDC` and `func_000BED6C`, two of the
+six +0x1C getters, are inside that run** - which is what makes the spacing a
+per-class block rather than a coincidence, and it is why those two 0x1C
+getters are the next ones worth writing.
 
 ## Pipeline
 
