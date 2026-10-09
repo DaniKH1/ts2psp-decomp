@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 607 (see below) |
-| **C functions that byte-match** | **607** (linked from `src/`) |
+| functions written in C | 608 (see below) |
+| **C functions that byte-match** | **608** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 607 of the 607 files here are verified to compile to the original bytes; the
+> 608 of the 608 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -4235,6 +4235,47 @@ out.  It also reloads `$s0` in the epilogue even though `$s0` has been dead
 since the last `swc1`; omitting that makes the function four bytes short, which
 is **a different kind of necessity** from the redundant data reloads beside it,
 and both are in the file.
+
+#### The group's fourth member, and a pair of labels that sit between instructions
+
+`func_000BD634` is the member that does the work, and it is the clearest thing
+in the cluster: **four globals are stored into the same field, 0x18 of the
+object, in sequence** - `sym_001EAA78` (the instance's own), then the three
+shared `sym_001E9E30`, `sym_001E9478`, `sym_001E9300`.  Each store overwrites the
+last, so **the final store wins and the first three are dead.**  Whether that is
+a layout mistake or four registrations through a scratch slot the callee is
+expected to consume is not decided by these bytes.
+
+**Three `beqz $s1` branches are all dead, and that is decidable.**  `$s1` holds
+`$a0`, and the `beqz $a0` at the top already returned when `$a0` was null - so
+every later `beqz $s1` falls through.  Each one sits in a delay slot holding a
+useful store, which is what makes them free artefacts of the scheduler rather
+than tests.  **A dead branch whose delay slot is load-bearing is the reason
+`.set noreorder` matters here**: under `reorder` gas would fill the slot and the
+stores would be lost.
+
+`jal func_000B9C88` with `$a1 = 0` is the **base-constructor call** that
+`func_0019D4AC`, `func_0019D508` and `func_0019D564` also make, and the
+`andi $s0, 0x1` before it is their flag test too - so this group belongs to the
+same class family as the three sibling classes.
+
+**This one took four attempts, all from label placement, and the failure mode is
+worth recording because it is new.**  `.Leboot_000BD6AC` is the `andi` and
+`.Leboot_000BD6B0` is the `beqz` immediately after it - **the two labels belong
+*between* two adjacent instructions**, because the compiler wanted that `andi`
+on the skipped path and a different use of the same slot on the fall-through.
+Putting them the other way round moves every branch by one word and changes
+nothing else about the function: same size, same instructions, three wrong words.
+Read off the instruction stream, `.Leboot_000BD6AC` looked like it belonged
+before the `or $a0, $s1, $zero` two instructions earlier, and that is where it
+went first.
+
+**This is the third time a label position, not a label name, has been the whole
+problem** - after `.Leboot_000BC09C` and the two `.Leboot_000BC09C_1`
+attempts.  The rule that follows from all three: **resolve the target address
+from the bytes and count, do not place the label where the surrounding code
+looks like it belongs.**  `verify_c.py` reported "3 of 40 words differ" every
+time and the size guard never fired.
 
 ## Pipeline
 
