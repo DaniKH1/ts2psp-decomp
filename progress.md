@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 612 (see below) |
-| **C functions that byte-match** | **612** (linked from `src/`) |
+| functions written in C | 614 (see below) |
+| **C functions that byte-match** | **614** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 612 of the 612 files here are verified to compile to the original bytes; the
+> 614 of the 614 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -4331,16 +4331,64 @@ taken.**  They call `func_000B9D34` - the default that is
 `ori $v0, $zero, 0x1` and nothing else - and then test `beqz $v0` on the
 result.  It is never zero, so the label each branch targets is unreachable,
 and in `func_000BE4D4` and `func_000BE75C` that label is the path returning
-0.  Only the fourth, `func_000BFEB8`, has a real test in it (`bne $a0,
-$a3`).  **Two independent copies of the same dead branch 0x280 bytes apart
-is what makes this a property of the source rather than a coincidence.**
+0.  Only `func_000BFEB8` has a real test in it, and it turns out to
+**return 1 on every path anyway** - `$s1` is set to 1 before anything
+happens and every exit writes it to `$v0`, including the early-out when
+`0x24($a0)` is null, which calls nothing at all.  **Two independent copies
+of the same dead branch 0x280 bytes apart is what makes that a property
+of the source rather than a coincidence.**
+
+**So the +0x01C slot is not four behaviours of one question.**  Three of
+the four overrides are `return 1` with extra work; `func_000BFEB8` is
+`return 1` with different extra work; and only `func_000BE138` can answer
+0.  **One of four overrides changes the answer, and the other three exist
+to do side work on the way to the same constant.**  Six of the eleven
+classes get that constant from a two-instruction stub, so the cheapest
+implementation of this method is also the common one.
+
+`func_000BE138` is the only override with a loop, and the loop is what
+makes it a *real* implementation rather than a wrapper: it visits
+`0x28($s4)` four-byte entries of the array at `0x2C($s4)`, calling
+`func_000BA9FC`, a thunk, and `func_000C42C8` on each.  **The loop cannot
+change the answer** - both its exits converge on `ori $v0, $zero, 0x1` -
+only the amount of work.
+
+`func_000BFEB8` has **six instructions in the middle that compute
+nothing**: they build an index and an offset into `$a2` and `$a1`, and at
+the join `.Leboot_000BFF04` the code reloads `$a0` from `$s0` and the
+next `jal`'s delay slot overwrites `$a1` with `$v0`.  Neither register is
+read again.  **The `bne` in the middle does branch and both destinations
+arrive at the same place, so what it distinguishes makes no difference to
+the result** - a test with real instructions on both arms and no
+consequence on either.
 
 `func_000BE4D4` and `func_000BE75C` are 25 of 27 words identical; the only
 difference is two `ori $a1, $zero, <imm>` immediates, `0x7, 0x8` against
 `0x8, 0x9`.  One body, two consecutive argument pairs through
-`func_000BA26C`.  Both are now byte-exact, along with `func_000B9D34`,
-`func_000C00AC`, `func_000AF58C` and `func_00198140` - **every function this
-family's vtables name at those four slots is now promoted.**
+`func_000BA26C`.  **Every function this family's vtables name at those
+four slots is now promoted** - the default, both binary variants, and all
+four overrides.
+
+#### The thunk idiom turns up a third time, inlined
+
+Inside `func_000BE138`'s loop there is the module's third instance of the
+multiple-inheritance adjustment, and **the first one the compiler inlined
+rather than calling a helper for**:
+
+    lw    $a0, 0x18($v0)
+    addiu $a0, $a0, 0xD0
+    lh    $a1, 0x0($a0)      <- signed half-word
+    lw    $a2, 0x4($a0)      <- function pointer
+    jalr  $a2
+      addu  $a0, $v0, $a1
+
+Both ends of this idiom were already on record: `func_0019D11C` reads a
+`{i16 adjust; void (*fn)()}` entry and adjusts `this` before its `jalr`,
+and `func_000805D4` returns `this + 8` to hand a sub-object back to the
+caller.  **Inlining the dispatch is what makes the layout visible
+directly** - that the adjustment is a half-word and the entry is 8 bytes
+are both readable here and were inferred there.  It also pins the thunk
+array at **+0xD0** of whatever `0x18` points to.
 
 **A correction worth recording, because the error was structural rather than
 arithmetic.**  I first put the +0x01C split at 5-6 and the two binary slots
