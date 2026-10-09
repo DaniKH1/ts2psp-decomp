@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 571 (see below) |
-| **C functions that byte-match** | **571** (linked from `src/`) |
+| functions written in C | 572 (see below) |
+| **C functions that byte-match** | **572** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 571 of the 571 files here are verified to compile to the original bytes; the
+> 572 of the 572 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -4024,6 +4024,50 @@ means **0x34 bytes of other fields sit between them**.
 `lwc1` / `lw` / `swc1` three times over.  Nothing in that sequence clobbers `$a0`,
 so **the reloads are redundant in any ordinary reading** and are recorded as
 such rather than explained away.
+
+#### The last override is a weighted 1-D solver, and getting it took four tries
+
+`func_000BBE78` (0x260 bytes, the +0x30 override of `sym_001EA588`) is the only
+one of the three that shares no shape with the others.  It advances a transform
+node by a weight and, when the motion leaves the node's interval, pushes the
+leftover to the parent and retries.  **Its node is a float interval where a
+field that is exactly 0.0f means "unbounded"**, which is why every
+`c.eq.s $f17, $f16` in the body is a *configuration* test and not a bound check:
+
+    0x0C  lower limit (0.0f = none)     0x10  upper limit (0.0f = none)
+    0x14  step size   (0.0f = none)     0x18  step size   (0.0f = none)
+    0x1C  accumulated weight            0x20  position
+    0x24  propagated parent position    0x28  resolved step (or 0.0f)
+    0x2C  resolved node value            0x34  dirty byte
+
+The same three-way cascade runs twice, once per direction, at `.Leboot_000BBF08`
+and `.Leboot_000BBF70` - **the two copies are identical apart from their field
+offsets**, which is the shape of a macro expanded with different arguments.
+
+**The tail is a hand-rolled sparse bitmap.**  `sra $t0, $a1, 5` followed by
+`sll $t0, $t0, 2` is `(bit >> 3) * 4` - the *word* index in bytes - and
+`andi $a1, $a1, 0x1F` with `sllv $a1, $t1, $a1` is the bit index within that word.
+**`0x1F` rather than `0x3F` is 32 bits per word on a 32-bit register**, and the
+`1 << bit` is computed with a `sllv` against a register holding 1 rather than a
+variable shift.  `lui $a2, (0x80000000 >> 16)` then `or $a1, $a1, $a2` sets
+bit 31 of the flags word at 0xC($a0) on every path reaching the tail: **bit 31 is
+the dirty bit.**
+
+**This one took four attempts, and the reason is worth recording because the tool
+did not help.**  Two of the four failures were me placing `.Leboot_000BC09C` at
+the wrong place.  The label's *name* matches the address of a `div.s` in the
+earlier clamp block, so the intuitive reading puts it there - and that is 0x1D
+instructions from where it belongs, after the bitmap update.  **gas did not
+report an undefined or misplaced label; it assembled the branch as a branch to
+itself** (`4501ffff`) and the only symptom was one wrong word in 152.
+
+The other two failures were label bookkeeping of my own making: renaming one of
+two identically-named labels to `.Leboot_000BC09C_1`, then removing that label
+entirely.  **`verify_c.py` caught all four, and the size guard never fired -
+these were same-size, one-word differences, which is the case the byte compare
+exists for.**  Trusting the splat's label *name* over the address it sits at is
+the specific mistake; the fix was to read `tools/disasm_range.py` for the branch
+target rather than inferring it.
 
 ## Pipeline
 
