@@ -152,6 +152,93 @@ def function_size(name):
     return int(m.group(1), 0) if m else None
 
 
+def split_report(elf, funcs) -> int:
+    """Split the table block where the adjustment word changes.
+
+    A table's entries carry one adjustment value - a primary table all
+    zero, a secondary thunk table one constant negative offset - so a
+    change in that word marks a boundary.  Unlike "is this word a code
+    pointer", that is decidable from the bytes alone, which is what makes
+    this the one way to count tables rather than runs.
+    """
+    from collections import Counter
+    secs = {s.name: s for s in elf.sections}
+    D = secs[".data"]
+    raw = elf.read(D.addr, D.size)
+    words = [struct.unpack("<I", raw[j:j + 4])[0] for j in range(0, len(raw), 4)]
+    nent = len(words) // 2
+
+    def sg(a):
+        return a - 0x10000 if a & 0x8000 else a
+
+    def ok(i):
+        a, b = words[2 * i], words[2 * i + 1]
+        return (b == 0 and a == 0) or (b in funcs and abs(sg(a)) <= MAX_ADJUST)
+
+    runs = []
+    i = 0
+    while i < nent:
+        if not ok(i):
+            i += 1
+            continue
+        j, nptr = i, 0
+        while j < nent and ok(j):
+            if words[2 * j + 1]:
+                nptr += 1
+            j += 1
+        if j - i >= 4 and nptr >= 3:
+            runs.append((i, j))
+        i = j if j > i else i + 1
+    if not runs:
+        print("no table runs found")
+        return 1
+
+    S, E = max(runs, key=lambda r: r[1] - r[0])
+    print("largest run: entries %d..%d = %d, 0x%06X..0x%06X"
+          % (S, E, E - S, D.addr + S * 8, D.addr + E * 8))
+
+    groups, gs, prev = [], S, words[2 * S]
+    for k in range(S + 1, E):
+        a, b = words[2 * k], words[2 * k + 1]
+        if b == 0 and a == 0:
+            continue
+        if a != prev:
+            groups.append((gs, k, prev))
+            gs, prev = k, a
+    groups.append((gs, E, prev))
+
+    zero = [g for g in groups if g[2] == 0]
+    print("constant-adjustment groups: %d   (adjustment 0: %d)"
+          % (len(groups), len(zero)))
+    print()
+    print("most common (adjustment, group length):")
+    for k, c in Counter((sg(a), e - s) for s, e, a in groups).most_common(12):
+        print("   adj %+5d  len %3d   x%d" % (k[0], k[1], c))
+
+    print()
+    print("distance between consecutive adjustment-0 groups:")
+    diffs = Counter((zero[i][0] - zero[i - 1][0]) * 8 for i in range(1, len(zero)))
+    for d, c in diffs.most_common(10):
+        print("   0x%03X (%3d bytes)  x%d" % (d, d, c))
+
+    best = None
+    for start in range(len(zero) - 5):
+        step = zero[start + 1][0] - zero[start][0]
+        n = 1
+        while (start + n + 1 < len(zero)
+               and zero[start + n + 1][0] - zero[start + n][0] == step):
+            n += 1
+        if best is None or n > best[1]:
+            best = (start, n, step)
+    if best and best[1] >= 4:
+        s, n, step = best
+        print()
+        print("longest regular stretch: %d groups at 0x%X bytes, 0x%06X..0x%06X"
+              % (n, step * 8, D.addr + zero[s][0] * 8,
+                 D.addr + zero[s + n][0] * 8))
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -159,10 +246,14 @@ def main() -> int:
                     help="how many of the most shared methods to show")
     ap.add_argument("--list", metavar="ADDR",
                     help="dump the table at ADDR slot by slot and exit")
+    ap.add_argument("--split", action="store_true", help="split the table block where the adjustment changes")
     ns = ap.parse_args()
 
     elf = pspelf.load(str(ELF_PATH))
     labels, funcs = load_symbols()
+
+    if ns.split:
+        return split_report(elf, funcs)
 
     if ns.list:
         addr = int(ns.list, 0)

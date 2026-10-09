@@ -4930,6 +4930,63 @@ was to suppress a number rather than report it, and the check that caught
 it - *the largest run must not hold more than half of all entries* - is
 the same shape as the earlier membership assertion.
 
+#### The class record is 0xA8 bytes, and the adjustment word is what marks it
+
+Last commit established that every table in the module sits in one block
+of 5,071 entries from `0x1E4110` to the end of `.data`, and that a scan
+cannot tell where one table ends and the next begins.  **The adjustment
+word can.**
+
+A table's entries all carry **one** adjustment value - a primary table is
+entirely zero, a secondary thunk table is entirely one constant negative
+offset - so a change in that word is a boundary.  Unlike "is this word a
+code pointer", that is decidable from the bytes alone, and `vtables.py
+--split` uses it.
+
+Splitting the block on that basis gives **221 constant-adjustment groups,
+105 of them at adjustment 0**, and the two dominant shapes are:
+
+| adjustment | length | occurs |
+| --- | --- | --- |
+| **-4** | **7 entries** | **41 times** |
+| **0** | **14 entries** | **32 times** |
+
+**Those two add up to 21 entries = 168 bytes = 0xA8, and 0xA8 is the most
+common distance between consecutive adjustment-0 groups, 32 times.**
+The longest perfectly regular stretch is sixteen records in a row at that
+stride, from `0x1E5D68` to `0x1E67E8`.
+
+**So the module emits classes in fixed 0xA8-byte records, and each record
+is a 14-entry primary vtable followed by a 7-entry secondary thunk
+table.**  The -4 in the second half says the secondary base sits **one
+word before the object** - the record is the class's own 14 methods
+followed by the 7 it inherits from a base placed earlier in memory.
+
+The eleven-record family is the other shape: **0xD8 = 216 bytes = 27
+entries, every adjustment zero**, a primary table with no secondary at
+all.  **So there are at least two class-record shapes in one module, and
+whether a class has a secondary base is visible in the record size
+before reading a single entry.**
+
+#### Why this closes a loop opened four passes ago
+
+`func_0019D11C` was the first function read in this project that loaded a
+**signed** half-word as an adjustment before a `jalr`, and at the time the
+bytes did not say what any of it was for.  Since then:
+
+- `func_000BE138` and `func_000BD3A4` found the same shape inlined at
+  **+0xD0**, confirming the entry is 8 bytes and the array's offset
+- `func_00196C04` found it again at **+0xF0**, through two hops
+- `func_0017FE50` showed **0x38($this) holding the primary table and
+  0x0C($this) the secondary**, installed by one constructor
+- and now the records themselves, with **-4 in 278 entries** of the block
+
+**The adjustment is real, it is negative, and the most common value in the
+module is -4.**  Every question this cluster raised about the multiple
+inheritance is now answerable from the bytes except *why the base goes
+first*, which is a layout choice the compiler made and the data does not
+argue either way about.
+
 **There is a second vtable family, and it has the same shape.**  The three
 `sym_001EA3E8` / `sym_001EA4B8` / `sym_001EA588` records found earlier are
 26 slots at a 0xD0 stride with two differing entries; these eleven are 27
