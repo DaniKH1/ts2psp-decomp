@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 624 (see below) |
-| **C functions that byte-match** | **624** (linked from `src/`) |
+| functions written in C | 634 (see below) |
+| **C functions that byte-match** | **634** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 624 of the 624 files here are verified to compile to the original bytes; the
+> 634 of the 634 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -4450,6 +4450,85 @@ doing its job: a misplaced label between a `jal` and its delay slot
 deletes a word.  Placing the two labels around the `andi`/`beqz` pair as
 the other nine do fixed it on the second attempt, and the remaining
 eight matched first try each.
+
+#### Slot +0x014 varies in one word, and its eleventh member is not a template at all
+
+Slot +0x014 is closed too - all eleven byte-exact.  **It is a narrower
+template than +0x0C: nine of the ten siblings differ from the first in
+exactly one instruction**, where the constructors needed two.
+
+| | +0x0C | +0x014 |
+| --- | --- | --- |
+| variable words | 2 (vtable, callee) | 1 (callee only) |
+| template size | 40 words | 20 words |
+
+There is no per-class vtable pointer in this slot, only the per-class
+callee.  The template asks `func_000A7AC8` whether to proceed, returns 0
+early if it says no, otherwise calls the per-class function on
+`0x18($s0)`, stores the count into `0x24($s1)`, and returns it cast to a
+boolean with `sltu $v0, $zero, $v0` - **the caller gets "did anything
+happen", not the count.**
+
+**The tenth member, `func_000BDEC4`, is 84 bytes - one word longer -
+and the word buys a second argument.**  In the other nine the `jal`'s
+delay slot holds `lw $a0, 0x18($s0)` and the callee takes one argument;
+here that load is hoisted above the `jal` to free the slot, and it
+carries `or $a1, $s0, $zero`.  So `func_0019EA2C` receives the caller's
+second argument too.  **Its callee is also not in the sequence the other
+ten form** - they call `func_0019E4F8`, `5F8`, `6EC`, `7E8`, `8F0`,
+`EB80`, `ED04`, `EE0C`, `EFE0` in order, and `func_0019EA2C` is
+adjacent to none of them.  This is a real difference in calling
+convention, not padding.
+
+**The eleventh, `func_000BFC2C`, is 652 bytes and shares only the
+opening.**  It asks the same question, but with **inverted polarity**:
+the other ten use `bnez $v0` on `func_000A7AC8`'s answer and this uses
+`beqz`.  So the two conventions disagree about what a non-zero answer
+means.  Either the callee's result is being interpreted differently here
+or the two sites were written against different helpers sharing a name;
+**the bytes cannot say which.**
+
+Its body is an **inlined 16-bit `memmove`**.  Every copy step is `lhu` /
+`sh` with both pointers advancing by 2, and every length is halved with
+
+    sra  $a3, $a2, 1
+    srl  $a3, $a3, 31
+    addu $a2, $a2, $a3
+    sra  $a2, $a2, 1
+
+which is **signed** division by two - an arithmetic shift plus a borrow
+from the sign bit, not the `srl $a2, $a2, 1` an unsigned count would
+use.  Three sites do it this way.  The overlap test is a three-word
+pointer comparison (`xor`, `sltiu $a1, $a1, 0x1`, `andi $a1, $a1, 0xFF`),
+and skipping it skips the whole second phase - **so the expensive half
+only runs when a copy actually happened.**  The limit is
+`0x28(base) + count` advanced by `0x24(base) * 2`, which **fixes the
+layout of the object at `0x14($s0)`: an element count at 0x24 and a base
+pointer at 0x28, both 16-bit-strided.**
+
+**Two calls to `func_00170654(0, 0)`, both results discarded.**  Before
+each call the code does `sb $zero` to a stack slot and `lb`s it straight
+back into `$a0` and `$a1` - the CodeWarrior idiom for materialising a
+default-constructed `bool` - so both arguments are provably zero at the
+call.  Each return is stored, read back with `lb`, and written to a slot
+that **is never read again.**  The calls are made for effect and their
+answers dropped.
+
+**With +0x0C and +0x014 closed, five of the seven varying slots are now
+fully read.**  Only +0x034 remains, and it is the one slot with no
+template: its ten pending members run from 52 to 384 bytes and no two
+of them share a shape.
+
+**A correction, and it is the second time this family has caught me
+conflating two neighbours.**  I read the survey output and gave
+`func_000BDCA4` a size of 0x54 with a paragraph about padding and a
+merged relocation.  It is 0x50 like its nine siblings; the 84-byte
+function is `func_000BDEC4`, two entries down the same column.  The
+paragraph was wrong about the size, the uniqueness and the padding, and
+`verify_c.py` matched the file as written - **because the file was right
+and only the prose was wrong.**  A tool cannot catch that, so the rule
+is the one already in this report: read the recorded size from the
+splat, not off a table of neighbours.
 
 **There is a second vtable family, and it has the same shape.**  The three
 `sym_001EA3E8` / `sym_001EA4B8` / `sym_001EA588` records found earlier are
