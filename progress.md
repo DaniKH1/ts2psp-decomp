@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 530 (see below) |
-| **C functions that byte-match** | **530** (linked from `src/`) |
+| functions written in C | 539 (see below) |
+| **C functions that byte-match** | **539** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 530 of the 530 files here are verified to compile to the original bytes; the
+> 539 of the 539 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -3799,6 +3799,53 @@ the `jr` - **tail-call-shaped code with nothing to tail-call.**
 before the object**, and passes that onward.  That is a vtable or a leading tag -
 the C++ `this - 1` adjustment - so `func_00127770` receives a base pointer, not
 the derived object.
+
+#### Nine more, and a fourth sighting of the 180.0f helper
+
+`func_0012323C` and `func_00124854` are **the same instruction sequence**, word
+for word, differing only in which three globals they touch:
+
+    func_0012323C   sym_001DE690 / 694 / 698
+    func_00124854   sym_001DE7A0 / 7A4 / 7A8
+
+Both read a divisor, divide it by `0x43340000` (**180.0f**, not 2^28) and by
+180.0f in the other direction, and store both quotients.  With
+`func_00000000` and `func_0010260C` that is **four independent copies** of the
+reciprocal-cache idiom.
+
+**The repetition is the evidence, and it points somewhere specific.**  A helper
+written four times identically is a template the original team pasted per class,
+not code that was shared - if it had been shared, the linker would have one symbol
+and the copies would call it.  Four sets of three consecutive globals, each
+holding a divisor and its two reciprocals against 180.0f, is a **per-class
+conversion rate table**.  180 is the divisor of a degrees-to-radians or
+unit-normalisation step, and each copy belongs to a different class.
+
+Whether the stored divisor is a length scale or an angle is **not settled by these
+bytes**; what is settled is that four classes each carry their own.
+
+`func_00112464` adds a fourth sighting of the 8-byte element size: it walks an
+array of `{word, float}` pairs comparing each against a key, returning a boolean.
+With `func_00110014` (push), `func_00110AB4` (pop) and `func_00112464` (search),
+**the array and its three operations are now all readable**.
+
+#### Three functions that read as inverses of each other
+
+`func_00112594` registers the operation name `"concatenate"`, and only if the
+incoming descriptor is not already id 4 does it first substitute `$a2` for `$a1`.
+The `ori $t0, $zero, 0x4` exists solely to hold that constant for one `bne` -
+**4 is a slot id, not a length or a tag.**
+
+`func_00116B48` looks like a plain version compare and is not: on the *equal* path
+it calls `func_00116990` first and discards the result, then returns 1
+unconditionally.  **It is a compare-and-refresh, and the expensive path is the
+cache hit** - the opposite of what the name suggests.  A refresh that failed
+still reports a hit.
+
+`func_0011631C` is the integer base-8 logarithm, and the way it computes the
+logarithm is the interesting part: it divides by **2** in a loop rather than by 8,
+so the loop counts halvings and the final `sll 3` converts at the end.  The
+result is `(halvings << 3) | odd part`, packed into one word.
 
 ## Pipeline
 
