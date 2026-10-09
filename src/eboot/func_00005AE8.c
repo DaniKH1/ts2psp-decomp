@@ -2,9 +2,9 @@
  * The Sims 2 PSP - func_00005AE8 (0x00005AE8, 0x8 bytes)
  *
  *     jr    $ra
- *     ori   $v0, $zero, 0x3
+ *       ori   $v0, $zero, 0x3
  *
- * Returns 3 in $v0.
+ * Returns the constant value 3 in $v0.
  */
 #include "types.h"
 

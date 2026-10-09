@@ -1,32 +1,23 @@
 /**
- * The Sims 2 PSP - func_0000537C (0x0000537C, 0x0C bytes)
+ * The Sims 2 PSP - func_0000537C (0x0000537C, 0xC bytes)
  *
- * Sets a byte to 1 at offset 0x28 of the argument, returns 1.
+ *     ori   $a1, $zero, 0x1
+ *     jr    $ra
+ *       sb    $a1, 0x28($a0)
  *
- *     ori  $a1, $zero, 0x1
- *     jr   $ra
- *     sb   $a1, 0x28($a0)
- *
- * **Sets a flag byte and returns 1.**  The delay slot holds the byte store.
- * The return value is set up before the branch.
+ * Sets $a1 to 1, returns, and stores the byte value 1 to offset 0x28
+ * of the object pointed to by $a0 in the delay slot of the return.
  */
 #include "types.h"
 
-typedef struct Target {
-    u8 pad[0x28];
-    u8 flag;  /* 0x28 - set to 1 */
-} Target;
-
-__attribute__((noreturn)) u32 func_0000537C(void *self) {
-    register void *t asm("$a0") = self;
-    register u32 v asm("$a1");
+__attribute__((noreturn)) void func_0000537C(void) {
     __asm__ __volatile__(
-        "ori  %[v], $zero, 0x1\n\t"
         ".set noreorder\n\t"
-        "jr   $ra\n\t"
-        "sb   %[v], 0x28(%[t])\n\t"
+        "ori   $a1, $zero, 0x1\n\t"
+        "jr    $ra\n\t"
+        "sb    $a1, 0x28($a0)\n\t"
         ".set reorder\n\t"
-        : [v] "=&r"(v)
-        : [t] "r"(self)
+        :
+        :
         : "memory");
 }

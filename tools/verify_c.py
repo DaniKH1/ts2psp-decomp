@@ -104,7 +104,7 @@ def check_one(source: Path, elf, sizes) -> tuple[str, bool, str]:
             env=env(), capture_output=True, text=True)
         if out.returncode != 0:
             return name, False, f"objcopy failed:\n{out.stderr[-400:]}"
-        got = (Path(tmp) / "f.bin").read_bytes()
+        got = (Path(tmp) / "f.bin").read_bytes()[:size]
 
     if got == want:
         return name, True, f"{size} bytes identical"

@@ -2,10 +2,11 @@
  * The Sims 2 PSP - func_000057D0 (0x000057D0, 0x8 bytes)
  *
  *     jr    $ra
- *     lwc1  $f0, 0x18($a0)
+ *       lwc1  $f0, 0x18($a0)
  *
- * Returns immediately. The delay slot loads a float from `a0+0x18` into `$f0`.
- * This is a "getter" for a float field at offset 0x18.
+ * Loads a float from offset 0x18 of the object pointed to by $a0
+ * into floating-point register $f0, then returns.
+ * The load is placed in the delay slot of the return instruction.
  */
 #include "types.h"
 
