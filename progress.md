@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 539 (see below) |
-| **C functions that byte-match** | **539** (linked from `src/`) |
+| functions written in C | 546 (see below) |
+| **C functions that byte-match** | **546** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 539 of the 539 files here are verified to compile to the original bytes; the
+> 546 of the 546 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -3846,6 +3846,71 @@ still reports a hit.
 logarithm is the interesting part: it divides by **2** in a loop rather than by 8,
 so the loop counts halvings and the final `sll 3` converts at the end.  The
 result is `(halvings << 3) | odd part`, packed into one word.
+
+#### Seven more, and what the vtables say about the classes
+
+Seven functions this pass, three of which are `func_0019D4AC`, `func_0019D508` and
+`func_0019D564`: constructors identical but for one `lui`, each stamping a vtable
+pointer into **0x18($a0)** before calling the base constructor `func_000B9C88`.
+**None of them writes `$v0`** - they are `void` constructors that hand back their
+argument in `$a0`.
+
+**The constructors make the three classes look independent; the vtables say
+otherwise.**  `sym_001EA3E8`, `sym_001EA4B8` and `sym_001EA588` are exactly 0xD0
+apart, each 26 entries of 8 bytes (a null word plus a pointer), slots running from
++0x08 to +0xC8.  Compared entry by entry, **the three differ in exactly two
+slots**:
+
+    +0x08   the constructor itself: 0019d4ac / 0019d508 / 0019d564
+    +0x30   000bbd84 / 000bbdc8 / 000bbe78
+
+The other 24 slots are the same address in all three.  **These are siblings that
+override one virtual method each**, the seventh virtual entry - not three classes
+with their own interfaces.  Their overriding methods are wildly different sizes
+(0x44, 0xB0 and 0x260 bytes) and all three begin by loading `0x8($a0)` and reading
+a float from it, which is consistent with three ways of doing the same geometric
+step rather than three unrelated operations.
+
+**Recording this as a correction.**  The first version of these files claimed each
+vtable was "0x34 entries" and that this showed "three classes with real virtual
+interfaces".  Both were wrong, and the error came from reasoning about what a
+0xD0-spaced vtable ought to contain instead of dumping the 26 entries and comparing
+them.  **The measurement is 26 slots, two of which differ** - a much more specific
+claim, and the opposite of the one the guess would have supported.**
+
+`func_0019D11C` is the matching dispatch and explains why the adjustment field is
+a *half-word*: it reads a thunk entry `{i16 adjust; void (*fn)()}` at `+8` from
+what `0x0($a0)` points to, and adds the signed adjustment to `this` in the `jalr`
+delay slot before transferring control.  **That is the multiple-inheritance
+`this` fixup, and `lh` rather than `lw` is what makes the offset signed.**  The
+`jalr` is a genuine tail call - the frame is torn down immediately after and no
+return address is fixed up.
+
+`func_001248D0` is the one genuinely geometric function here, and it is a
+one-dimensional interval walker.  Five floats:
+
+    0x0  current value          0x4  period / full scale
+    0x8  scale factor           0xC  cursor, the field being advanced
+    0x10 bound
+
+It adds the incoming step to the cursor and, on overflow, rescales the value as
+`(value / bound) * scale + value`.  **`bc1fl` is the nullifying form and the
+nullification is load-bearing**: on the path where the cursor is still inside the
+bound, the `ori $a1, 0x1` in its delay slot is *discarded*, leaving `$a1` at 0 and
+sending the `beqz` to the rescale.  Read plainly, the flag means "no wrap
+happened".  Note that 0x4 is used only on the non-wrap path and 0x8 only on the
+wrap path.
+
+`func_0019B9DC` registers the **same "!vlab" tag** as `func_0019B9B8` but through a
+different entry point, `func_000D6B20` instead of `func_000D90F4`.  **So "!vlab"
+has two registration paths and "surf" one** - the tag is not a key into a single
+table, it selects how a handler gets installed.
+
+`func_001AB9B8` is a vtable installer whose first store is dead in the original:
+it writes `sym_001EDC30` into 0x0($a0) and then overwrites it with
+`sym_00001C54` one instruction later.  **The second `beqz $a0` is also
+unreachable** - the first branch already proved `$a0` non-zero.  Both artefacts
+are in the shipped code, not in any reading of it.
 
 ## Pipeline
 
