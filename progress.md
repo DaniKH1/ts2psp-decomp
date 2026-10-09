@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 644 (see below) |
-| **C functions that byte-match** | **644** (linked from `src/`) |
+| functions written in C | 649 (see below) |
+| **C functions that byte-match** | **649** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 644 of the 644 files here are verified to compile to the original bytes; the
+> 649 of the 649 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -4676,6 +4676,106 @@ belongs to something else.  **The bytes do not say which**, and picking
 one reading would be a guess dressed as a finding.  What *is* decidable
 is that the 0x24 accessor in this family carries no size information at
 all, and now that eleven separate functions have demonstrated it.
+
+#### 289 vtables, a shared base of empty methods, and the type-name registry
+
+With the eleven closed, the next question was how big the rest of the
+object model is.  Scanning `.rodata` and `.data` for runs of pointers
+that are **genuine function starts** - not merely values inside
+`.text` - gives **289 candidate vtables**: 287 in `.data`, 2 in
+`.rodata`, from 5 to 377 slots, median 13.  **1,301 distinct functions
+appear in them.**
+
+**A shared base of 47 to 53 classes, and it is almost entirely empty.**
+Four functions - `func_00154908`, `func_00154910`, `func_00154920` and
+`func_00154928` - are all `jr $ra` / `nop`, and appear in 52, 53, 47 and
+47 vtables.  `func_00154930` is `return 0` and shares the same 47.
+
+**They are four separate addresses, not one.**  A single empty base
+method would appear at one address in every table that inherited it.
+Four distinct addresses, four hundred slots between them, means **the
+compiler emitted a copy at each override site and the linker merged
+none of them.**  The four also recur at overlapping slot ranges -
+`func_00154908` at slots 12, 14, 18, 24; `func_00154910` at 10, 12, 16,
+22; `func_00154920` at 16, 18, 22, 28; `func_00154928` at 18, 20, 24, 30
+- **the same addresses at the same depths in unrelated tables, which is
+one base class with four empty methods in a row.**
+
+The void variants are the more widely shared of the two shapes (52, 53,
+47, 47 against 47 for the boolean), **and that ordering is forced**: a
+subclass that replaces a `false`-returning method with a void body is
+legal, and the reverse is not.
+
+#### `func_00154938` returns a class name, and the strings after it are the registry
+
+The twelfth byte past `func_00154930` is the interesting one:
+
+    lui   $v0, %hi(str_gameObjectBehavior)
+    jr    $ra
+      addiu $v0, $v0, %lo(str_gameObjectBehavior)
+
+**A virtual method returning a class name, at the end of the base class
+that fifty classes inherit unchanged - that is how the game's
+serialisation or reflection system finds out what an object is.**
+
+And the `.rodata` region at `0x1C1D60` is that system's registry:
+**115 consecutive name-like strings and not one engine term among
+them.**
+
+    complex  character  player  mplayer  fplayer
+    oscardelfuego  anniehowell  hoothowell  virginyafeng
+    virginyafeng_vamp  nightbeast  circebeaker  lokibeaker
+    pt9  lazlocurious  dennisphilips  emilyemory  bulldratch
+    bedsinglemoderate  magicmirror  carmagazine  plumbobcar
+    moneytree  cowthulustage  cow  loading  g_hud  ring  date
+
+Five abstract names - `complex`, `character`, `player`, and `mplayer` /
+`fplayer`, the male and female player classes - then a run of **Sims and
+NPCs**, then a run of **props and objects**.  **Searching the block for
+`texture`, `mesh`, `skin`, `bone`, `anim`, `sound`, `font`, `shader`,
+`camera`, `light`, `node`, `graph`, `geom` or `vert` returns nothing**,
+so the registry names game content types exclusively: **the rendering
+and geometry types are named somewhere else, or not by string at
+all.**
+
+**`str_gameObjectBehavior` exists twice** - at `0x1BF9FC`, which is what
+`func_00154938` returns, and again as the registry's first entry at
+`0x1C1D60`.  Two copies of one string in `.rodata` means the linker did
+not merge them, so **the getter's result and the registry's first entry
+are different pointers to equal text, and a pointer comparison between
+them would fail.**  Which of the two is authoritative is not decidable
+here, but the duplication itself is.
+
+#### Two tooling mistakes of my own, both caught by a sanity check
+
+Getting these numbers took three attempts and two of them were wrong in
+ways that produced plausible output.
+
+**First: I counted tables per *slot*, not per table.**  A vtable that
+lists the same function twice - and several do, since a base class can
+be inherited twice - was counted twice.  The output said one function
+appeared in **56 tables** when the scan had found only **39**, which is
+impossible.  The fix is to accumulate addresses into a `set`, and the
+correctness check is the obvious one: **the maximum count over all
+functions cannot exceed the number of tables found.**  That single
+assertion would have caught it immediately, and it is now part of the
+script.
+
+**Second: I guessed where `.text` ended and guessed it wrong.**  Using
+`0 < w < 0x1B0128` accepted small integers as code addresses, so `0x1`,
+`0x2`, `0x5` appeared as "functions" in a dozen tables each, and only
+**235 of 1,710** entries resolved to a real `func_` symbol.  The section
+headers give the real bounds - `.text` 0x0 to 0x1B0128, `.rodata`
+0x1BF880 to 0x1D1ABC, `.data` 0x1D1B00 to 0x1EDF88 - but even those are
+not enough: **the right test is not an address range at all, it is
+membership in the set of known function starts**, which the symbol map
+gives directly.  With that filter every entry is a function and the
+numbers become sane: 289 tables, 1,301 functions, 47 the widest
+membership.
+
+**The general lesson is that both errors were caught by checking whether
+the output was self-consistent, not by looking at it.**  Neither
+produced an obviously wrong number in isolation.
 
 **There is a second vtable family, and it has the same shape.**  The three
 `sym_001EA3E8` / `sym_001EA4B8` / `sym_001EA588` records found earlier are
