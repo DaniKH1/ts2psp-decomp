@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 639 (see below) |
-| **C functions that byte-match** | **639** (linked from `src/`) |
+| functions written in C | 644 (see below) |
+| **C functions that byte-match** | **644** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 639 of the 639 files here are verified to compile to the original bytes; the
+> 644 of the 644 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -4593,6 +4593,89 @@ three times that by its other users.  **A 0x24 accessor in this class
 family describes nothing whatsoever about the size of what it hands
 out** - and this is the fourth independent function in the cluster to
 disagree with that getter about the size.
+
+#### Four nullifying-branch idioms, and the whole family closed
+
+Slot +0x034 is finished, and with it **every function the eleven
+vtables name at any of the seven varying slots**.  Seven of seven, no
+pending entries.
+
+`func_000BD3A4` was the last one, and it is **the function every other
+member of its own slot calls first** - `jal func_000BD3A4` is the opening
+instruction of all ten of them, so the tenth member of the slot is the
+slot's shared prologue.
+
+**It contains the fourth instance of the multiple-inheritance thunk and
+the second inlined one, and it settles where the thunk array lives:**
+
+    lw    $a0, 0x18($s1)
+    addiu $a0, $a0, 0xD0
+    lh    $a1, 0x0($a0)
+    lw    $a2, 0x4($a0)
+    jalr  $a2
+      addu  $a0, $s1, $a1
+
+`func_000BE138` pinned **+0xD0** out of its own loop one pass ago, and
+this reads +0xD0 out of `0x18($s1)` - **two independent call sites
+agreeing on the same offset.**  The entry is 8 bytes: signed half-word
+adjustment at +0, function pointer at +4.
+
+**Bit 0x40000000 of the second argument gates a call to
+`updateNodeGraph_03FC`, and `func_000BFF34` - the eleventh member, in a
+different slot - gates on that same bit and calls the same
+`updateNodeGraph_03FC`.**  Two functions in different slots of different
+vtables keying off one bit and reaching for one callee is about as
+strong a link as bytes alone can give.
+
+**Four uses of a nullifying FP branch, and none of them mean the same
+thing.**  All four are `bc1fl`/`bc1tl` with a useful instruction in the
+delay slot, and the nullify bit is what decides which:
+
+| where | compare | delay slot | effect |
+| --- | --- | --- | --- |
+| `func_000BDCF4` | `c.le.s` vs 0.0f | `mov.s $f13, $f12` | clamp: `min(x, 0)` |
+| `func_000BD3A4` | `c.le.s` vs 0.0f | `ori $a0, $zero, 0x1` | boolean: `x > 0` |
+| `func_000BFF34` | `c.eq.s` vs 0.0f | `ori $a0, $zero, 0x1` | boolean: `x != 0` |
+| `func_000BFF34` | - | - | plain `bc1t` + `nop`: early-out |
+
+**The two `ori`-in-delay-slot cases differ by one comparison**, `c.le.s`
+against `c.eq.s`, which is the difference between testing the sign and
+testing against zero.  And the module also writes the same predicate the
+long way elsewhere: `func_000BFC2C` builds a pointer equality as
+`xor` / `sltiu $a1, $a1, 0x1` / `andi $a1, $a1, 0xFF`.  **Two ways of
+asking "is it non-zero" in one module, one five instructions and one
+three.**
+
+`func_000BE220` stores **one quantity in three encodings** - `0x14`
+clamped, `0x18` copied as a float, and `0x1C` truncated with
+`trunc.w.s` and stored as a word at `0xBC`.  `func_000BFF34` truncates a
+float to a **single byte** at `0x221`.
+
+`func_000BE220`'s eight block copies are two 12-byte structs followed by
+six 8-byte pairs, **with matching strides on both sides** - source
+`0x20`, `0x2C`, `0x38`, then `0x40` by 8; destination `0xC0`, `0xCC`,
+`0xD8`, then `0xE0` by 8 - so the two records have identical layout.
+That the `0x38` and `0x40` elements are 8 apart while the pair before
+them is 12 apart is the clearest statement in the slot that **the record
+is not uniformly packed and these are not an array of one type.**
+
+**And the members still disagree about the size of the object at
+`0x24($s0)`**, which is the point worth keeping:
+
+| member | highest byte written | object is at least |
+| --- | --- | --- |
+| `func_000BE540` | 0xBC | 0xBD bytes |
+| `func_000BE220` | 0x104 | 0x108 bytes |
+| `func_000BDF18` | 0x12C | 0x130 bytes |
+| `func_000BFF34` | 0x224 | 0x225 bytes |
+
+**Four functions, one field, four different lower bounds, spanning 0xBD
+to 0x225.**  They are not measuring the same object, or they are
+measuring one object and three of them are writing into memory that
+belongs to something else.  **The bytes do not say which**, and picking
+one reading would be a guess dressed as a finding.  What *is* decidable
+is that the 0x24 accessor in this family carries no size information at
+all, and now that eleven separate functions have demonstrated it.
 
 **There is a second vtable family, and it has the same shape.**  The three
 `sym_001EA3E8` / `sym_001EA4B8` / `sym_001EA588` records found earlier are
