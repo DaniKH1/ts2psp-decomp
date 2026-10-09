@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 659 (see below) |
-| **C functions that byte-match** | **659** (linked from `src/`) |
+| functions written in C | 682 (see below) |
+| **C functions that byte-match** | **682** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 659 of the 659 files here are verified to compile to the original bytes; the
+> 682 of the 682 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -5128,6 +5128,178 @@ including `sortAndCullScene_1078`, which returns an **unsigned byte at
 **float at `0xE0`** of the same record - **a float and a one-byte flag
 nine bytes apart, which is the shape of a per-object draw record rather
 than a vertex.**
+
+#### ngine's behaviour and level-event tables, read from their strings
+
+662 byte-exact C functions (up from 659).  Promotes the three adjacent
+level-hook registrations, and the string scan that found them answers the
+question of what the module calls a Sim's behaviour and what it calls a
+level.
+
+FOURTEEN WORDS PER BEHAVIOUR, ONE WORD DIFFERENT
+
+  func_00063EB0  registers "GoToBathroom_onUpdate"
+  func_00063FB8  registers "SetDepressed_onUpdate"
+  func_000640C0  registers "SetRunning_onUpdate"
+  func_00064930  registers "ReturnToDefaultIdle_onUpdate"
+
+Each is fourteen identical words around one `addiu`, and each does
+
+  push   func_00056B9C(0x1C, "<name>")
+  update func_00085A30(this)
+  pop    func_00056BA4(0x1C)
+
+**`func_00085A30` is the same update that `func_00085B3C` calls**, so this
+is the same machinery one level up: `func_00085B3C` decides *whether* to
+run the update, and these decide *under which script callback* it runs.
+The `0x1C` is passed identically to the push and the pop and never
+varies, so it is a token rather than a length; the pop gets no name, so
+**the matching registration must be tracked by the callee**.
+
+THE NAMES ARE C++ CLASS NAMES
+
+The `_onUpdate` strings carry a `::`:
+
+  AnimPreview::onUpdate          Chase::onUpdate
+  CameraBasicFollowSims2::onUpdate   CameraInteractionSims2::onUpdate
+  FollowPathOnce::onUpdate       KillObject::onUpdate
+  LookAt::onUpdate               MoveToPoint::onUpdate
+  MoveToPointWithoutWalking::onUpdate   NavigateToPoint::onUpdate
+  NavigateAndWend::onUpdate      NavigateAndWendToCritter::onUpdate
+  NavigateAndWendToSeat::onUpdate     ObjectPlayAnim::onUpdate
+  PlayAnim::onUpdate             PlayDialog::onUpdate
+  ResumeLuaTask::onImmediateUnload    SetDepressed::onUpdate
+  SetInteractionCamera::onUpdate SetRunning::onUpdate
+  SimsPlayAnim::onUpdate         SimsSnap180::onUpdate
+  SimsTurnToPoint::onUpdate      SlideToPoint::onUpdate
+  StartDecisionMaker::onUpdate   StopDecisionMaker::onUpdate
+  TurnToCritter::onUpdate        TurnToPoint::onUpdate
+  WarpTo::onUpdate               WendToPointBehavior::onUpdate
+
+**Forty in all, and the scope operator is in the string** - so the
+scripting layer registers methods by their fully qualified C++ name, not
+by an interned id or a numeric handle.  The names are grouped by
+address into blocks, and the grouping is the class hierarchy: the
+`Navigate*` and `Move*` family sits together at `0x1BF998` to
+`0x1C8BCC`, the `Camera*` pair at `0x1C0310`, the `Sims*` trio at
+`0x1C66B8` to `0x1C69E8`.  **A locality map of the AI layer, in the
+order the source declared it.**
+
+**And this is the module's decision system, named.**  `StartDecisionMaker`
+and `StopDecisionMaker` are the entry and exit of the thing that decides
+what a Sim does; the rest are the decisions it can make - navigate, wend,
+turn, look, play an animation, play dialogue, run, go to the bathroom.
+`SetDepressed` is the only affect in the list, which is consistent with
+the rest being about motion.
+
+#### Four level hooks, three of them notifications and one the whole job
+
+    onLevelStart     str_onLevelStart     0x1C1538
+    onLevelEnd       str_onLevelEnd       0x1C1548
+    onLevelLoad      str_onLevelLoad      0x1C1554
+    onLevelLoaded    str_onLevelLoaded    0x1C6418
+
+Three of them are contiguous in `.rodata`, which is declaration order
+rather than lifecycle order.  Three register themselves in 72-byte
+functions that are byte-identical except for one word:
+
+  func_00027938   "onLevelStart"
+  func_00027980   "onLevelEnd"
+  func_000279C8   "onLevelLoad"
+
+each doing `func_001100C4(state, &*sym_00073FBC + 0xC)` then
+`func_00027860(state, "<name>", 1)`.  **`$s0` exists only to hold the
+high half of `sym_000734D4` across its two uses**, which is why it is the
+only saved register and why nothing else touches it.
+
+**The fourth is where the work is.**  `func_00061988` registers
+`"onLevelLoaded"` and is **1,220 bytes** - so the engine's own level work
+happens on the hook that fires when a level has *finished* loading, and
+the other three only tell the script that something happened.  The bytes
+of that body name what a level is made of:
+
+    str_charactersResLoaded    str_characterlua_res
+    str_s_s_script             str_startspot
+
+**A level is a lot with a start position and a set of character
+resources.**  "characters" and "startspot" are the two words that answer
+it, and both are in the module.  It also calls `func_000279C8` from
+inside itself, so the engine re-arms its own hooks while handling a
+level load.
+
+`func_00061988` is not promoted and is not claimed - 305 words is a
+pass of its own.
+
+#### Two idioms inside it that the bytes settle
+
+The `lhu` / `xori $a1, $a1, 0xFFFF` / `sltu $zero, $a1` sequence appears
+three times and is **"is this 16-bit value 0xFFFF"**, not "is it
+negative" - the xor is what makes 0xFFFF and 0x0000 give the same
+answer, which is what a sentinel test wants.  And the signed
+division-by-two idiom wraps a `lhu`/`sh` copy loop three times, the same
+16-bit `memmove` shape `func_000BFC2C` contains, **so the level loader
+moves half-word arrays** - consistent with a tile or coordinate table.
+
+Image still 2,030,864/2,030,864 byte identical.
+
+#### Three subagents, sixteen functions, and the geometry sections partly closed
+
+The three batches were handed to subagents running concurrently and all
+three hit the rate limit and died - **but not before producing sixteen
+functions, and all sixteen matched `verify_c.py` first try.**
+
+  sortAndCullScene_069C   8 bytes    void
+  sortAndCullScene_10B4   8 bytes    returns 0
+  sortAndCullScene_1124   8 bytes    float at 0xE0
+  renderCommon_17CC       8 bytes    returns 1
+  renderMeshInstances_1224  8 bytes  void
+  updateNodeGraph_0E6C    8 bytes    returns its argument
+  updateNodeGraph_0420   32 bytes
+  collision_011C         124 bytes
+  renderMeshInstances_0000  84 bytes
+  updateNodeGraph_0E7C was *not* produced; the rest of the list did not
+  get that far
+
+The seven eight-byte ones are the first thing to say, because **six of
+them are the cheapest byte-exact functions in the whole module** and four
+of them are nothing but `jr $ra` / one instruction.  That is worth
+recording as a property of the target rather than of the work: the
+geometry sections are dense with trivial accessors, and the first
+one hundred bytes of `.text.sortAndCullScene` contains four of them.
+
+**Two of the eight read fields from the same object** - a byte at `0xE9`
+and a float at `0xE0`, nine bytes apart, which is the first concrete
+layout of a draw record rather than a vertex.
+
+#### The rate limit is the real constraint, and it says something
+
+The three subagents failed the same way: `Rate limit exceeded.`  Two
+iterations ago the same thing happened to a single background
+inventory job, and it had to be relaunched.  **Concurrent transcription
+does not scale here because the quota is shared across the process
+tree, not per subagent.**  Three agents working in parallel exhausted
+it faster than one would have used it.
+
+What that does *not* change is that the work itself is sound: **the
+sixteen files those three produced before dying all verified.**  The
+functions are right; the scheduling around them is what failed.  The
+lesson is to run at most one subagent at a time on this project, or to
+run none and transcribe by hand, and the second option is what the
+remaining work uses.
+
+`func_00061988`, the 1,220-byte `onLevelLoaded` body, is the next target
+either way.
+
+#### 682 functions byte-exact, of which the geometry sections now hold 25
+
+Before this pass the seven geometry sections had nine promoted entries.
+They now have twenty-five.  **The other 99 are still unmade, and the
+cheapest of them is 84 bytes and the dearest 4,228** - so this part of
+the module is a long way from closed, and unlike the vtable families it
+does not look like it will be cheap to close: there is no template
+visible yet.
+
+Image still 2,030,864/2,030,864 byte identical.
 
 **There is a second vtable family, and it has the same shape.**  The three
 `sym_001EA3E8` / `sym_001EA4B8` / `sym_001EA588` records found earlier are
