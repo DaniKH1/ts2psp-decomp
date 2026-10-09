@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 597 (see below) |
-| **C functions that byte-match** | **597** (linked from `src/`) |
+| functions written in C | 604 (see below) |
+| **C functions that byte-match** | **604** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 597 of the 597 files here are verified to compile to the original bytes; the
+> 604 of the 604 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -4116,6 +4116,75 @@ consecutive run from 0x000BD5F4 to 0x000BE8B8, then 0x000BEE9C, then a gap to
 six +0x1C getters, are inside that run** - which is what makes the spacing a
 per-class block rather than a coincidence, and it is why those two 0x1C
 getters are the next ones worth writing.
+
+#### Eight more, and the rule from the last pass gets a confirmation
+
+Writing `func_000BEBDC` and `func_000BED6C` settled what the census could only
+suggest.  **The run of thirteen 0x24 getters is not thirteen copies of one
+accessor** - it is one class's block in which one member happens to have
+thirteen getters and the member at 0x1C has two, and those two sit *inside* the
+run.  So the block's offsets are 0x1C and 0x24.
+
+The duplicated-pair rule from the previous pass also gets its first test away
+from offset 0.  `func_00080584` and `func_0008058C` are identical adjacent
++0x18 getters, and they sit **directly inside another class's accessor block** -
+which is what distinguishes "emitted twice" from "a second class that happens to
+match".  The second reading is not merely unlikely, it is *unavailable* when the
+pair is inside a block: a different class would not be emitted in the middle of
+this one's accessors.
+
+**The cleanest instance is the whole block at 0x000804B8-0x000805D4**, which is
+six consecutive small functions:
+
+    func_000804B8   bit 3 of 0x4($a0)      flag query
+    func_00080514   lw $v0, 0x1C($a0)     getter
+    func_0008054C   lw $v0, 0x20($a0)     getter
+    func_00080584   lw $v0, 0x18($a0)     getter
+    func_0008058C   lw $v0, 0x18($a0)     duplicate
+    func_000805D4   addiu $v0, $a0, 0x8   base-pointer accessor
+
+So this class has a flags word at 0x04, words at 0x18, 0x1C and 0x20, and a
+sub-object at +8.  **0x20 is the only getter in the module that reads it**, and
+`func_000805DC` immediately after the block dereferences 0x2C($s1) + 0x18, so
+the object is at least 0x30 bytes with 0x24-0x2C having no accessor.
+
+`func_000804B8` is worth a second look: `andi $v0, $a0, 0x8` followed by
+`sltu $v0, $zero, $v0` is **a bitmask test cast to a real boolean** - the same
+pair as `func_00112148`, and without the `sltu` the caller would have to know
+that "true" is 8.  `tools/flag_accessors.py` already censuses this shape and
+reports eight of them over eight (offset, mask, bit) rows, with bit 3 at offset
+0x04 being exactly this function.
+
+**One correction to a claim made here earlier.**  A draft of this section said
+bit 3 "means the same thing in this class and in `func_000BBE78`'s", on the
+strength of both using `andi $a1, $a1, 0x8`.  The census does not support that:
+**every row in the accessor census is a different offset and a different bit**,
+and the only two that share a bit number are both in the 0x18 halfword of a
+different class (bit 20, `func_001A9D54`/`D68`/`D80`).  So `0x8` is one
+accessor's mask and `func_000BBE78`'s is another's; **the coincidence is a
+shared mask value, not a shared flag meaning**, and the file for
+`func_000804B8` was left as it was rather than gaining the claim.
+
+**A file worth keeping as the reference for this shape.**  `func_000804B8` was
+already transcribed in a *readable* form - a typed struct and a named return -
+rather than the bare `__attribute__((noreturn))` block that is the default
+idiom here.  **A rewrite of it to match the surrounding files' style would have
+made it worse**, so it was reverted rather than kept.  `func_001A9ABC` and
+`func_00112148` are the same boolean-cast shape, and `func_001A9ABC`'s file is
+the most explicit about why the cast exists at all.
+
+#### `addiu $v0, $a0, 0x8` is the other half of the thunk idiom
+
+`func_000805D4` returns `this + 8` and is **not** a field getter - it hands back
+a pointer into the object so the caller can treat the sub-object as an object
+and call accessors on it.  The counterpart is `func_0019D11C`, which reads a
+*signed half-word* adjustment out of a thunk and adds it to `this` before a
+`jalr`.  **Between them the two ends of the multiple-inheritance adjustment are
+both visible in the module: one hard-coded at a compile-time offset, one computed
+per-object from a vtable entry.**  Because `func_000805D4`'s offset is a
+constant, its sub-object sits at a fixed place in the class rather than at a
+position that varies - which is the difference between single inheritance with
+a base class and a genuine multiple-inheritance thunk.
 
 ## Pipeline
 
