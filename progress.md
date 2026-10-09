@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 655 (see below) |
-| **C functions that byte-match** | **655** (linked from `src/`) |
+| functions written in C | 657 (see below) |
+| **C functions that byte-match** | **657** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 655 of the 655 files here are verified to compile to the original bytes; the
+> 657 of the 657 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -4986,6 +4986,56 @@ module is -4.**  Every question this cluster raised about the multiple
 inheritance is now answerable from the bytes except *why the base goes
 first*, which is a layout choice the compiler made and the data does not
 argue either way about.
+
+#### The vtable entry is not always a thunk, and two base calls that do nothing
+
+The sixteen regular 0xA8-byte records from `0x1E5D68` each need six
+unmade functions, and three of them are in **all sixteen**: `func_00085AE4`,
+`func_00085B10` and `func_00085B3C`.  The first two are promoted, and
+reading them produced a correction to how this report has been labelling
+things for four passes.
+
+    addiu $sp, $sp, -0x20
+    lw    $a1, 0x38($a0)
+    addiu $a1, $a1, 0x38        <- entry 7
+    lh    $a2, 0x0($a1)
+    lw    $a1, 0x4($a1)
+    jalr  $a1
+      addu  $a0, $a0, $a2
+    ...
+
+**This is not a multiple-inheritance thunk.**  `0x38($this)` is the
+object's vtable pointer - `func_0017FE50` installs the class's own table
+there - so `addiu $a1, $a1, 0x38` advances past seven entries and indexes
+**entry 7 of the primary table**.  The `lh` reads that entry's adjustment
+field and the `lw` its pointer, exactly as a thunk reader does, **but
+this is the primary table where every adjustment is zero**, so `$a2` is
+0 and the call is made with `this` unadjusted.
+
+**So the eight-byte `{i16 adjust, fnptr}` shape has two uses that are
+indistinguishable from the instruction stream alone:** a real adjustment
+when the entry sits in a secondary base's thunk table, and a zero
+adjustment when it is a plain slot of the primary.  **Telling them apart
+requires the table, not the code.**  Every previous pass in this report
+described this instruction sequence as a thunk on the strength of the
+code alone, and this is the case where that reading was wrong.
+
+**And the slot it calls is empty.**  Entry 7 of the primary table at
+`0x1E5D60` is `func_00154920`, which is `jr $ra` / `nop`;
+`func_00085B10` calls entry 8, which is `func_00154928`, also `jr $ra` /
+`nop`.  **Both are no-ops that pay for a frame and an indirect call to
+reach a body that does nothing** - qualified base-class calls the
+compiler could not devirtualise, landing on defaults that were never
+overridden.  Eleven words apart in `.text`, twenty-eight bytes apart in
+every table.
+
+That is the module's fourth distinct use of an indirect call with no
+effect, after the three dead `beqz $s1` in `func_000BD634`, the dead
+branches in the `+0x01C` overrides, and the discarded
+unsigned-to-float conversions in `func_000BE540`.  **All four are
+artefacts of the compiler being unable to fold something it had already
+resolved**, which is a different thing from a bug and shows up the same
+way in the disassembly.
 
 **There is a second vtable family, and it has the same shape.**  The three
 `sym_001EA3E8` / `sym_001EA4B8` / `sym_001EA588` records found earlier are
