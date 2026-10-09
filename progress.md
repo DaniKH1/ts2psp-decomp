@@ -4277,6 +4277,58 @@ from the bytes and count, do not place the label where the surrounding code
 looks like it belongs.**  `verify_c.py` reported "3 of 40 words differ" every
 time and the size guard never fired.
 
+#### The eleven globals are eleven vtables, and there is a second vtable family
+
+The per-instance globals the groups name turned out to be the key to the whole
+structure.  Collecting every pointer the eleven wide members name gives fourteen
+globals, and eleven of them are **exactly 0xD8 apart**:
+
+    sym_001EAA78  sym_001EAB50  sym_001EAC28  sym_001EAD00  sym_001EADD8
+    sym_001EAEB0  sym_001EAF88  sym_001EB060  sym_001EB138  sym_001EB2E8
+    sym_001EB560
+
+`0xD8` = 216 bytes = **27 eight-byte entries**.  Reading each 216-byte record as
+a table of pointers settles what it is: **25 of its 27 entries are the same in
+all eleven, and every one points into `.text`.**
+
+So the eleven groups are not eleven instances of one type - **they are eleven
+sibling classes, and `sym_001EAA78` is the vtable of the first.**  The two
+globals `func_000BD634` also names, `sym_001E9E30`, `sym_001E9478` and
+`sym_001E9300`, are a *different* set: they sit at irregular spacing (+0x178,
++0x9B8, +0xC48) and each is named by all eleven, so they are shared, not
+per-class.
+
+**Slot by slot, the eleven vtables differ in seven entries:**
+
+| slot | differs | what |
+| --- | --- | --- |
+| +0x0C | 11 distinct | each class's own `func_000BD7A8`-shape |
+| +0x014 | 11 distinct | each class's own |
+| +0x01C | 5 distinct | five behaviours across eleven classes |
+| +0x034 | 11 distinct | each class's own |
+| +0x04C | 2 distinct | `func_000C00AC` or `func_0018F668` |
+| +0x064 | 2 distinct | `func_000AF58C` or `func_00198140` |
+| +0x0D4 | 10 distinct | ten of eleven set it |
+
+and the other 19 are identical across all eleven.  **The two slots that differ
+in exactly two variants, +0x04C and +0x064, are the only binary choices in the
+whole interface** - everything else is either per-class or invariant.
+
+**There is a second vtable family, and it has the same shape.**  The three
+`sym_001EA3E8` / `sym_001EA4B8` / `sym_001EA588` records found earlier are
+26 slots at a 0xD0 stride with two differing entries; these eleven are 27 slots
+at a 0xD0... **0xD8** stride with seven.  **Both put a constructor at slot +0x0C**
+- `func_0019D4AC`-shaped in one family, `func_000BD7A8`-shaped in the other - and
+both are built out of the same run of `func_0018F6xx` default stubs, so the two
+families share a base class.  **Slot +0x0C is the constructor in every vtable
+found in this module so far**, and `func_000BD634` - the function transcribed
+last - is itself one of these constructors.
+
+`+0x04C`'s two variants are worth a note: one is `func_0018F668`, **the void
+default** already promoted from the first family.  **The same stub is reused
+across both vtable families**, which is what a shared base class looks like
+once the inheritance is flat.
+
 ## Pipeline
 
 #### `addiu $v0, $a0, 0x8` is the other half of the thunk idiom
