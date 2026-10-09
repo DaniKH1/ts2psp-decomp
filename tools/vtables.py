@@ -46,9 +46,15 @@ from paths import ELF_PATH
 
 MIN_PTRS = 4
 MIN_ENTRIES = 4
-MAX_ENTRIES = 4096
+MAX_ENTRIES = 8192
 MIN_PTR_FRACTION = 0.6
 ENTRY = 8
+
+# An adjustment is a byte offset applied to `this`, so it has to be small.
+# Without this bound a plain data table whose words happen to alternate
+# data and code reads as a thunk table with million-byte offsets, which is
+# what happened when the adjustment word was accepted unfiltered.
+MAX_ADJUST = 0x2000
 
 # Tables in this module are laid out back to back, so a run of conforming
 # entries is usually several tables and not one.  The largest run found
@@ -90,7 +96,18 @@ def find_tables(elf, funcs):
     A table may begin with a zero header - the eleven-record family has an
     eight-byte one, so 8 + 26 * 8 == 216 exactly - so a zero entry is
     tolerated at the front and does not break the run.
+
+    The adjustment word is taken as it stands, so long as it is small
+    enough to be a byte offset - sym_001E5DD0 carries -4 in every entry
+    and is a genuine multiple-inheritance thunk table.  Requiring it to
+    be zero, as an earlier version did, discarded precisely those.
     """
+    def signed(a):
+        return a - 0x10000 if a & 0x8000 else a
+
+    def plausible(a):
+        return a == 0 or abs(signed(a)) <= MAX_ADJUST
+
     secs = {s.name: s for s in elf.sections}
     tables = []
     for sec in (secs[".rodata"], secs[".data"]):
@@ -100,18 +117,19 @@ def find_tables(elf, funcs):
         i = 0
         while i < nent:
             adj, f = words[2 * i], words[2 * i + 1]
-            if f != 0 and (f not in funcs or (adj != 0 and adj != 0xFFFFFFFF)):
+            if f != 0 and (f not in funcs or not plausible(adj)):
                 i += 1
                 continue
-            j, nptr, nonzero_adj = i, 0, 0
+            j, nptr, nonzero_adj, adjusts = i, 0, 0, set()
             while j < nent:
                 a, b = words[2 * j], words[2 * j + 1]
                 if b == 0 and a == 0:
                     j += 1              # header or trailing nulls
                     continue
-                if b not in funcs or (a != 0 and a != 0xFFFFFFFF):
+                if b not in funcs or not plausible(a):
                     break
                 nptr += 1
+                adjusts.add(a)
                 if a:
                     nonzero_adj += 1
                 j += 1
@@ -119,7 +137,7 @@ def find_tables(elf, funcs):
             if (nptr >= MIN_PTRS and MIN_ENTRIES <= span <= MAX_ENTRIES
                     and nptr >= span * MIN_PTR_FRACTION):
                 tables.append((sec.addr + i * ENTRY, span, words[2 * i:2 * j], sec.name,
-                               nonzero_adj))
+                               nonzero_adj, sorted(adjusts - {0})))
             i = j if j > i else i + 1
     return tables
 
@@ -165,7 +183,7 @@ def main() -> int:
     # like two classes, and the tell is that the maximum exceeds the total.
     use = defaultdict(set)
     slots_of = defaultdict(set)
-    for addr, span, words, _sec, _nz in tables:
+    for addr, span, words, _sec, _nz, _adj in tables:
         for k in range(0, len(words), ENTRY):
             w = words[k + 1]
             if w in funcs:
@@ -178,7 +196,6 @@ def main() -> int:
         % (len(tables), widest))
 
     sizes = sorted(t[1] for t in tables)
-    nzadj = sum(1 for t in tables if t[4])
     merged = [t for t in tables if t[1] > LIKELY_MERGED]
     print("candidate table runs: %d  (8-byte entries)" % len(tables))
     bysec = defaultdict(int)
@@ -190,7 +207,26 @@ def main() -> int:
           % (sizes[0], sizes[len(sizes) // 2], sizes[-1]))
     print("  distinct functions used as entries: %d" % len(use))
     print("  widest single membership: %d of %d runs" % (widest, len(tables)))
-    print("  tables with any non-zero adjustment: %d" % nzadj)
+
+    print()
+    print("adjustment words, which are the multiple-inheritance offsets:")
+    hist = defaultdict(int)
+    for t in tables:
+        for a in t[5]:
+            hist[a] += 1
+    if not hist:
+        print("   none: every entry in every run has adjustment 0, so these")
+        print("   tables have the layout of thunk arrays and behave as plain")
+        print("   vtables.")
+    else:
+        for a, c in sorted(hist.items()):
+            signed = a - 0x10000 if a & 0x8000 else a
+            print("   %6d (0x%04X = %+d)  in %d runs" % (a, a, signed, c))
+        nz = [t for t in tables if t[4]]
+        print("   %d of %d runs carry a non-zero adjustment" % (len(nz), len(tables)))
+        for t in sorted(nz, key=lambda t: -t[4])[:8]:
+            print("      0x%06X  %4d entries, adjustments %s"
+                  % (t[0], t[1], [a - 0x10000 if a & 0x8000 else a for a in t[5]]))
     if merged:
         print()
         print("  %d run(s) longer than %d entries; each is probably several"
@@ -204,21 +240,32 @@ def main() -> int:
     hist = defaultdict(int)
     for v in use.values():
         hist[len(v)] += 1
-    print()
-    print("functions appearing in exactly k tables:")
-    for k in sorted(hist):
-        if k >= 3:
-            print("   k=%-3d %4d functions" % (k, hist[k]))
+    biggest = max(sizes) if sizes else 0
+    if biggest > sum(sizes) * 0.5:
+        print()
+        print("  MEMBERSHIP CENSUS SUPPRESSED")
+        print("  One run holds %d of %d entries, so nearly everything landed in a"
+              % (biggest, sum(sizes)))
+        print("  single block.  A membership count over one run is trivially 1 for")
+        print("  every function and says nothing.  Separate the tables first; this")
+        print("  happens whenever the adjustment filter is relaxed far enough to")
+        print("  keep the real thunk tables.")
+    else:
+        print()
+        print("functions appearing in exactly k tables:")
+        for k in sorted(hist):
+            if k >= 3:
+                print("   k=%-3d %4d functions" % (k, hist[k]))
 
-    print()
-    print("most widely shared methods:")
-    for w, v in sorted(use.items(), key=lambda kv: -len(kv[1]))[:ns.wide]:
-        name = labels.get(w, "<unlabelled 0x%X>" % w)
-        size = function_size(name) if name.startswith("func_") else None
-        sl = sorted(slots_of[w])[:4]
-        tag = "promoted" if (Path("src/eboot") / (name + ".c")).exists() else ""
-        print("   %-16s %3d tables  size %-5s slots %-14s %s"
-              % (name, len(v), size, ",".join(str(x) for x in sl), tag))
+        print()
+        print("most widely shared methods:")
+        for w, v in sorted(use.items(), key=lambda kv: -len(kv[1]))[:ns.wide]:
+            name = labels.get(w, "<unlabelled 0x%X>" % w)
+            size = function_size(name) if name.startswith("func_") else None
+            sl = sorted(slots_of[w])[:4]
+            tag = "promoted" if (Path("src/eboot") / (name + ".c")).exists() else ""
+            print("   %-16s %3d tables  size %-5s slots %-14s %s"
+                  % (name, len(v), size, ",".join(str(x) for x in sl), tag))
     return 0
 
 

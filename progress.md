@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 653 (see below) |
-| **C functions that byte-match** | **653** (linked from `src/`) |
+| functions written in C | 655 (see below) |
+| **C functions that byte-match** | **655** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 653 of the 653 files here are verified to compile to the original bytes; the
+> 655 of the 655 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -4832,6 +4832,103 @@ this function, one per base class that declares a boolean method, and
 the linker kept none of them.**  That is visible directly in the symbol
 map and needs no scan at all, which is why it is worth stating
 separately from the counts a scan cannot pin down.
+
+#### Every adjustment is not zero, and the whole table block is one run
+
+**The claim in the last commit that every adjustment in every table is
+zero was wrong, and it was wrong because the tool silently discarded the
+entries that disagreed.**  `find_tables` required the adjustment word to
+be zero, so every entry with a real multiple-inheritance offset was
+rejected and the census reported `tables with any non-zero adjustment: 0`
+- a statement about the filter, not about the module.
+
+Accepting any plausible adjustment changes the picture completely:
+
+    candidate table runs: 2
+    entries: min 16, median 5071, max 5071
+    distinct functions used as entries: 537
+
+    adjustment words:
+       -272  -144  -128  -88  -72  -60  -48
+        -40   -36   -28   -24   -20   -8   -4
+
+**There is one block of 5,071 eight-byte entries running from `0x1E4110`
+to the end of `.data`, and it contains every table in the module.**  4,655
+of its entries have adjustment 0 and 416 do not - **and every non-zero
+adjustment is negative**, from -4 to -272, with -4 by far the most common.
+
+**Negative, and that is the answer to a question the earlier passes kept
+asking.**  A base sub-object at a negative offset means the base sits
+*before* the derived object in memory, which is what a primary base at a
+fixed offset looks like when the compiler lays out the derived members
+first.  The most common adjustment, -4, is one word - **the base class
+begins one word before the object whose vtable this is.**  So the
+multiple-inheritance adjustments are real, they are negative, and the
+"signed half-word" in the thunk readers was not a formality.
+
+`sym_001E5DD0` is the clearest instance: **every one of its entries carries
+-4**, and it is installed at `0x0C($this)` by the constructor
+`func_0017FE50`.
+
+#### A constructor that shows where the tables are stored
+
+`func_0017FE50` is 0x6C bytes and is entry 3 of the table at
+`0x1E5D60`:
+
+    lui   $a0, %hi(sym_001E5D60)
+    addiu $a0, $a0, %lo(sym_001E5D60)
+    sw    $a0, 0x38($s1)        <- the class's own table
+
+    lui   $a0, %hi(sym_001E5DD0)
+    addiu $a0, $a0, %lo(sym_001E5DD0)
+    sw    $a0, 0xC($s1)         <- the secondary thunk table
+
+    ...
+    andi  $a0, $s0, 0x1
+    beqz  $a0, .Leboot_0017FEA8
+    lui   $a0, %hi(sym_00073BF0)
+    jal   func_001571E4
+      addiu $a0, $a0, %lo(sym_00073BF0)
+
+**`0x38($this)` is the object's vtable pointer and `0x0C($this)` is its
+secondary base's thunk table**, and this constructor installs both.  That
+closes the loop with the thunk readers: `func_000BE138` reached the thunk
+array via `lw $a0, 0x18($v0)` and `func_000BD3A4` via `lw $a0, 0x18($s1)`,
+so there are three fixed object fields now known to hold tables -
+**0x0C, 0x18 and 0x38** - and the constructor shows two of them being
+filled in one place.
+
+The two `beqz $a0, .Leboot_0017FEA8` exits also read as a flag test on
+the second argument rather than as a null check, since the first is
+preceded by a `beqz $a0` on the argument itself.
+
+#### The two name slots, and the duplication they expose
+
+Entry 1 of the table at `0x1E5D60` is `func_001779E4`, returning
+`"gameObjectBehavior"`; entry 2 is `func_0017FEBC`, returning
+`"playFidget"`.  Entry 1 of `sym_001E56A8` is `func_00154938`, returning
+`"gameObjectBehavior"` again.
+
+**So slots 1 and 2 are a family name and an own name**, and the family
+name is the same everywhere while the own name is not - **which is why a
+class that changes no behaviour still has entries that differ from its
+sibling's.**  Both promoted.
+
+`func_001779E4` returns `str_gameObjectBehavior_1D60` at `0x1C1D60`
+while `func_00154938` returns `str_gameObjectBehavior` at `0x1BF9FC` -
+**the same text at two addresses, reached through two different functions,
+neither of them equal to the other.**  The duplication noted earlier now
+has both of its ends named.
+
+#### The census is suppressed rather than reported
+
+Relaxing the adjustment merges everything into one 5,071-entry run, and a
+membership count over a single run is trivially 1 for every function.
+**The tool now detects that and refuses to print the census**, saying so
+instead.  That is the fourth time in this sequence that the honest move
+was to suppress a number rather than report it, and the check that caught
+it - *the largest run must not hold more than half of all entries* - is
+the same shape as the earlier membership assertion.
 
 **There is a second vtable family, and it has the same shape.**  The three
 `sym_001EA3E8` / `sym_001EA4B8` / `sym_001EA588` records found earlier are
