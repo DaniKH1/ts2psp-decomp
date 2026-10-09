@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 682 (see below) |
-| **C functions that byte-match** | **682** (linked from `src/`) |
+| functions written in C | 683 (see below) |
+| **C functions that byte-match** | **683** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 682 of the 682 files here are verified to compile to the original bytes; the
+> 683 of the 683 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -5300,6 +5300,59 @@ does not look like it will be cheap to close: there is no template
 visible yet.
 
 Image still 2,030,864/2,030,864 byte identical.
+
+#### A level is a lot with a start position and a set of character resources
+
+`func_00061988` is the 1,220-byte body of the `"onLevelLoaded"` script
+hook, and it is the only one of the four level lifecycle hooks that does
+work rather than notifying.  The other three are 72 bytes each and
+byte-identical apart from the string they register.
+
+**Inside that body, in order, the resources a level is built from:**
+
+    str_charactersResLoaded    a character resource finished loading
+    str_characterlua_res       the Lua half of that resource
+    str_s_s_script             a script file named s_s_script
+    str_startspot              where the level's start position is
+
+**"characters" and "startspot" are the two words that answer the
+question.**  A level is a lot with a start position and a set of character
+resources, and the hook that fires when loading completes is where the
+engine stitches them together.  It also calls `func_000279C8` - the
+`onLevelLoad` registration - **from inside itself**, so the engine re-arms
+its own hooks while handling a level load.
+
+The token here is `8`, not the `0x1C` the Sim behaviours use, and it is
+passed identically to the push and the pop.
+
+**Two idioms the bytes settle.**  The `lhu` / `xori 0xFFFF` / `sltu $zero,
+$t0` sequence appears three times and is **"is this 16-bit value 0xFFFF"**,
+not "is it negative" - the xor is what makes 0xFFFF and 0x0000 the same
+answer, which is what a sentinel test wants.  And the signed division by
+two idiom wraps a `lhu`/`sh` copy loop three times, the same 16-bit
+`memmove` shape `func_000BFC2C` contains - **so the level loader moves
+half-word arrays**, consistent with a tile or coordinate table.
+
+#### The hex-word prefix is a trap worth naming
+
+This one took four attempts and the failure was entirely in the harness,
+not the transcription.  The splat listing prints each instruction as
+
+    /* FILEOFF  VADDR  HEXWORD */  mnemonic operands
+
+and the transcription carried the HEXWORD into the C string.  gas rejects
+it: "junk at end of line, first unrecognized character is 9".  **Every
+other promoted file in the repository carries only the mnemonic, and the
+two look identical on the page - so the difference is invisible in a diff
+and only shows up as a compile error.**
+
+The fix was to strip the leading eight hex characters, and after that it
+matched first try.  **The general rule for this project: the asm string
+never carries the encoding word**, and that is worth writing down because
+it is the kind of mistake that looks like a transcription error and is not.
+
+The full disassembly is in the file, 305 words, and it was read against the
+listing before being written.
 
 **There is a second vtable family, and it has the same shape.**  The three
 `sym_001EA3E8` / `sym_001EA4B8` / `sym_001EA588` records found earlier are
