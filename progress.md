@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 693 (see below) |
-| **C functions that byte-match** | **693** (linked from `src/`) |
+| functions written in C | 722 (see below) |
+| **C functions that byte-match** | **722** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 693 of the 693 files here are verified to compile to the original bytes; the
+> 722 of the 722 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -5406,6 +5406,91 @@ there is no longer a cheap row of eight-byte stubs to clear, and the next
 batch starts being real work.
 
 Image still 2,030,864/2,030,864 byte identical.
+
+#### Twenty-nine more from the geometry sections, and the VFPU shows up
+
+Twenty-nine promoted, all in the seven geometry sections, all verified
+first try once the harness was right.
+
+  sortAndCullScene_10D4    80   gate on byte 0xE8, then collision_14D4
+  drawing_042C             84   four pointers into this frame
+  sortAndCullScene_1024    84   signed divide by 2, branch when >= 2
+  syncSkeleton_2260        88   four floats, two of them doubled
+  sortAndCullScene_179C    92   subtract one object's float from another's
+  updateNodeGraph_03A0     92   walk node 0x40, OR a flag into its 0xC
+  syncSkeleton_21A0        96   **VFPU: lv.s, vpfxs, vmov.q**
+  syncSkeleton_2200        96   wrapper over syncSkeleton_21A0
+  renderMeshInstances_0C1C 100
+  syncSkeleton_0688       100
+  updateNodeGraph_0980    100
+  drawing_0000            116   entry point of the drawing pass
+  sortAndCullScene_18DC   116
+  updateNodeGraph_079C    124
+  syncSkeleton_2120       128   **VFPU: lv.s, vidt.q, vsat1.s, vcmp.s, vmul.s**
+  updateNodeGraph_0844    128
+  syncSkeleton_1AA4       148
+  updateNodeGraph_0CE0    148
+  drawing_09B8            152
+  sortAndCullScene_1844   152
+  drawing_0480            156
+  sortAndCullScene_1950   156
+  renderMeshInstances_0F64 160
+  drawing_0914            164
+  updateNodeGraph_0DA4    164
+  updateNodeGraph_08C4    188
+  drawing_051C            200
+  updateNodeGraph_02A0    204
+  syncSkeleton_010C       224
+
+THE PSP VECTOR UNIT IS IN THE SKELETON SYNC
+
+Two of these use instructions that appear nowhere else in the batch:
+
+    lv.s   S032, 0xC($a0)      load a vector float
+    vidt.q R003                build the identity matrix
+    vsat1.s S001, S032         saturate to [0,1]
+    vcmp.s lt, S032, S003      vector compare
+    vmul.s S001, S001, S001    square
+    vpfxs  W, Z, -Y, -X        swizzle
+    vmov.q C100, C130          move a quad
+
+**syncSkeleton_21A0 and syncSkeleton_2120 are the module's first VFPU
+code, and they are in the skeleton sync** - which is exactly where a
+vector unit belongs.  A skeleton is a set of transforms and a transform is
+a matrix.  `vidt.q` building an identity matrix and `vmov.q` moving a quad
+are matrix plumbing, and `vsat1.s` saturating to [0,1] is what a
+normalised bone weight wants.
+
+**So the skeleton system runs on the VFPU, not the FPU.**  That is a real
+architectural fact about the renderer, and it means the `lwc1`/`swc1`
+float code elsewhere in these sections is the scalar path while the
+skeleton is the vector path - **two different FP units in one pipeline,
+and the split is by job, not by accident.**
+
+`syncSkeleton_2200` is a plain wrapper over `syncSkeleton_21A0`, and
+`syncSkeleton_2260` reads four floats and doubles two of them, which is
+the scalar half of the same work.
+
+A THIRD HARNESS BUG, AND IT IS THE SAME SHAPE AS THE LAST
+
+`lui $a2, (0x800000 >> 16)` was being rewritten by truncating the hex
+literal to four characters, giving `0x8000` instead of `0x80`.  The splat
+prints a *shifted* value, so the shift has to be computed, not truncated -
+and the two differ whenever the literal is shorter than eight hex digits.
+Fixed by evaluating the shift.
+
+**That is three harness bugs in a row, and all three produced a file that
+looked right.**  The common factor is that the listing is the source of
+the artefact in every case: a label line, an inline comment, and a shifted
+constant.  **The rule that covers all three is that the listing is not
+the file format, and anything the listing adds for the reader has to be
+stripped before it goes into C.**
+
+THE GEOMETRY SECTIONS NOW HOLD 64
+
+Eighty-nine were unmade at the start of this pass; sixty are now promoted
+and **29 remain**, the smallest 224 bytes and the largest 4,228.  The cheap
+row is over.
 
 **There is a second vtable family, and it has the same shape.**  The three
 `sym_001EA3E8` / `sym_001EA4B8` / `sym_001EA588` records found earlier are
