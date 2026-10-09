@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 683 (see below) |
-| **C functions that byte-match** | **683** (linked from `src/`) |
+| functions written in C | 693 (see below) |
+| **C functions that byte-match** | **693** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 683 of the 683 files here are verified to compile to the original bytes; the
+> 693 of the 693 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -5353,6 +5353,59 @@ it is the kind of mistake that looks like a transcription error and is not.
 
 The full disassembly is in the file, 305 words, and it was read against the
 listing before being written.
+
+#### ore from the geometry sections, and two harness bugs fixed
+
+693 byte-exact C functions (up from 683). Closes out the batch the
+subagents left half-finished when the rate limit killed them.
+
+  updateNodeGraph_03FC    36 bytes
+  updateNodeGraph_0818    44 bytes
+  renderMeshInstances_1004  48 bytes
+  updateNodeGraph_0D74    48 bytes
+  updateNodeGraph_036C    52 bytes
+  drawing_0074            64 bytes
+  drawing_07D0            64 bytes
+  sortAndCullScene_17F8   76 bytes
+  updateNodeGraph_0FAC    76 bytes
+  drawing_0780            80 bytes
+
+All ten are in the four smallest geometry sections - updateNodeGraph,
+renderMeshInstances, sortAndCullScene and drawing - and all ten verified
+first try once the harness was right.
+
+TWO HARNESS BUGS, BOTH WORTH NAMING
+
+Both were in the transcription helper, not in the transcription, and both
+produced a file that looked correct on the page.
+
+Missing labels. The helper emitted the .Leboot_XXXXXXXX lines but never
+the matching label definitions, so gas silently assembled each branch as
+a branch to itself - the exact failure mode the project notes warn about,
+where the only symptom is one wrong word. Fixed by tracking labels
+alongside instructions and emitting them at their own positions.
+
+A stray comment inside the disassembly. The splat prints
+"bc1t .Leboot_001B5C14 /* handwritten instruction */", and the */ ends the
+C doc comment six lines early. The file then compiled with "expected '=',
+',', ';' ... before '*' token" pointing at an ordinary instruction line.
+Fixed by stripping every /* ... */ from the listing before it goes into a
+comment.
+
+The second is the more dangerous: the error points at a line that is not
+the problem, and the real problem is invisible because the comment simply
+ends and the rest of the file parses as code. Neither would have shown up
+in a diff against the listing, because the listing is the source of both
+artefacts.
+
+THE GEOMETRY SECTIONS NOW HOLD 35
+
+Twenty-five were promoted by the subagents, ten by hand in this pass.  89
+of the 124 are still unmade, and the smallest remaining is 84 bytes - so
+there is no longer a cheap row of eight-byte stubs to clear, and the next
+batch starts being real work.
+
+Image still 2,030,864/2,030,864 byte identical.
 
 **There is a second vtable family, and it has the same shape.**  The three
 `sym_001EA3E8` / `sym_001EA4B8` / `sym_001EA588` records found earlier are

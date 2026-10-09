@@ -8,6 +8,9 @@ collision_1210
 collision_12D0
 collision_1384
 collision_1430
+drawing_0074
+drawing_0780
+drawing_07D0
 func_00000000
 func_0000002C
 func_00000058
@@ -667,6 +670,7 @@ func_001AF15C
 func_001AF16C
 renderCommon_17CC
 renderMeshInstances_0000
+renderMeshInstances_1004
 renderMeshInstances_1034
 renderMeshInstances_1060
 renderMeshInstances_1224
@@ -678,9 +682,15 @@ sortAndCullScene_1080
 sortAndCullScene_10B4
 sortAndCullScene_10BC
 sortAndCullScene_1124
+sortAndCullScene_17F8
 syncSkeleton_22B8
 syncSkeleton_27D0
 syncSkeleton_2808
+updateNodeGraph_036C
+updateNodeGraph_03FC
 updateNodeGraph_0420
+updateNodeGraph_0818
+updateNodeGraph_0D74
 updateNodeGraph_0E48
 updateNodeGraph_0E6C
+updateNodeGraph_0FAC
