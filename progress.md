@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 614 (see below) |
-| **C functions that byte-match** | **614** (linked from `src/`) |
+| functions written in C | 624 (see below) |
+| **C functions that byte-match** | **624** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 614 of the 614 files here are verified to compile to the original bytes; the
+> 624 of the 624 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -4398,6 +4398,58 @@ turned a taxonomy into a flat five-way choice; the "2 distinct" cells hide a
 10-against-1 split completely.  **A cell that records only how many distinct
 values a slot has cannot support any claim about how the classes are
 distributed - the membership list has to be printed.**
+
+#### The +0x0C slot is a template, and ten of the eleven are the same function
+
+Slot +0x0C is the constructor, and it turned out to be the cheapest slot
+to close: **all eleven are now byte-exact.**
+
+Nine of them are **38 of 40 words identical to `func_000BD634`**.  Two
+words differ, and they are always the same two:
+
+| word | what varies |
+| --- | --- |
+| 8 | the vtable installed - one `addiu $a0, $a0, %lo(sym_...)` |
+| 12 | the callee - one `jal func_...` |
+
+Everything else - four globals stored into field 0x18 with three of them
+dead, three `beqz $s1` that never branch, the base-constructor call to
+`func_000B9C88`, the bit-0 flag test, the two labels sitting between the
+`andi` and the `beqz` around it - is byte-for-byte the same in all ten.
+**That is a template expanded per class, and the eleven vtables are the
+only thing that varies.**
+
+The callees run strictly upward in vtable order, `func_0019E490` through
+`func_0019F058`, **at irregular spacing from 0xE0 to 0x1D4 bytes** across
+ten gaps totalling 0xBC8.  The ordering is a fact about the linker, but
+it means the eleven constructors' callees form a contiguous run with
+nothing interleaved.
+
+**The eleventh is the template with two of the four stores deleted** -
+32 words instead of 40.  `func_000BFBAC` drops the `sym_001E9E30` and
+`sym_001E9478` stores and their two dead branches, leaving only
+`sym_001E9300`, so its chain is two stores rather than four and its two
+labels are where the other ten have three.  **The dead stores went from
+three to one because two were deleted, not because the survivor started
+mattering** - the last store wins either way, so this class behaves
+identically to the other ten.
+
+`func_000BFBAC` is also the class that overrides all three of +0x01C,
++0x04C and +0x064.  **The shortest constructor and the extra overrides
+sit in the same record, and that is suggestive but not evidence** - dead
+stores in a constructor and live entries in a vtable are unrelated code.
+What *is* decidable is that this one class also answers 0 at +0x064
+where the other ten return their argument.
+
+**One mechanical note, because it cost a retry and the fix is the same
+trap as `func_000BD634`'s.**  The first attempt at `func_000BD7A8` put
+`.Leboot_000BD820` before the `andi` instead of after the `jal`'s delay
+slot, and the build came back **156 bytes instead of 160** - the size
+guard fired before the word comparison did.  That is the size guard
+doing its job: a misplaced label between a `jal` and its delay slot
+deletes a word.  Placing the two labels around the `andi`/`beqz` pair as
+the other nine do fixed it on the second attempt, and the remaining
+eight matched first try each.
 
 **There is a second vtable family, and it has the same shape.**  The three
 `sym_001EA3E8` / `sym_001EA4B8` / `sym_001EA588` records found earlier are
