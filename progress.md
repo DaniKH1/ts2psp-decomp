@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 518 (see below) |
-| **C functions that byte-match** | **518** (linked from `src/`) |
+| functions written in C | 530 (see below) |
+| **C functions that byte-match** | **530** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 518 of the 518 files here are verified to compile to the original bytes; the
+> 530 of the 530 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -3735,6 +3735,70 @@ guard doing its job rather than a near miss:
 `func_00009490` resolves to zero when the file is compiled standalone, so the
 verified section was 100 bytes where the original is 104.  **The size guard caught
 it and the file was deleted rather than kept as a "close enough" candidate.**
+
+#### Twelve more: the shapes that carry their own documentation
+
+The next twelve are all under 0x30 bytes and, taken together, they say something
+the individual files cannot.  Four of them are one-call forwards:
+
+    func_0010AA3C  call func_0010F7CC, then call func_001138F0 with both results
+    func_0010B358  call func_0010B28C with a constant 1 in the delay slot
+    func_00110ADC  unpack {0($a1), 4($a1)} into {arg1, arg2} of func_00113458
+    func_0011BD2C  hand func_0011BB60 a stack slot and read the answer back out
+
+**Those four are the same shape as `func_00009378` was and `func_001023DC` is** -
+thin adapters that exist to give one function a different signature.  Their bodies
+are almost entirely delay-slot work, and in three of the four the argument setup
+*is* the delay slot.
+
+Two more return a hard-coded constant and discard what the callee said:
+
+    func_0010CD40  jal func_001085A0 / ori $v0, $zero, 0x1
+    func_00110DE4  jal func_00112754 / or  $v0, $zero, $zero
+
+**So `func_0010CD40` reports success unconditionally** - whatever
+`func_001085A0` returns is never read.  These are the `void`-in-int wrappers the
+engine is full of, and the distinction from `func_00112148` is worth naming:
+that one *does* use the result, and `sltu $v0, $zero, $v0` casts it to a
+boolean, destroying any distinction between 1 and 2 on the way out.
+
+#### The chunk-tag pair, and a byte order that reads backwards
+
+`func_0016F674` and `func_0019B9B8` are instruction-for-instruction identical
+apart from one `lui`/`addiu` pair, and both call `func_000D90F4` after narrowing
+the caller's third argument with `andi $a3, $a2, 0xFF`.  **That is the second
+independent instance of this registration idiom**, which makes it the house
+pattern for a chunk-table entry rather than a local habit.
+
+The tags are `D_66727573` = **"surf"**, the third sighting of that name, and
+`D_2161756C`.  The second one is the reason to write it out: the bytes are
+`21 76 6C 61`, and read in the order they sit in the file that is
+**"!vla" with the `a` last** - `!vlab` by the eye, and the trailing `a` is what
+the eye keeps dropping.  **A four-character code with a leading `!` and a
+trailing letter is the kind of thing a reader silently "corrects", so the file
+records the bytes rather than the intended word.**
+
+#### `func_00110014` and `func_00110AB4` fix the element size of the render array
+
+Pushed together they pin down a data structure neither could alone:
+
+    func_00110014  stores the word 3 and one int-as-float, then advances the
+                   array pointer at 0x8($a0) by 8
+    func_00110AB4  computes  0x8($a0) - (index * 8) - 8
+
+**So an element is 8 bytes - a word plus a float, 4-byte-aligned with no padding
+- and `func_00110AB4` indexes backwards.**  An index of 0 gives the element one
+*before* the cursor, which is why the constant is `-8` and not `0`: this is the
+address-of-element walk a pop loop performs, counting down from the current end.
+
+`func_00110014` has no frame at all.  It reloads `0x8($a0)` a second time rather
+than keeping the pointer, and stores the incremented value in the delay slot of
+the `jr` - **tail-call-shaped code with nothing to tail-call.**
+
+`func_001277FC` is a null guard with a twist: it loads `-4($a0)`, **the word
+before the object**, and passes that onward.  That is a vtable or a leading tag -
+the C++ `this - 1` adjustment - so `func_00127770` receives a base pointer, not
+the derived object.
 
 ## Pipeline
 
