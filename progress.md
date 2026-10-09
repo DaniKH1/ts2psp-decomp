@@ -12,8 +12,8 @@ Target: `pgs-si2.iso` -> `/PSP_GAME/SYSDIR/EBOOT.BIN`, decrypted to
 | functions recovered | 7,497 |
 | functions byte-identical | 7,497 (100 %) |
 | relocations recovered | 66,503 / 66,503 |
-| functions written in C | 649 (see below) |
-| **C functions that byte-match** | **649** (linked from `src/`) |
+| functions written in C | 653 (see below) |
+| **C functions that byte-match** | **653** (linked from `src/`) |
 | named symbols recovered | 3 functions + 3,754 strings |
 | static constructors mapped | 320 (160 register file format tags) |
 
@@ -3538,7 +3538,7 @@ ones.
 `tools/sync_counts.py` propagated 456 into both reports, and it left this behind
 in `README.md`:
 
-> 649 of the 649 files here are verified to compile to the original bytes; the
+> 653 of the 653 files here are verified to compile to the original bytes; the
 > remaining 1 is the only undecided attempt.
 
 **The tool substitutes counts; it does not know that the sentence it substituted
@@ -4769,6 +4769,69 @@ whether the output could possibly be true.**  The self-consistent check
 - the maximum membership cannot exceed the run count - is the only one of
 the four that would have caught the first, and it is the one now written
 into the tool.
+
+#### A second family of three, and a fifth thunk at a third base address
+
+With the eleven closed, `tools/vtables.py` can separate the runs that
+are genuinely single tables from the ones that are several placed end to
+end.  Runs of 32 entries or fewer are unambiguous: **56 of the 82 runs
+are single tables**, and the rest are flagged.
+
+**Three of those single tables open with the same four entries:**
+
+    0x1EC528   13 entries     [0] func_00196BE4  [1] func_00171268
+    0x1ECD88   15 entries            func_00196BE4    func_00171268
+    0x1EDB78   13 entries            func_00196BE4    func_00171268
+                                 [2] func_00171280  [3] func_00196C04
+
+A second family, three classes instead of eleven.  **All four shared
+entries are now byte-exact**, and what they are is worth spelling out
+because the interface reads like a contract:
+
+| slot | function | what it is |
+| --- | --- | --- |
+| 0 | `func_00196BE4` | **returns `FLT_MAX`** - `0x7F7FFFFF` |
+| 1 | `func_00171268` | returns 0 |
+| 2 | `func_00171280` | returns 1 |
+| 3 | `func_00196C04` | a thunk dispatch, 44 bytes |
+
+**Slot 0 is a limit, not a value.**  `lui 0x7F7F` / `ori 0xFFFF` builds
+`0x7F7FFFFF` and `mtc1` moves it to `$f0` - the largest finite float,
+returned in an FPU register and therefore assembled by hand because
+there is no pool entry for it in this ABI.
+
+**Slots 1 and 2 are one question asked twice.**  `or $v0, $zero, $zero`
+and `ori $v0, $zero, 0x1`, sixteen bytes apart in `.text` and adjacent
+in all three tables - **the "is X / is not X" pair**, the same shape the
+`sym_001EA3E8` family opens with and the one `func_000B9D34` belongs to.
+Keeping them separately overridable is the only reason a compiler would
+emit two copies instead of one, which is consistent with all four being
+per-base-class copies.
+
+**And slot 3 is the fifth instance of the multiple-inheritance thunk, at
+a third base address.**  The other four read the thunk array out of
+`0x18($this)` at **+0xD0**; this one goes `lw $a2, 0x78($a0)` then
+`addiu $a2, $a2, 0x78`, so it reaches **+0xF0** of the object the first
+hop points at.  The entry layout is identical - **signed** `lh` half-word
+adjustment at +0, function pointer at +4, eight bytes per entry, `$a0`
+formed in the delay slot - **so two hops are the only thing that differs,
+and the thunk structure is now confirmed at two offsets.**
+
+**So the module has three thunk sites: +0xD0 twice, +0xF0 once, all
+eight-byte `{i16 adjust, fnptr}` entries.**  That is the same structure
+the vtables themselves use - and in the vtables every adjustment is zero,
+which is why they behave as plain vtables while the +0xD0 and +0xF0
+arrays do not.
+
+#### The one number that does not depend on the scan
+
+`func_00171268` is a `return 0` at `0x171268` and `func_00154930` is
+another at `0x154930` - sixteen kilobytes apart, both two instructions,
+both answers to "no".  **The module contains many independent copies of
+this function, one per base class that declares a boolean method, and
+the linker kept none of them.**  That is visible directly in the symbol
+map and needs no scan at all, which is why it is worth stating
+separately from the counts a scan cannot pin down.
 
 **There is a second vtable family, and it has the same shape.**  The three
 `sym_001EA3E8` / `sym_001EA4B8` / `sym_001EA588` records found earlier are
