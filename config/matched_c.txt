@@ -46,6 +46,7 @@ noop_at_00024CFC
 noop_at_000255B8
 noop_at_0004A914
 read_code_word_at_0x743A4_00049A90
+return_0x10_at_0000F574
 return_0x8000_at_000E5A10
 set_u8_at_0x330_000FCC8C
 set_word

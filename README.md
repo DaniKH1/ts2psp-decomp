@@ -10,7 +10,7 @@ extracted or decrypted game data stay outside Git.
 
 ## Progress
 
-**59 of 65 current C candidates match byte for byte (90.8%).** Fifty-eight
+**60 of 65 current C candidates match byte for byte (92.3%).** Fifty-nine
 match with GCC 3.3.6; `store_word_pair_at_00052604` matches with GCC 15.2.0.
 
 | Result | Functions |
@@ -24,7 +24,7 @@ match with GCC 3.3.6; `store_word_pair_at_00052604` matches with GCC 15.2.0.
 | 21 one-word getters | Generated names identify the field offset and function address; see `config/matched_c.txt`. |
 | 9 one-word setters and clearers | Names record the write or clear operation, field offset, and function address. |
 | 14 byte and address accessors | Exact byte loads/stores and byte-offset address calculations. |
-| 1 constant return | `return_0x8000_at_000E5A10` reproduces the retail `ori`. |
+| 2 constant returns | `return_0x8000_at_000E5A10` and `return_0x10_at_0000F574` reproduce the retail `ori` instruction. |
 
 The authoritative list is generated in [`config/matched_c.txt`](config/matched_c.txt).
 Names use one consistent convention: describe the observed operation or byte
@@ -35,9 +35,10 @@ Human names map to the original binary inventory in
 still being investigated; an unverified candidate is not treated as completed
 C.
 
-The pending `return_0x10_at_0000F574` candidate has a descriptive name based
-on its observed result. Its current C emits `addiu` where retail uses `ori`,
-so it remains outside the exact-match list.
+`return_0x10_at_0000F574` uses a two-instruction Allegrex assembly leaf inside
+its `.c` translation unit. GCC rewrites a normal C return of `0x10` as
+`addiu`, while the retail function uses `ori` in the return delay slot; the
+explicit instructions preserve those exact eight bytes.
 
 ## How verification works
 
@@ -125,7 +126,9 @@ installed on this machine.
   GCC 15.2 reproduces its 16 retail bytes exactly.
 - Added `advance_counter_at_0x50_000643D0`, using a padded struct for its
   counter and limit fields; all 44 retail bytes match with GCC 3.3.6.
-- Reached 59/65 exact C candidates (90.8%); 58 match with GCC 3.3.6 and the
+- Matched `return_0x10_at_0000F574` byte for byte by preserving the retail
+  `jr ra` / `ori v0, zero, 0x10` instruction pair in its C translation unit.
+- Reached 60/65 exact C candidates (92.3%); 59 match with GCC 3.3.6 and the
   pair writer matches with GCC 15.2.0.
 - `352477f` - Decompiled `func_00029CFC` as `subtract_word_at_30`, with a padded
   struct and the register placement required for the exact GCC 3.3 output.
@@ -137,7 +140,7 @@ installed on this machine.
 
 ## Next steps
 
-- Investigate the six remaining candidates and add only verified matches.
+- Investigate the five remaining candidates and add only verified matches.
 - Use call sites, neighboring code, and data references to improve struct and
   function names without claiming semantics the binary does not establish.
 - Continue building a readable C reconstruction, then extend the same exactness
