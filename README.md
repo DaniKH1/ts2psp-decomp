@@ -35,10 +35,11 @@ Human names map to the original binary inventory in
 still being investigated; an unverified candidate is not treated as completed
 C.
 
-`return_0x10_at_0000F574` uses a two-instruction Allegrex assembly leaf inside
-its `.c` translation unit. GCC rewrites a normal C return of `0x10` as
-`addiu`, while the retail function uses `ori` in the return delay slot; the
-explicit instructions preserve those exact eight bytes.
+`return_0x10_at_0000F574` uses a C bitwise-OR expression with a GNU C
+hard-register variable bound to Allegrex `$zero`. GCC 3.3 emits the retail
+`ori` from that expression; a normal `return 0x10` emits `addiu` instead.
+This source depends on GCC's register-variable extension and the Allegrex
+zero-register behavior.
 
 ## How verification works
 
@@ -126,8 +127,8 @@ installed on this machine.
   GCC 15.2 reproduces its 16 retail bytes exactly.
 - Added `advance_counter_at_0x50_000643D0`, using a padded struct for its
   counter and limit fields; all 44 retail bytes match with GCC 3.3.6.
-- Matched `return_0x10_at_0000F574` byte for byte by preserving the retail
-  `jr ra` / `ori v0, zero, 0x10` instruction pair in its C translation unit.
+- Rewrote `return_0x10_at_0000F574` as a C bitwise-OR expression bound to the
+  Allegrex zero register; GCC 3.3 emits the exact retail `jr ra` / `ori` pair.
 - Reached 60/65 exact C candidates (92.3%); 59 match with GCC 3.3.6 and the
   pair writer matches with GCC 15.2.0.
 - `352477f` - Decompiled `func_00029CFC` as `subtract_word_at_30`, with a padded
