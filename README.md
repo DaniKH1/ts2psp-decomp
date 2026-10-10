@@ -22,8 +22,16 @@ all of that was removed on purpose and is being rebuilt here, cleaner, with the
 same verification discipline: **nothing is committed as C unless it has been
 proven to compile to the original bytes.**
 
+**Current match count: 10 / 20 candidates in `src/`** (50% byte-exact).
+
 The first exact C matches are now in: `func_00049A90` and `func_00049AA0`
-both reproduce all 16 retail bytes with the GCC 3.3 lane.
+both reproduce all 16 retail bytes with the GCC 3.3 lane. Eight additional
+trivial leaf functions (`func_000068E8`, `func_000111D8`, `func_00024CFC`,
+`func_000255B8`, `func_000273BC`, `func_0004A914`, `func_0004E5CC`,
+`func_0004E5D4`) match at 8 bytes each. Two candidates (`func_0000F574`,
+`func_0004E5DC`) differ by one delay-slot word; three wrapper functions differ
+only in frame-prologue words (known GCC 3.3 vs. retail frame-layout difference);
+the remaining five need further work.
 
 What is proven so far:
 
@@ -400,6 +408,10 @@ labels separately instead of inflating the function count with them.
    `config/imports.txt`, wired into `symbols.ld`) — the pspsdk stub-record
    join, the `SHA-1(name)[:4]` LE scheme, and curated psplibdoc records;
    `sceKernel…`-style calls now resolve to their real stubs.
-6. Assemble the inventory back to a byte-exact image (the asm layer).
-7. Decompile function by function — readable C, human-named structs,
+6. ✅ **First byte-exact C functions**: 10 of 20 candidates in `src/`
+   match exactly (50%). Includes 2 accessor functions (16 bytes each)
+   and 8 trivial leaf functions (8 bytes each). Three wrapper functions
+   differ only in frame-prologue words; two differ by one delay-slot word.
+7. Assemble the inventory back to a byte-exact image (the asm layer).
+8. Decompile function by function — readable C, human-named structs,
    renamed symbols wherever the code shows what it does.
