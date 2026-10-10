@@ -5,3 +5,4 @@
 //   func_000000B0 gameUpdate
 
 func_0004E5DC set_word
+func_00029CFC subtract_word_at_30

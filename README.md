@@ -22,7 +22,7 @@ all of that was removed on purpose and is being rebuilt here, cleaner, with the
 same verification discipline: **nothing is committed as C unless it has been
 proven to compile to the original bytes.**
 
-**Current match count: 11 / 20 candidates in `src/`** (55% byte-exact).
+**Current match count: 12 / 20 candidates in `src/`** (60% byte-exact).
 
 The first exact C matches are now in: `func_00049A90` and `func_00049AA0`
 both reproduce all 16 retail bytes with the GCC 3.3 lane. Eight additional
@@ -30,9 +30,10 @@ trivial leaf functions (`func_000068E8`, `func_000111D8`, `func_00024CFC`,
 `func_000255B8`, `func_000273BC`, `func_0004A914`, `func_0004E5CC`,
 `func_0004E5D4`) match at 8 bytes each. The renamed `set_word` function
 (`func_0004E5DC`) stores a value through a one-word struct and matches at 8
-bytes. `func_0000F574` differs by one delay-slot word; three wrapper functions
-differ only in frame-prologue words (known GCC 3.3 vs. retail frame-layout
-difference); the remaining five need further work.
+bytes. `subtract_word_at_30` updates a word in a padded object and matches
+all 16 bytes at `func_00029CFC`. `func_0000F574` differs by one delay-slot
+word; three wrapper functions differ only in frame-prologue words (known GCC
+3.3 vs. retail frame-layout difference); the remaining four need further work.
 
 What is proven so far:
 
@@ -254,7 +255,7 @@ documented path:
 * **Lane 3 (`gcc33` → `C:\pspdev33`) is usable**: patched GCC 3.3.6 is built
   natively under MSYS2 (`all-gcc` only) and reuses lane 1's assembler and
   linker. The harness compiles all twenty current candidates in all three lanes.
-  Eleven candidates now match exactly with GCC 3.3.6; nine still differ.
+  Twelve candidates now match exactly with GCC 3.3.6; eight still differ.
 
 ## Verification harness
 
@@ -408,10 +409,11 @@ labels separately instead of inflating the function count with them.
    `config/imports.txt`, wired into `symbols.ld`) — the pspsdk stub-record
    join, the `SHA-1(name)[:4]` LE scheme, and curated psplibdoc records;
    `sceKernel…`-style calls now resolve to their real stubs.
-6. ✅ **First byte-exact C functions**: 10 of 20 candidates in `src/`
-   match exactly (50%). Includes 2 accessor functions (16 bytes each)
-   and 8 trivial leaf functions (8 bytes each). Three wrapper functions
-   differ only in frame-prologue words; two differ by one delay-slot word.
+6. **Byte-exact C functions**: 12 of 20 candidates in `src/` match
+   exactly (60%). Includes 2 16-byte accessors, one 8-byte setter, one
+   16-byte word update and 8 trivial leaf functions (8 bytes each). Three
+   wrapper functions differ only in frame-prologue words; one candidate
+   differs by one delay-slot word.
 7. Assemble the inventory back to a byte-exact image (the asm layer).
 8. Decompile function by function — readable C, human-named structs,
    renamed symbols wherever the code shows what it does.

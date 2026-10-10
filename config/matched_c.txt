@@ -12,3 +12,4 @@ func_0004A914
 func_0004E5CC
 func_0004E5D4
 set_word
+subtract_word_at_30
