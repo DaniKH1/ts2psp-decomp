@@ -35,10 +35,12 @@ Human names map to the original binary inventory in
 still being investigated; an unverified candidate is not treated as completed
 C.
 
-`return_0x10_at_0000F574` uses a C bitwise-OR expression with a GNU C
-hard-register variable bound to Allegrex `$zero`. GCC 3.3 emits the retail
-`ori` from that expression; a normal `return 0x10` emits `addiu` instead.
-This source depends on GCC's register-variable extension and the Allegrex
+`return_0x10_at_0000F574` uses a C bitwise-OR expression and a GNU C
+hard-register variable bound to Allegrex `$zero`. An empty extended-`asm`
+output constraint exposes that register as the expression's input; it emits
+no machine instruction. GCC 3.3 then emits the retail `ori`, while a normal
+`return 0x10` emits `addiu`. This target-specific source depends on GCC's
+register-variable and extended-`asm` extensions and the Allegrex
 zero-register behavior.
 
 ## How verification works
@@ -127,8 +129,9 @@ installed on this machine.
   GCC 15.2 reproduces its 16 retail bytes exactly.
 - Added `advance_counter_at_0x50_000643D0`, using a padded struct for its
   counter and limit fields; all 44 retail bytes match with GCC 3.3.6.
-- Rewrote `return_0x10_at_0000F574` as a C bitwise-OR expression bound to the
-  Allegrex zero register; GCC 3.3 emits the exact retail `jr ra` / `ori` pair.
+- Made the `return_0x10_at_0000F574` register binding an explicit empty-`asm`
+  output operand; it emits no instructions and GCC 3.3 retains the exact
+  retail `jr ra` / `ori` pair from the C expression.
 - Reached 60/65 exact C candidates (92.3%); 59 match with GCC 3.3.6 and the
   pair writer matches with GCC 15.2.0.
 - `352477f` - Decompiled `func_00029CFC` as `subtract_word_at_30`, with a padded
