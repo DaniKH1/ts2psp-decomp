@@ -35,6 +35,10 @@ Human names map to the original binary inventory in
 still being investigated; an unverified candidate is not treated as completed
 C.
 
+The pending `return_0x10_at_0000F574` candidate has a descriptive name based
+on its observed result. Its current C emits `addiu` where retail uses `ori`,
+so it remains outside the exact-match list.
+
 ## How verification works
 
 1. `config/functions.txt` records function addresses and sizes recovered from
