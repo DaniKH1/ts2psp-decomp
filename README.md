@@ -153,9 +153,11 @@ that decides it:
    absolute address of every symbol a candidate can reference — the retail
    `.symtab` is empty, so this file *is* the recovered symbol table:
    * 5,180 function names from `config/functions.txt`;
+   * **223 named import stubs** (`sceKernelCreateThread = 0x001B0630;`, …)
+     from `config/imports.txt` — see *Import names* below;
    * 104 section anchors (`_sec_*_START`/`_SIZE`), 26 import-library anchors
      (`_stub_sceAudio`, …);
-   * **7,305 data addresses** recovered by scanning the original code for
+   * **6,421 data addresses** recovered by scanning the original code for
      `lui`+`addiu`/`ori` and load/store pairs that resolve into an allocated
      section — globals, string literals, jump tables — each annotated with
      which functions reach it.
@@ -180,18 +182,36 @@ assembled with `psp-as` and linked with the flags above resolves
 15.2.0; its first two verdicts were `DIFFERS`, which is what surfaced the
 era difference documented under *Compiler era*.
 
-Import stubs are pinned per *library* only: the image contains no NID→name
-database (individual imports are named in `.rodata.sceNid` as bare NIDs), so a
-candidate calling `sceKernel…` by name will not link to the right stub yet —
-recovering those names by hashing candidate names against the NID table is its
-own roadmap item.
+### Import names: recovered 223/223
+
+The image stores imports as bare 32-bit NIDs (`.rodata.sceNid`) with no
+name table — names only existed in the SDK that linked the game.
+`tools/imports.py` rebuilds them from three sources, in order:
+
+1. **pspsdk stub records** — its assembly import macros spell the pairing
+   out (`IMPORT_FUNC "InitForKernel",0x1D3256BA,sceKernelRegisterChunk`),
+   giving a straight join on (library, NID): **216** of the 223;
+2. **the NID scheme itself** — an NID is the first 4 bytes of
+   `SHA-1(function name)`, read little-endian. Sanity-checked over the
+   pspsdk records: 2,479/3,119 agree (the rest are the salted
+   later-firmware kernel NIDs psplibdoc documents; this era's userland
+   imports are plain);
+3. **`config/nid-extra.txt`** — the 7 records neither source covers
+   (5 `sceMpegAvc*` YCbCr/Csc calls, `sceKernelGetModuleId`,
+   `sceKernelSetCompilerVersion`), curated from `pspdev/psplibdoc` where
+   every one is flagged `matching` (SHA-1 reproduces it).
+
+Result: `config/imports.txt` names **all 223** imports, and
+`linkerscript.py` pins each to its stub address — a candidate calling
+`sceIoOpen`/`sceKernelCreateThread` now links to the exact stub the
+retail link did.
 
 ## What is here
 
 | path | |
 | --- | --- |
 | `tools/` | MIT licensed. Everything that produced the above, and the checks. |
-| `config/` | input hashes, function inventory, generated `pgs-si2.symbols.ld`, renames, matched list. |
+| `config/` | input hashes, function inventory, import names (`imports.txt`, `nid-extra.txt`), generated `pgs-si2.symbols.ld`, renames, matched list. |
 | `disks/` | gitignored: the extracted module image. Never commit it. |
 | `bin/` | gitignored: downloaded tool binaries (`pspdecrypt`, objdiff). |
 | `src/` | the hand-written decompilation — only byte-exact files, one function per `.c`. |
@@ -209,6 +229,7 @@ python tools/extract_iso.py   # pull BOOT.BIN + EBOOT.BIN out of the ISO
 bin/pspdecrypt.exe -o disks/pgs-si2/EBOOT.dec disks/pgs-si2/EBOOT.BIN
 python tools/elfinfo.py       # section map + symbol census
 python tools/inventory.py     # function inventory -> config/functions.txt
+python tools/imports.py       # NID -> name join -> config/imports.txt (223/223)
 python tools/linkerscript.py  # recovered symbol table -> config/pgs-si2.symbols.ld
 python tools/verify_c.py      # byte-compare every src/*.c against BOOT.BIN
 python tools/list_iso.py      # what is on the disc
@@ -264,8 +285,10 @@ labels separately instead of inflating the function count with them.
    not the retail one (see *Compiler era*) — build the `gcc-4.6.4-psp`
    lane into `C:\pspdev46` (in progress) and get the first byte-exact
    match recorded, per candidate under whichever lane reproduces it.
-5. Recover import names: hash candidate names against `.rodata.sceNid` so
-   `sceKernel…`-style calls resolve to their real stubs during verification.
+5. ✅ Import names: **223/223 recovered** (`tools/imports.py` →
+   `config/imports.txt`, wired into `symbols.ld`) — the pspsdk stub-record
+   join, the `SHA-1(name)[:4]` LE scheme, and curated psplibdoc records;
+   `sceKernel…`-style calls now resolve to their real stubs.
 6. Assemble the inventory back to a byte-exact image (the asm layer).
 7. Decompile function by function — readable C, human-named structs,
    renamed symbols wherever the code shows what it does.

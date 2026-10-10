@@ -9,8 +9,11 @@ same instruction words as the retail build.
 
 Contents, in order:
   * section anchors      _sec_text_RENDER = 0x...;  _sec_text_RENDER_SIZE
-  * import stub anchors  _stub_sceAudio = 0x...;     (library granularity for
-                        now - individual import names are not in the image)
+  * import stubs         sceKernelCreateThread = 0x...;  (named 223/223 by
+                        tools/imports.py: pspsdk stub records + SHA-1(NID)
+                        + config/nid-extra.txt)
+  * library anchors      _stub_sceAudio = 0x...;     (kept: the original code
+                        also reaches stubs by address alone)
   * every inventory name func_000000B0 = 0x...;      (config/functions.txt)
   * data references      dword_001D1B00 = 0x...;     recovered by scanning the
                         original code for lui/addiu and load/store pairs that
@@ -30,6 +33,7 @@ import pspelf  # noqa: E402
 
 OUT = ROOT / "config" / "pgs-si2.symbols.ld"
 FUNCTIONS = ROOT / "config" / "functions.txt"
+IMPORTS = ROOT / "config" / "imports.txt"
 
 # MIPS32 opcodes we care about while scanning code for address material.
 OP_LUI = 0x0F
@@ -199,6 +203,28 @@ def main() -> int:
             stub_lines.append((addr, f"_stub_{name[len('.sceStub.text.'):]}"
                                      f" = 0x{addr:08X};"))
 
+    # --- named import stubs (tools/imports.py -> config/imports.txt) -------
+    import_lines: list[tuple[int, str]] = []
+    if IMPORTS.is_file():
+        for raw in IMPORTS.read_text(encoding="utf-8").splitlines():
+            raw = raw.strip()
+            if not raw or raw.startswith("#"):
+                continue
+            parts = raw.split()
+            if len(parts) != 4:
+                print(f"error: malformed line in {IMPORTS.name}: {raw}",
+                      file=sys.stderr)
+                return 1
+            addr_s, _lib, _nid, name = parts
+            if name == "?":
+                continue
+            if name in seen_names:
+                print(f"error: duplicate symbol name {name}", file=sys.stderr)
+                return 1
+            seen_names.add(name)
+            addr = int(addr_s, 16)
+            import_lines.append((addr, f"{name} = 0x{addr:08X};"))
+
     # --- data references recovered from the original code ------------------
     data_refs: dict[int, list[str]] = {}
     for addr, size, section, tier, name in entries:
@@ -236,9 +262,10 @@ def main() -> int:
  *  assembles to the very instruction words the retail build shipped.
  *
  *  {len(func_lines)} inventory symbols, {len(anchor_lines)} section anchors,
- *  {len(stub_lines)} import-library anchors, {len(data_lines)} recovered data
- *  addresses (scanned from lui/addiu and load/store pairs in the original
- *  code - see "ref:" comments for which functions reach them).
+ *  {len(import_lines)} named import stubs, {len(stub_lines)} import-library
+ *  anchors, {len(data_lines)} recovered data addresses (scanned from
+ *  lui/addiu and load/store pairs in the original code - see "ref:" comments
+ *  for which functions reach them).
  * ========================================================================== */
 
 
@@ -250,6 +277,9 @@ def main() -> int:
     body.append("\n/* --- import stub libraries (granularity: library, not function) --- */\n")
     for _, line in sorted(stub_lines, key=lambda t: t[0]):
         body.append(line + "\n")
+    body.append("\n/* --- named import stubs (config/imports.txt) --- */\n")
+    for _, line in sorted(import_lines, key=lambda t: t[0]):
+        body.append(line + "\n")
     body.append("\n/* --- functions (config/functions.txt) --- */\n")
     for _, line in sorted(func_lines, key=lambda t: t[0]):
         body.append(line + "\n")
@@ -260,8 +290,8 @@ def main() -> int:
     OUT.write_text("".join(body), encoding="utf-8")
     mod.close()
     print(f"wrote {OUT.relative_to(ROOT)}: {len(func_lines)} functions, "
-          f"{len(anchor_lines)} anchors, {len(stub_lines)} stub libs, "
-          f"{len(data_lines)} data addresses")
+          f"{len(anchor_lines)} anchors, {len(import_lines)} imports, "
+          f"{len(stub_lines)} stub libs, {len(data_lines)} data addresses")
     return 0
 
 
