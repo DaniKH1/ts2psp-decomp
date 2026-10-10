@@ -10,10 +10,10 @@ extracted or decrypted game data stay outside Git.
 
 ## Progress
 
-**83 of 88 current C candidates match byte for byte (94.3%).** Eighty-two
-match with GCC 3.3.6; `store_word_pair_at_00052604` matches with GCC 15.2.0.
-The binary inventory contains 5,180 entries, so only 83 (1.6%) currently have
-verified C implementations. The other 5,092 entries are not yet represented by
+**61 of 66 current C candidates match byte for byte (92.4%).** Sixty match
+with GCC 3.3.6; `store_word_pair_at_00052604` matches with GCC 15.2.0.
+The binary inventory contains 5,180 entries, so only 66 (1.3%) currently have
+verified C implementations. The other 5,114 entries are not yet represented by
 candidate sources, and five of the current candidates still fail byte matching.
 This is early decompilation progress; it is not yet enough to recompile the
 whole game.
@@ -21,11 +21,11 @@ whole game.
 | Result | Functions |
 | --- | --- |
 | 16-byte code-word accessors | `read_code_word_at_0x743A4_00049A90`, `write_code_word_at_0x743A4_00049AA0` |
-| 16-byte field update | `subtract_word_at_30` |
+| 16-byte field update | `subtract_word_at_30` (`func_00029CFC`) |
 | 16-byte pair writer | `store_word_pair_at_00052604` writes two words to a caller-provided struct and returns its address. |
 | 44-byte counter update | `advance_counter_at_0x50_000643D0` increments the field at `+0x50` and wraps it at the limit in `+0x54`. |
 | 8-byte word accessors | `set_word`, `get_word_at_0x0_0004E5CC`, `get_word_at_0x0_0004E5D4` |
-| 8-byte leaves | 27 empty functions (`noop_at_<address>` names where the symbol is unknown, plus `renderMeshInstances_001BEC24`), and `get_address_at_0x30_000111D8` and `get_address_at_0x5C_000273BC`. |
+| 8-byte leaves | Four empty no-ops (`noop_at_*`), plus `get_address_at_0x30_000111D8` and `get_address_at_0x5C_000273BC`. |
 | 21 one-word getters | Generated names identify the field offset and function address; see `config/matched_c.txt`. |
 | 9 one-word setters and clearers | Names record the write or clear operation, field offset, and function address. |
 | 14 byte and address accessors | Exact byte loads/stores and byte-offset address calculations. |
@@ -33,9 +33,8 @@ whole game.
 
 The authoritative list is generated in [`config/matched_c.txt`](config/matched_c.txt).
 Names use one consistent convention: describe the observed operation or byte
-offset, then include the original address as a stable suffix. The 26 empty
-functions with no known symbol use `noop_at_<address>` because their purpose
-is not established.
+offset, then include the original address as a stable suffix. The four empty
+functions use `noop_at_<address>` because their purpose is not established.
 Human names map to the original binary inventory in
 [`config/renames.txt`](config/renames.txt). The remaining five candidates are
 still being investigated; an unverified candidate is not treated as completed
