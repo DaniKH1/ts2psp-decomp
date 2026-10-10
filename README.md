@@ -7,7 +7,8 @@ the disc image with no symbols and no source.
 | --- | --- |
 | module image | 2,567,365 bytes (plain ELF, decrypted) |
 | code | `.text` is 1,769,768 bytes = 442,442 instructions |
-| functions | enumerated per section (see Roadmap) |
+| functions | **5,180 enumerated** (see `config/functions.txt`) |
+| jump-table labels | 2,441 recorded separately (not functions) |
 | relocation tables | `.rel.text` 451,232 bytes, plus per-TU `.rel.*` |
 
 The engine is Maxis' "Elem", the shared engine also used by *The Sims 3* — the
@@ -45,6 +46,12 @@ What is proven so far:
     previous attempt's count;
   * 3,754 string literals in `.rodata` (74,300 bytes), 115,848 bytes of
     `.data`, and 963,972 bytes of `.bss`.
+* The function inventory is complete and reproducible:
+  `tools/inventory.py` finds **5,180 functions** from the binary alone —
+  4,616 `jal` targets, 320 static constructors from `.cplinit`, 55 tail
+  calls (`j` targets no conditional branch reaches), 160 data-pointer
+  entries, and the 8 section heads — and books 2,441 switch jump-table
+  labels separately (`config/functions.txt`).
 
 ## The build target
 
@@ -89,12 +96,38 @@ derivative work of Maxis/EA's copyright and is **unlicensed on purpose** —
 no disc image, decrypted executable or toolchain binary is committed here.
 You need your own copy of the game. This is not legal advice.
 
+## Function inventory
+
+`tools/inventory.py` enumerates every function **from the binary alone** —
+no symbol table is needed because the module links at 0 and every `jal`
+carries its target in the instruction word. Sources, and the tier each
+entry gets in `config/functions.txt`:
+
+| tier | count | source |
+| --- | --- | --- |
+| `section` | 8 | start of a `-ffunction-sections` code section |
+| `call` | 4,616 | target of a `jal` |
+| `jump` | 55 | target of a bare `j` that no conditional branch reaches (tail calls) |
+| `ctor` | 320 | entry of the static constructor list in `.cplinit` |
+| `data` | 160 | a relocated data word pointing into code (vtable-ish, worth a per-function look) |
+| **total** | **5,180** | |
+
+2,441 further relocated data words point *into* function bodies in clusters —
+switch jump tables — and are recorded but deliberately not counted as
+functions.  The 320 constructors match an independent count from the previous
+attempt's notes, which is a good sign for the method.
+
+Everything the previous attempt called 7,497 "functions" is here with the
+sources separated: this inventory counts 5,180 and books the jump-table
+labels separately instead of inflating the function count with them.
+
 ## Roadmap
 
 1. ✅ Extract and identify the module image.
-2. Function inventory: split every code section into functions using the
-   relocation graph (`jal` targets) and section boundaries.
-3. Assemble the inventory back to a byte-exact image (the asm layer).
-4. Get psp-gcc in place and stand up the compile-and-compare harness.
+2. ✅ Function inventory: every code section split into functions by
+   `jal` graph, constructor list and section boundaries
+   (`tools/inventory.py` → `config/functions.txt`).
+3. Get psp-gcc in place and stand up the compile-and-compare harness.
+4. Assemble the inventory back to a byte-exact image (the asm layer).
 5. Decompile function by function — readable C, human-named structs,
    renamed symbols wherever the code shows what it does.
