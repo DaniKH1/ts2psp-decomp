@@ -31,7 +31,7 @@ Names use one consistent convention: describe the observed operation or byte
 offset, then include the original address as a stable suffix. The four empty
 functions use `noop_at_<address>` because their purpose is not established.
 Human names map to the original binary inventory in
-[`config/renames.txt`](config/renames.txt). The remaining six candidates are
+[`config/renames.txt`](config/renames.txt). The remaining five candidates are
 still being investigated; an unverified candidate is not treated as completed
 C.
 
