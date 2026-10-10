@@ -4,7 +4,6 @@
 advance_counter_at_0x50_000643D0
 clear_u8_at_0x11C_000ABE2C
 clear_word_at_0x334_000FD3C8
-func_00029CFC
 get_address_at_0x30_000111D8
 get_address_at_0x5C_000273BC
 get_byte_address_at_0x104_000FBFF0

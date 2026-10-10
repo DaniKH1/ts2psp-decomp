@@ -7,14 +7,14 @@
  *
  * The surrounding object and the field's game meaning are still unknown.
  */
-typedef struct WordAt30 {
+typedef struct WordWithValueAt30 {
     unsigned char padding[0x30];
-    unsigned value;
-} WordAt30;
+    unsigned value_at_0x30;
+} WordWithValueAt30;
 
-void subtract_word_at_30(WordAt30 *object, unsigned amount)
+void subtract_word_at_30(WordWithValueAt30 *object, unsigned amount)
 {
-    register unsigned previous asm("$6") = object->value;
+    register unsigned previous asm("$6") = object->value_at_0x30;
     amount = previous - amount;
-    object->value = amount;
+    object->value_at_0x30 = amount;
 }
