@@ -46,6 +46,11 @@ What is proven so far:
     previous attempt's count;
   * 3,754 string literals in `.rodata` (74,300 bytes), 115,848 bytes of
     `.data`, and 963,972 bytes of `.bss`.
+* The original compiler is **psp-gcc**, identified from the binary itself:
+  `e_flags` `0x10A23001` (MIPS2 + EABI32 + Allegrex + `noreorder`) and the
+  `-G0 -fno-pic -ffunction-sections -fno-common` fingerprint (see
+  *The build target*).  The previous attempt's README said CodeWarrior;
+  its own build driver disagreed, and the header settles it.
 * The function inventory is complete and reproducible:
   `tools/inventory.py` finds **5,180 functions** from the binary alone —
   4,616 `jal` targets, 320 static constructors from `.cplinit`, 55 tail
@@ -55,16 +60,40 @@ What is proven so far:
 
 ## The build target
 
-The original was built with **CodeWarrior for PSP** (`mwccpsp.exe`).
-psp-gcc does not reproduce its instruction selection, so byte-exact C is
-reached function by function, pinning the handful of registers and delay slots
-where the two compilers disagree. The toolchain facts:
+**The retail EBOOT was produced by psp-gcc**, not CodeWarrior — the evidence
+is in the binary itself and it is checkable:
 
-| | |
+| evidence | value |
 | --- | --- |
-| original compiler | CodeWarrior PSP (`mwccpsp`, `-O4,p -lang=c++`) |
-| matching compiler | psp-gcc (pspdev) |
-| verification | compile → extract `.text` → compare bytes, relocation-aware |
+| ELF `e_flags` | `0x10A23001` — MIPS2, EABI32, Allegrex, `noreorder`: psp-gcc's default combination |
+| small data | `-G0` — no `.sdata`/`.sbss`, not one `R_MIPS_GPREL16`; every global is a `%hi`/`%lo` pair |
+| addressing | `-fno-pic` — absolute, no GOT indirection |
+| sections | `-ffunction-sections` — the TUs survive as `.text.collision`, `.text.drawing`, … |
+| tentative defs | `-fno-common` — landed in `.linkonce.d` |
+
+(The previous attempt's README called the compiler CodeWarrior; its own build
+driver contradicted that with the table above. The header wins — it is in the
+file.)
+
+The flags every byte-exact C file must be compiled with:
+
+```sh
+psp-gcc -G0 -mabi=eabi -march=allegrex \
+        -fno-pic -fno-common -ffunction-sections -fdata-sections \
+        -fno-strict-aliasing -O2 -c
+```
+
+### Toolchain status: not yet on this machine
+
+There are **no Windows binaries** of psp-gcc anywhere: pspdev publishes only
+Linux/macOS tarballs (checked every release back to 2020), devkitPro dropped
+PSP from its package repos (`dkp-windows` has devkitARM/PPC/A64 but no PSP),
+and no copy survives on disk. The plan, in order of preference:
+
+1. build the pspdev toolchain from source under the existing MSYS2
+   (documented route; long but automatable);
+2. only if modern GCC's codegen turns out not to match the retail bytes,
+   pin an older psptoolchain GCC version (the game is from 2007).
 
 ## What is here
 
@@ -80,9 +109,15 @@ where the two compilers disagree. The toolchain facts:
 ## Reproducing
 
 ```sh
+# one-time: pspdecrypt, verified against the checksum the reference project records
+python tools/fetch.py https://github.com/John-K/pspdecrypt/releases/download/1.0/pspdecrypt-1.0-windows.zip bin/pspdecrypt.zip
+# (expand bin/pspdecrypt.zip into bin/; sha1 of pspdecrypt.exe must be
+#  c218f5aaed99c0995b11300ec081a7e279169285)
+
 python tools/extract_iso.py   # pull BOOT.BIN + EBOOT.BIN out of the ISO
 bin/pspdecrypt.exe -o disks/pgs-si2/EBOOT.dec disks/pgs-si2/EBOOT.BIN
 python tools/elfinfo.py       # section map + symbol census
+python tools/inventory.py     # function inventory -> config/functions.txt
 python tools/list_iso.py      # what is on the disc
 ```
 
