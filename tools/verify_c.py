@@ -75,7 +75,7 @@ def build(source: Path, root: Path, stem: str, tmp: str
     """Compile+link+extract .text for one lane; (bytes, "") or (None, error)."""
     obj = Path(tmp) / f"{stem}.o"
     res = subprocess.run(
-        [pspcc.tool("psp-gcc", root), *pspcc.CPPFLAGS, *pspcc.CFLAGS,
+        [pspcc.tool("psp-gcc", root), *pspcc.CPPFLAGS, *pspcc.cflags(root),
          *pspcc.OPTFLAGS, "-c", str(source), "-o", str(obj)],
         env=pspcc.env(root), capture_output=True, text=True)
     if res.returncode != 0:

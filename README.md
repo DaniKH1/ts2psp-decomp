@@ -194,8 +194,41 @@ retail but 9 under gcc 4.6.4 (folds `limit - 1` into a reversed `slt` +
 inverted branch, and sinks the early store into the branch delay slot) and 7
 under gcc 15 (`movz` instead of the branch). Three independent generation
 traits, all version-locked: **the retail compiler predates the oldest branch
-pspdev still maintains (4.6.4)**. Open question for the next step: whether a
-2007-era compiler (gcc 4.1/4.3 line + allegrex patch) can be built at all.
+pspdev still maintains (4.6.4)**.
+
+#### Era research: the Sony official SDK compiler
+
+The open question "which gcc is retail, and can it be built" now has a
+documented path:
+
+* **No version string survives in the image.** `BOOT.BIN` was swept for
+  `.comment` sections, `GCC: (GNU)` / `gcc version` / `psp-gcc` strings,
+  bare `X.Y.Z` triples, years and month names: the only version-like string
+  is zlib's own `1.1.4` (the game links zlib). The compiler identity must
+  come from codegen, not from strings.
+* **Sony's official SDK compiler versions are documented**: psp-gcc 1.x is
+  based on **GCC 3.3.x**, psp-gcc 2.x on **GCC 4.0.x**
+  (Retro Reversing's [Official Sony PSP SDK](https://www.retroreversing.com/pspsdk)
+  overview). The Sims 2 PSP (Oct 2007, built with the official SDK — the
+  `c:/ad_clean/...` build path and `sce*` imports) therefore sits in the
+  **3.3.x–4.0.x** window — consistent with every codegen trait above.
+* **The original allegrex port still exists.** The
+  [BRS-PSP-Research-Initiative](https://github.com/BRS-PSP-Research-Initiative)
+  (running the same match-the-compiler game for *Black Rock Shooter: the
+  Game*) maintains
+  [Psptoolchain-Allegrex-3.3](https://github.com/BRS-PSP-Research-Initiative/Psptoolchain-Allegrex-3.3):
+  the 2005 Marcus Brown `psp`/allegrex port of GCC 3.3 as a patch series
+  (`patches/gcc/3.3/new`), with binutils 2.25.1 patches, built inside Docker
+  on Debian Sarge i386. Their README: *"GCC 3.3 — the version that Sony
+  built the PSP toolchain off of"*, and their priority list targets
+  "GCC 3.2, 3.3, 3.4 and 4.0 (all versions found in binary strings)".
+* **Lane 3 plan (gcc33 → `C:\pspdev33`)**: build that patched GCC 3.3
+  *natively* under MSYS2 — `all-gcc` only (the harness links with
+  `psp-ld -T symbols.ld` directly, so no newlib/libgcc is needed) — and
+  **reuse lane 1's binutils**: instruction encoding is ISA-determined, so
+  keeping `psp-as`/`psp-ld` identical across lanes isolates the cc1
+  version as the single variable. Host dialect forced with
+  `-std=gnu89 -fcommon` (the same trick that built GCC 4.6.4).
 
 ## Verification harness
 
@@ -337,13 +370,15 @@ labels separately instead of inflating the function count with them.
    `tools/verify_c.py` + `config/pgs-si2.symbols.ld`, link stage proven
    against the real binaries).
 4. 🔄 Compiler era: the `gcc-4.6.4-psp` lane **is built** into
-   `C:\pspdev46` (binutils + gcc; newlib intentionally skipped) and
-   `verify_c.py` runs dual-lane (`gcc15`, `gcc46`) with the two
-   retail-derived flags in place. Wrapper and leaf probes narrowed the
-   remaining gap to version-locked traits (see *Compiler era*): the
-   retail compiler predates 4.6.4 — next is deciding whether a 2007-era
-   gcc (4.1/4.3 line + allegrex patch) can be built, and landing the
-   first byte-exact match under whichever lane reproduces it.
+   `C:\pspdev46` and proved retail predates it (version-locked traits,
+   see *Compiler era*). The era question is now **researched**: retail
+   comes from Sony's official SDK compiler window
+   (**psp-gcc 1.x = GCC 3.3.x**, psp-gcc 2.x = GCC 4.0.x), and the
+   original 2005 allegrex port of GCC 3.3 survives as the
+   BRS-PSP-Research-Initiative patch set — lane 3 (`gcc33`) is being
+   built natively from it (`all-gcc`, reusing lane 1's binutils).
+   Landing the first byte-exact match follows whichever lane reproduces
+   retail.
 5. ✅ Import names: **223/223 recovered** (`tools/imports.py` →
    `config/imports.txt`, wired into `symbols.ld`) — the pspsdk stub-record
    join, the `SHA-1(name)[:4]` LE scheme, and curated psplibdoc records;
