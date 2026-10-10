@@ -33,7 +33,17 @@ functions use `noop_at_<address>` because their purpose is not established.
 Human names map to the original binary inventory in
 [`config/renames.txt`](config/renames.txt). The remaining five candidates are
 still being investigated; an unverified candidate is not treated as completed
-C.
+C. Current verification results for those candidates:
+
+| Candidate | Current finding |
+| --- | --- |
+| `func_00000B28` | The struct-based float scaling source compiles to 32 bytes; retail code is 48 bytes. The scalar loads, multiplies, and stores still need to be expressed in a form that preserves the retail instruction sequence. |
+| `func_0002BBA8` | The current comparison source compiles to 12 bytes; retail code is 32 bytes and uses a conditional branch, a shared return path, and `ori` constants. Straightforward C conditional and return variants are optimized into a shorter comparison. |
+| `func_0004AAFC`, `func_0004AB18`, `func_000F8084` | Their C sources call the expected PSP imports, but all three compile with different stack-frame and return-address offsets. Retail uses a 32-byte frame and saves `$ra` at `+16`; none of the installed compiler lanes currently reproduces that layout for these wrappers. |
+
+These are open reverse-engineering tasks, not accepted matches. The verifier
+currently reports **60/65** exact candidates; the `--verbose` output shows the
+first differing instruction for each pending function.
 
 `return_0x10_at_0000F574` uses a C bitwise-OR expression and a GNU C
 hard-register variable bound to Allegrex `$zero`. An empty extended-`asm`
