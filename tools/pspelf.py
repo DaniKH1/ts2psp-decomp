@@ -7,6 +7,7 @@ sizes) and the raw bytes at a virtual address.  Nothing here writes.
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 from elftools.elf.elffile import ELFFile
@@ -37,6 +38,18 @@ class Module:
             for name, (addr, size, _flags) in self.sections.items()
             if size > 0
         )
+        # Program headers are captured once, up front: pyelftools parses
+        # them lazily through the file handle, and verify_c.py shares one
+        # Module across a thread pool - lazy parsing plus concurrent
+        # seek() corrupts the segment table.  Combined with the lock in
+        # read(), the whole object is safe for concurrent readers.
+        self._segments: list[tuple[int, int, int]] = []   # (vaddr, filesz, offset)
+        for seg in self._elf.iter_segments():
+            h = seg.header
+            if h["p_type"] == "PT_LOAD":
+                self._segments.append(
+                    (h["p_vaddr"], h["p_filesz"], h["p_offset"]))
+        self._lock = threading.Lock()
 
     def close(self) -> None:
         self._file.close()
@@ -49,12 +62,11 @@ class Module:
 
     def read(self, addr: int, size: int) -> bytes:
         """Raw bytes of [addr, addr+size) as the loader sees them."""
-        for seg in self._elf.iter_segments():
-            h = seg.header
-            if h["p_type"] == "PT_LOAD" and h["p_vaddr"] <= addr < h["p_vaddr"] + h["p_filesz"]:
-                off = h["p_offset"] + (addr - h["p_vaddr"])
-                self._file.seek(off)
-                return self._file.read(size)
+        for vaddr, filesz, offset in self._segments:
+            if vaddr <= addr < vaddr + filesz:
+                with self._lock:
+                    self._file.seek(offset + (addr - vaddr))
+                    return self._file.read(size)
         raise ValueError(f"address 0x{addr:08X} is not in any PT_LOAD segment")
 
     def containing_section(self, addr: int) -> str | None:

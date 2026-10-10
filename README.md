@@ -75,12 +75,14 @@ is in the binary itself and it is checkable:
 driver contradicted that with the table above. The header wins — it is in the
 file.)
 
-The flags every byte-exact C file must be compiled with:
+The flags every byte-exact C file must be compiled with (the last two are
+derived from observed retail code, see *Compiler era*):
 
 ```sh
 psp-gcc -G0 -mabi=eabi -march=allegrex \
         -fno-pic -fno-common -ffunction-sections -fdata-sections \
-        -fno-strict-aliasing -O2 -c
+        -fno-strict-aliasing -mpreferred-stack-boundary=4 \
+        -fno-optimize-sibling-calls -O2 -c
 ```
 
 ### Toolchain: built from source under MSYS2
@@ -119,12 +121,39 @@ and no copy survives on disk. So the toolchain is being built from source:
 `psp-gcc`, `psp-ld`, `psp-objcopy`, plus newlib (`psp/include`, `libc.a`) and
 pthread-embedded (`build.txt` carries all five build entries).
 
+#### Second lane: GCC 4.6.4 in `C:\pspdev46`
+
+Built from the same `psptoolchain-allegrex` scripts with
+`C:\pspdev46-src\build.sh` (per-step host flags) and
+`C:\pspdev46-src\override.sh` pinning the gcc ref:
+
+* the override must set **`PSPTOOLCHAIN_ALLEGREX_GCC_DEFAULT_REPO_REF`** —
+  `toolchain.sh` passes `$TAG` (empty for branch clones) as `$1`, so scripts
+  read the `_DEFAULT_` variable, and a wrong name silently clones modern GCC;
+* host flags per step: binutils 2.44 (2025 code) needs
+  `-std=gnu17`/`-std=gnu++17`, the 2012-era steps need
+  `-std=gnu89`/`-std=gnu++98 -fpermissive -fcommon`;
+* **`liblto_plugin.so` name fix**: the driver demands a readable
+  `LTOPLUGINSONAME` (`liblto_plugin.so`) on *every* invocation, but MSYS
+  installs `cyglto_plugin-0.dll` — a copy under that name in
+  `libexec/gcc/psp/4.6.4/` unblocks everything;
+* steps run as `1 2` (binutils + gcc) — **newlib/pthread are skipped**:
+  newlib 4.5's `sys/_intsup.h` type machinery fails against gcc 4.6's
+  predefined macros, and the harness needs no libc (candidates are
+  self-contained and link against `symbols.ld` with
+  `--unresolved-symbols=ignore-all`).
+
+**Status: usable** — `C:\pspdev46\bin\psp-gcc.exe` reports
+`psp-gcc (GCC) 4.6.4`, and `verify_c.py` now tries every installed lane.
+
 ### Compiler era: retail is not GCC 15
 
 The first two candidates proved that modern GCC's codegen differs from the
 2007 retail build in ways no flag recovers (see the evidence below), so a
-second, era-adjacent lane is building: **`gcc-4.6.4-psp`** (the oldest
+second, era-adjacent lane was built: **`gcc-4.6.4-psp`** (the oldest
 allegrex-capable branch upstream) into `C:\pspdev46`, alongside GCC 15.
+`verify_c.py` tries every installed lane per candidate (`--lane` narrows);
+a MATCH under any lane counts.
 
 Evidence, all checkable from `BOOT.BIN`:
 
@@ -143,6 +172,30 @@ GCC 15 (`-fno-if-conversion` does not apply — it is expression expansion),
 and pointer locals fold flat, so these differences are version traits, not
 C-shape problems. Candidates are tried against both lanes; per-function
 matching decides which toolchain is recorded for it.
+
+Two further flags are **derived from retail observations** and are now part
+of the harness flag set:
+
+| flag | evidence |
+| --- | --- |
+| `-mpreferred-stack-boundary=4` | every retail frame is 16-byte aligned (`func_0004AB18`: `sp-32`, `ra` at 16; 8-byte default misaligns the stack) |
+| `-fno-optimize-sibling-calls` | a census of all `.text` found **559** call-wrappers keeping `frame+jal+jr` in tail position and **0** true sibling calls (the 33 functions ending in `j` are loop back-edges, delay slots do body work) |
+
+With those two, the wrapper candidates match retail **except for the frame
+word** (4 of 7 words identical): retail frames put `ra` at 16 in a 32-byte
+frame, i.e. a 16-byte register-argument area below it (`REG_PARM_STACK_SPACE`
+for oldabi). Both available GCCs give `ra` at 12 in a 16-byte frame for
+`-mabi=eabi`, because gcc ≥ 4.6 classifies EABI as *neither* old nor new ABI
+(`TARGET_OLDABI = {ABI_32, ABI_O64}`), so the 16-byte floor never applies —
+and `-mabi=32` overshoots (`ra` at 28: `calls.c` adds the floor *and* every
+in-register argument's size). Leaf functions (frameless, no outgoing-args
+logic) were probed next: `func_000643D0` compiles to 11 instructions in
+retail but 9 under gcc 4.6.4 (folds `limit - 1` into a reversed `slt` +
+inverted branch, and sinks the early store into the branch delay slot) and 7
+under gcc 15 (`movz` instead of the branch). Three independent generation
+traits, all version-locked: **the retail compiler predates the oldest branch
+pspdev still maintains (4.6.4)**. Open question for the next step: whether a
+2007-era compiler (gcc 4.1/4.3 line + allegrex patch) can be built at all.
 
 ## Verification harness
 
@@ -165,7 +218,9 @@ that decides it:
    `psp-gcc` (the flags above) → link against `symbols.ld` so `%hi`/`%lo`
    pairs and `jal` targets resolve exactly as the retail link did →
    `psp-objcopy -O binary --only-section=.text*` → byte-compare against
-   `BOOT.BIN`. `--adopt` writes the passing list to
+   `BOOT.BIN`. Every **installed toolchain lane** is tried per candidate
+   (`gcc15`, `gcc46`; `--lane` restricts), and a MATCH names the lane that
+   produced it. `--adopt` writes the passing list to
    `config/matched_c.txt`. Renames live in `config/renames.txt`
    (`<inventory_name> <your_name>`), so readable names never lose the
    original address.
@@ -281,10 +336,14 @@ labels separately instead of inflating the function count with them.
    compile-and-compare harness standing (`tools/linkerscript.py` +
    `tools/verify_c.py` + `config/pgs-si2.symbols.ld`, link stage proven
    against the real binaries).
-4. 🔄 Compiler era: the first two candidates proved GCC 15's codegen is
-   not the retail one (see *Compiler era*) — build the `gcc-4.6.4-psp`
-   lane into `C:\pspdev46` (in progress) and get the first byte-exact
-   match recorded, per candidate under whichever lane reproduces it.
+4. 🔄 Compiler era: the `gcc-4.6.4-psp` lane **is built** into
+   `C:\pspdev46` (binutils + gcc; newlib intentionally skipped) and
+   `verify_c.py` runs dual-lane (`gcc15`, `gcc46`) with the two
+   retail-derived flags in place. Wrapper and leaf probes narrowed the
+   remaining gap to version-locked traits (see *Compiler era*): the
+   retail compiler predates 4.6.4 — next is deciding whether a 2007-era
+   gcc (4.1/4.3 line + allegrex patch) can be built, and landing the
+   first byte-exact match under whichever lane reproduces it.
 5. ✅ Import names: **223/223 recovered** (`tools/imports.py` →
    `config/imports.txt`, wired into `symbols.ld`) — the pspsdk stub-record
    join, the `SHA-1(name)[:4]` LE scheme, and curated psplibdoc records;
