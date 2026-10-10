@@ -48,6 +48,7 @@ identity_pointer_at_00096FA8
 identity_pointer_at_000C300C
 identity_pointer_at_000CD698
 identity_pointer_at_000F2220
+identity_pointer_at_001AA5D8
 noop_at_000068E8
 noop_at_00024CFC
 noop_at_000255B8
@@ -99,6 +100,7 @@ return_zero_at_000A816C
 return_zero_at_000E58D4
 return_zero_at_000E5AD4
 return_zero_at_000E5ADC
+return_zero_at_000F698C
 return_zero_at_000F8F9C
 return_zero_at_001004B8
 return_zero_at_00101AD4
@@ -106,6 +108,7 @@ return_zero_at_0013073C
 return_zero_at_0013D1DC
 return_zero_at_00142A9C
 return_zero_at_001455A0
+return_zero_at_0019C028
 set_float_at_0x10_000F96C0
 set_float_at_0x18_000F96B8
 set_float_at_0x34_000F9768
