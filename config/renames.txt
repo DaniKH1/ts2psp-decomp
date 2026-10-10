@@ -61,3 +61,4 @@ func_00049AA0 write_code_word_at_0x743A4_00049AA0
 func_0004A914 noop_at_0004A914
 func_0004E5CC get_word_at_0x0_0004E5CC
 func_0004E5D4 get_word_at_0x0_0004E5D4
+func_00052604 store_word_pair_at_00052604

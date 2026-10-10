@@ -56,5 +56,6 @@ set_word_at_0x50_000F9614
 set_word_at_0x58_0009D550
 set_word_at_0x8_000CD700
 set_word_at_0xCC_000CDEEC
+store_word_pair_at_00052604
 subtract_word_at_30
 write_code_word_at_0x743A4_00049AA0

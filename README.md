@@ -10,13 +10,14 @@ extracted or decrypted game data stay outside Git.
 
 ## Progress
 
-**57 of 65 current C candidates match byte for byte (87.7%).** All 57
-currently match with the GCC 3.3.6 Allegrex lane.
+**58 of 65 current C candidates match byte for byte (89.2%).** The latest
+addition matches with GCC 15.2.0; the other 57 currently match with GCC 3.3.6.
 
 | Result | Functions |
 | --- | --- |
 | 16-byte code-word accessors | `read_code_word_at_0x743A4_00049A90`, `write_code_word_at_0x743A4_00049AA0` |
 | 16-byte field update | `subtract_word_at_30` |
+| 16-byte pair writer | `store_word_pair_at_00052604` writes two words to a caller-provided struct and returns its address. |
 | 8-byte word accessors | `set_word`, `get_word_at_0x0_0004E5CC`, `get_word_at_0x0_0004E5D4` |
 | 8-byte leaves | Four empty no-ops, plus `get_address_at_0x30_000111D8` and `get_address_at_0x5C_000273BC`. |
 | 21 one-word getters | Generated names identify the field offset and function address; see `config/matched_c.txt`. |
@@ -29,7 +30,7 @@ Names use one consistent convention: describe the observed operation or byte
 offset, then include the original address as a stable suffix. The four empty
 functions use `noop_at_<address>` because their purpose is not established.
 Human names map to the original binary inventory in
-[`config/renames.txt`](config/renames.txt). The remaining eight candidates are
+[`config/renames.txt`](config/renames.txt). The remaining seven candidates are
 still being investigated; an unverified candidate is not treated as completed
 C.
 
@@ -115,7 +116,10 @@ installed on this machine.
 - Added 9 exact one-word setters and clearers.
 - Added 14 exact byte accessors, byte setters, and address getters.
 - Added an exact constant return for `0x8000`.
-- Reached 57/65 exact C candidates (87.7%), all verified with GCC 3.3.6.
+- Added `store_word_pair_at_00052604`, which writes a two-word result struct;
+  GCC 15.2 reproduces its 16 retail bytes exactly.
+- Reached 58/65 exact C candidates (89.2%); 57 match with GCC 3.3.6 and this
+  pair writer matches with GCC 15.2.0.
 - `352477f` - Decompiled `func_00029CFC` as `subtract_word_at_30`, with a padded
   struct and the register placement required for the exact GCC 3.3 output.
 - `47bf530` - Replaced the incorrect `func_0004E5DC` getter hypothesis with
@@ -126,7 +130,7 @@ installed on this machine.
 
 ## Next steps
 
-- Investigate the eight remaining candidates and add only verified matches.
+- Investigate the seven remaining candidates and add only verified matches.
 - Use call sites, neighboring code, and data references to improve struct and
   function names without claiming semantics the binary does not establish.
 - Continue building a readable C reconstruction, then extend the same exactness
