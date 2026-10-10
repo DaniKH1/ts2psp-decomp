@@ -10,7 +10,7 @@ The retail ISO and extracted game data are kept outside Git.
 
 ## Current progress
 
-The binary inventory contains **5,180 functions**. The repository tracks **175
+The binary inventory contains **5,180 functions**. The repository tracks **178
 C implementations** that reproduce their retail bytes exactly. Five more
 local candidates are still being investigated and do not match yet; they stay
 out of the tracked source set until verified. Current work is concentrated in
@@ -146,6 +146,9 @@ decompilation workflows; it is not a source for this game.
   zero.
 - Added an exact global float getter, a global byte clear, and three global
   word setters in the `0x0006xxxx` and `0x001Dxxxx` regions.
+- Added exact float constant returns for `480.0f`, `272.0f`, and positive
+  infinity. Their unions preserve the retail bit patterns, with a no-instruction
+  register constraint for the retail `$a0` placement.
 - Corrected `return_0x10_at_0000F574` to use only a GNU C hard-register
   variable bound to `$zero`; the unnecessary empty inline-assembly statement
   was removed. GCC 3.3.6 emits the exact retail 8 bytes.
