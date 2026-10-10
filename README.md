@@ -10,7 +10,7 @@ The retail ISO and extracted game data are kept outside Git.
 
 ## Current progress
 
-The binary inventory contains **5,180 functions**. The repository tracks **132
+The binary inventory contains **5,180 functions**. The repository tracks **137
 C implementations** that reproduce their retail bytes exactly. Five more
 local candidates are still being investigated and do not match yet; they stay
 out of the tracked source set until verified. Current work is concentrated in
@@ -132,6 +132,9 @@ decompilation workflows; it is not a source for this game.
   low-16-bit read at `+0x04`, and a word write plus adjacent clear at `+0x48`.
 - Added exact global access at `0x001D03828` and a global byte store at
   `0x001D03624`; their C structs preserve the observed base and offsets.
+- Added exact 12-byte struct operations for paired float storage, a word/byte
+  field update, two-byte clearing, and a clear-through-pointer helper. A second
+  global byte store at `0x001D04930` also matches.
 - Corrected `return_0x10_at_0000F574` to use only a GNU C hard-register
   variable bound to `$zero`; the unnecessary empty inline-assembly statement
   was removed. GCC 3.3.6 emits the exact retail 8 bytes.
