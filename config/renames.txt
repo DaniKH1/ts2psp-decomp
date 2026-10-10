@@ -1,0 +1,5 @@
+// Human renames: "<inventory_name> <your_name>" - one per line.
+// Lets a candidate in src/ use a readable function name while the inventory,
+// the linker symbols and the byte comparison keep tracking the original
+// address. Example:
+//   func_000000B0 gameUpdate

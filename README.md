@@ -83,27 +83,75 @@ psp-gcc -G0 -mabi=eabi -march=allegrex \
         -fno-strict-aliasing -O2 -c
 ```
 
-### Toolchain status: not yet on this machine
+### Toolchain status: building from source under MSYS2
 
 There are **no Windows binaries** of psp-gcc anywhere: pspdev publishes only
 Linux/macOS tarballs (checked every release back to 2020), devkitPro dropped
 PSP from its package repos (`dkp-windows` has devkitARM/PPC/A64 but no PSP),
-and no copy survives on disk. The plan, in order of preference:
+and no copy survives on disk. So the toolchain is being built from source:
 
-1. build the pspdev toolchain from source under the existing MSYS2
-   (documented route; long but automatable);
-2. only if modern GCC's codegen turns out not to match the retail bytes,
-   pin an older psptoolchain GCC version (the game is from 2007).
+* host: the existing MSYS2 at `C:\msys64` (its `prepare.sh` does not know
+  MSYS2, so dependencies were installed by hand with `pacman` — `base-devel`,
+  `gcc`, `cmake`, `bison`, `flex`, `meson`, `ninja`, `libtool`, `gpgme`,
+  `texinfo`, plus the `gmp-devel`/`mpfr-devel`/`mpc-devel`/`isl-devel`
+  split-out development packages GCC needs);
+* source: `pspdev/psptoolchain-allegrex` cloned to `C:\pspdev-src` — it builds
+  binutils `allegrex-v2.44`, GCC `allegrex-v15.2.0` (two stages) and newlib
+  `allegrex-v4.5.0` into `PSPDEV=C:\pspdev` (no spaces in the path);
+* first failure fixed: the bundled readline (pulled in via gdb) still uses K&R
+  declarations (`extern char *tgoto ();`), which GCC 15 rejects under its C23
+  default where `()` means `(void)` — the build now exports
+  `CFLAGS="-O2 -std=gnu17"`;
+* only the psptoolchain dependencies are needed (`check-pspdev.sh`); the
+  outer pspdev repo's `check-dependencies.sh` demands pkg-config metadata for
+  libarchive/openssl/ncurses that MSYS2 does not ship, but those libraries are
+  only used by `psp-pacman`, not by psp-gcc.
+
+If modern GCC's codegen turns out not to match the retail bytes, the fallback
+is to pin an older psptoolchain GCC version (the game is from 2007).
+
+## Verification harness
+
+Byte-exactness is the definition of "decompiled" here, and this is the machine
+that decides it:
+
+1. **`tools/linkerscript.py`** regenerates `config/pgs-si2.symbols.ld`, the
+   absolute address of every symbol a candidate can reference — the retail
+   `.symtab` is empty, so this file *is* the recovered symbol table:
+   * 5,180 function names from `config/functions.txt`;
+   * 104 section anchors (`_sec_*_START`/`_SIZE`), 26 import-library anchors
+     (`_stub_sceAudio`, …);
+   * **7,305 data addresses** recovered by scanning the original code for
+     `lui`+`addiu`/`ori` and load/store pairs that resolve into an allocated
+     section — globals, string literals, jump tables — each annotated with
+     which functions reach it.
+2. **`tools/verify_c.py`** checks each `src/<name>.c`:
+   `psp-gcc` (the flags above) → link against `symbols.ld` so `%hi`/`%lo`
+   pairs and `jal` targets resolve exactly as the retail link did →
+   `psp-objcopy -O binary --only-section=.text*` → byte-compare against
+   `BOOT.BIN`. `--adopt` writes the passing list to
+   `config/matched_c.txt`. Renames live in `config/renames.txt`
+   (`<inventory_name> <your_name>`), so readable names never lose the
+   original address.
+3. **`tools/pspcc.py`** locates the toolchain and encodes the exact
+   compiler flags in one place; **`tools/pspelf.py`** is the read-only
+   module-image reader everything else shares.
+
+Import stubs are pinned per *library* only: the image contains no NID→name
+database (individual imports are named in `.rodata.sceNid` as bare NIDs), so a
+candidate calling `sceKernel…` by name will not link to the right stub yet —
+recovering those names by hashing candidate names against the NID table is its
+own roadmap item.
 
 ## What is here
 
 | path | |
 | --- | --- |
 | `tools/` | MIT licensed. Everything that produced the above, and the checks. |
-| `config/` | hashes of the inputs, and later the symbol map. |
+| `config/` | input hashes, function inventory, generated `pgs-si2.symbols.ld`, renames, matched list. |
 | `disks/` | gitignored: the extracted module image. Never commit it. |
 | `bin/` | gitignored: downloaded tool binaries (`pspdecrypt`, objdiff). |
-| `src/` | the hand-written decompilation — only byte-exact files, once it starts. |
+| `src/` | the hand-written decompilation — only byte-exact files, one function per `.c`. |
 | `include/` | the shared types (`f32`, `Vec3f`, object layouts). |
 
 ## Reproducing
@@ -118,6 +166,8 @@ python tools/extract_iso.py   # pull BOOT.BIN + EBOOT.BIN out of the ISO
 bin/pspdecrypt.exe -o disks/pgs-si2/EBOOT.dec disks/pgs-si2/EBOOT.BIN
 python tools/elfinfo.py       # section map + symbol census
 python tools/inventory.py     # function inventory -> config/functions.txt
+python tools/linkerscript.py  # recovered symbol table -> config/pgs-si2.symbols.ld
+python tools/verify_c.py      # byte-compare every src/*.c against BOOT.BIN
 python tools/list_iso.py      # what is on the disc
 ```
 
@@ -162,7 +212,13 @@ labels separately instead of inflating the function count with them.
 2. ✅ Function inventory: every code section split into functions by
    `jal` graph, constructor list and section boundaries
    (`tools/inventory.py` → `config/functions.txt`).
-3. Get psp-gcc in place and stand up the compile-and-compare harness.
-4. Assemble the inventory back to a byte-exact image (the asm layer).
-5. Decompile function by function — readable C, human-named structs,
+3. 🔄 Get psp-gcc in place (building from source under MSYS2 into
+   `C:\pspdev`, see *Toolchain status*) — and stand up the
+   compile-and-compare harness: **done** (`tools/linkerscript.py` +
+   `tools/verify_c.py` + `config/pgs-si2.symbols.ld`, waiting only on the
+   compiler to run).
+4. Recover import names: hash candidate names against `.rodata.sceNid` so
+   `sceKernel…`-style calls resolve to their real stubs during verification.
+5. Assemble the inventory back to a byte-exact image (the asm layer).
+6. Decompile function by function — readable C, human-named structs,
    renamed symbols wherever the code shows what it does.
