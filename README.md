@@ -10,7 +10,7 @@ The retail ISO and extracted game data are kept outside Git.
 
 ## Current progress
 
-The binary inventory contains **5,180 functions**. The repository tracks **148
+The binary inventory contains **5,180 functions**. The repository tracks **159
 C implementations** that reproduce their retail bytes exactly. Five more
 local candidates are still being investigated and do not match yet; they stay
 out of the tracked source set until verified. Current work is concentrated in
@@ -134,6 +134,8 @@ decompilation workflows; it is not a source for this game.
   `0x001D03624`; their C structs preserve the observed base and offsets.
 - Added five global word getters across the `0x0005xxxx` to `0x001E1F8C`
   address ranges, preserving the retail high-register base and signed offsets.
+- Added eleven functions returning static addresses; their target-specific C
+  expressions preserve the retail high-half/low-half construction.
 - Added exact 12-byte struct operations for paired float storage, a word/byte
   field update, two-byte clearing, and a clear-through-pointer helper. A second
   global byte store at `0x001D04930` also matches.
