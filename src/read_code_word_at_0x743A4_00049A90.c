@@ -1,4 +1,4 @@
-/* func_00049A90 - the read half of an accessor pair (see func_00049AA0):
+/* read_code_word_at_0x743A4_00049A90 - the read half of an accessor pair (see func_00049AA0):
  *
  *   lui  a0, 0x7
  *   addiu a0, a0, 0x43A0     ; base 0x000743A0
@@ -19,7 +19,7 @@ struct unk_743A0 {
 
 extern char code_000743A0;
 
-unsigned func_00049A90(void)
+unsigned read_code_word_at_0x743A4_00049A90(void)
 {
     register struct unk_743A0 *base asm("$4")
         = (struct unk_743A0 *)&code_000743A0;

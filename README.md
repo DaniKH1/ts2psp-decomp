@@ -10,20 +10,24 @@ extracted or decrypted game data stay outside Git.
 
 ## Progress
 
-**56 of 64 current C candidates match byte for byte (87.5%).** All 56
+**57 of 65 current C candidates match byte for byte (87.7%).** All 57
 currently match with the GCC 3.3.6 Allegrex lane.
 
 | Result | Functions |
 | --- | --- |
-| 16-byte accessors | `func_00049A90`, `func_00049AA0` |
+| 16-byte code-word accessors | `read_code_word_at_0x743A4_00049A90`, `write_code_word_at_0x743A4_00049AA0` |
 | 16-byte field update | `subtract_word_at_30` |
-| 8-byte accessors | `set_word`, `func_0004E5CC`, `func_0004E5D4` |
-| 8-byte leaf functions | `func_000068E8`, `func_000111D8`, `func_00024CFC`, `func_000255B8`, `func_000273BC`, `func_0004A914` |
+| 8-byte word accessors | `set_word`, `get_word_at_0x0_0004E5CC`, `get_word_at_0x0_0004E5D4` |
+| 8-byte leaves | Four empty no-ops, plus `get_address_at_0x30_000111D8` and `get_address_at_0x5C_000273BC`. |
 | 21 one-word getters | Generated names identify the field offset and function address; see `config/matched_c.txt`. |
 | 9 one-word setters and clearers | Names record the write or clear operation, field offset, and function address. |
 | 14 byte and address accessors | Exact byte loads/stores and byte-offset address calculations. |
+| 1 constant return | `return_0x8000_at_000E5A10` reproduces the retail `ori`. |
 
 The authoritative list is generated in [`config/matched_c.txt`](config/matched_c.txt).
+Names use one consistent convention: describe the observed operation or byte
+offset, then include the original address as a stable suffix. The four empty
+functions use `noop_at_<address>` because their purpose is not established.
 Human names map to the original binary inventory in
 [`config/renames.txt`](config/renames.txt). The remaining eight candidates are
 still being investigated; an unverified candidate is not treated as completed
@@ -50,7 +54,8 @@ valid when the retail body is just `jr ra` and its delay-slot `nop`.
 ## Current toolchains
 
 `tools/pspcc.py` defines the compiler lanes and shared flags. The verifier tries
-every installed lane unless restricted with `--lane`.
+installed lanes in order until a candidate matches or all lanes fail; `--lane`
+restricts the check to selected lanes.
 
 | Lane | Compiler | Location | State |
 | --- | --- | --- | --- |
@@ -109,7 +114,8 @@ installed on this machine.
   names describe the observed load and offset without guessing field meaning.
 - Added 9 exact one-word setters and clearers.
 - Added 14 exact byte accessors, byte setters, and address getters.
-- Reached 56/64 exact C candidates (87.5%), all verified with GCC 3.3.6.
+- Added an exact constant return for `0x8000`.
+- Reached 57/65 exact C candidates (87.7%), all verified with GCC 3.3.6.
 - `352477f` - Decompiled `func_00029CFC` as `subtract_word_at_30`, with a padded
   struct and the register placement required for the exact GCC 3.3 output.
 - `47bf530` - Replaced the incorrect `func_0004E5DC` getter hypothesis with
