@@ -102,6 +102,13 @@ and no copy survives on disk. So the toolchain is being built from source:
   declarations (`extern char *tgoto ();`), which GCC 15 rejects under its C23
   default where `()` means `(void)` — the build now exports
   `CFLAGS="-O2 -std=gnu17"`;
+* second failure fixed: `libcody` (inside GCC) probes with
+  `#if __cplusplus != 201103` and retries with `-std=c++11` *prepended* —
+  an exported `CXXFLAGS=-std=gnu++17` lands after it and overrides the retry
+  (the last `-std` wins), so no `CXXFLAGS` is exported;
+* binutils (`allegrex-v2.44`) is built and installed — `psp-as`, `psp-ld`,
+  `psp-objcopy`, `psp-objdump` are in `C:\pspdev\bin`; GCC + newlib are
+  building (resumed via `toolchain.sh 2 3 4 5`);
 * only the psptoolchain dependencies are needed (`check-pspdev.sh`); the
   outer pspdev repo's `check-dependencies.sh` demands pkg-config metadata for
   libarchive/openssl/ncurses that MSYS2 does not ship, but those libraries are
@@ -136,6 +143,13 @@ that decides it:
 3. **`tools/pspcc.py`** locates the toolchain and encodes the exact
    compiler flags in one place; **`tools/pspelf.py`** is the read-only
    module-image reader everything else shares.
+
+The link stage is already proven against the real toolchain binaries: a smoke
+test assembled with `psp-as` and linked with the flags above resolves
+`%hi/%lo(dword_001BF890)` to the exact retail pair (`lui 0x001C` +
+`addiu -1904`) and `jal func_00000058` to `0x0C000016` — the addresses in
+`symbols.ld` drive the relocations correctly. Only `psp-gcc` itself is still
+building.
 
 Import stubs are pinned per *library* only: the image contains no NID→name
 database (individual imports are named in `.rodata.sceNid` as bare NIDs), so a
