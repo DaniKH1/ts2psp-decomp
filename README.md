@@ -10,7 +10,7 @@ extracted or decrypted game data stay outside Git.
 
 ## Progress
 
-**33 of 41 current C candidates match byte for byte (80.5%).** All 33
+**42 of 50 current C candidates match byte for byte (84%).** All 42
 currently match with the GCC 3.3.6 Allegrex lane.
 
 | Result | Functions |
@@ -20,6 +20,7 @@ currently match with the GCC 3.3.6 Allegrex lane.
 | 8-byte accessors | `set_word`, `func_0004E5CC`, `func_0004E5D4` |
 | 8-byte leaf functions | `func_000068E8`, `func_000111D8`, `func_00024CFC`, `func_000255B8`, `func_000273BC`, `func_0004A914` |
 | 21 one-word getters | Generated names identify the field offset and function address; see `config/matched_c.txt`. |
+| 9 one-word setters and clearers | Names record the write or clear operation, field offset, and function address. |
 
 The authoritative list is generated in [`config/matched_c.txt`](config/matched_c.txt).
 Human names map to the original binary inventory in
@@ -105,7 +106,8 @@ installed on this machine.
 
 - Added 21 exact word getters at offsets from `0x00` through `0x3C`; their
   names describe the observed load and offset without guessing field meaning.
-- Reached 33/41 exact C candidates (80.5%), all verified with GCC 3.3.6.
+- Added 9 exact one-word setters and clearers.
+- Reached 42/50 exact C candidates (84%), all verified with GCC 3.3.6.
 - `352477f` - Decompiled `func_00029CFC` as `subtract_word_at_30`, with a padded
   struct and the register placement required for the exact GCC 3.3 output.
 - `47bf530` - Replaced the incorrect `func_0004E5DC` getter hypothesis with
