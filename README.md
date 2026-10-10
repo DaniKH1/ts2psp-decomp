@@ -83,7 +83,7 @@ psp-gcc -G0 -mabi=eabi -march=allegrex \
         -fno-strict-aliasing -O2 -c
 ```
 
-### Toolchain status: building from source under MSYS2
+### Toolchain: built from source under MSYS2
 
 There are **no Windows binaries** of psp-gcc anywhere: pspdev publishes only
 Linux/macOS tarballs (checked every release back to 2020), devkitPro dropped
@@ -106,16 +106,43 @@ and no copy survives on disk. So the toolchain is being built from source:
   `#if __cplusplus != 201103` and retries with `-std=c++11` *prepended* —
   an exported `CXXFLAGS=-std=gnu++17` lands after it and overrides the retry
   (the last `-std` wins), so no `CXXFLAGS` is exported;
-* binutils (`allegrex-v2.44`) is built and installed — `psp-as`, `psp-ld`,
-  `psp-objcopy`, `psp-objdump` are in `C:\pspdev\bin`; GCC + newlib are
-  building (resumed via `toolchain.sh 2 3 4 5`);
+* binutils (`allegrex-v2.44`), GCC `allegrex-v15.2.0` (two stages), newlib
+  and pthread-embedded all built and installed — `psp-gcc`, `psp-as`,
+  `psp-ld`, `psp-objcopy`, `psp-objdump` are in `C:\pspdev\bin`
+  (`C:\pspdev\build.txt` records all five build entries);
 * only the psptoolchain dependencies are needed (`check-pspdev.sh`); the
   outer pspdev repo's `check-dependencies.sh` demands pkg-config metadata for
   libarchive/openssl/ncurses that MSYS2 does not ship, but those libraries are
   only used by `psp-pacman`, not by psp-gcc.
 
-If modern GCC's codegen turns out not to match the retail bytes, the fallback
-is to pin an older psptoolchain GCC version (the game is from 2007).
+**Status: complete.** `C:\pspdev\bin` has the full GCC 15.2.0 toolchain —
+`psp-gcc`, `psp-ld`, `psp-objcopy`, plus newlib (`psp/include`, `libc.a`) and
+pthread-embedded (`build.txt` carries all five build entries).
+
+### Compiler era: retail is not GCC 15
+
+The first two candidates proved that modern GCC's codegen differs from the
+2007 retail build in ways no flag recovers (see the evidence below), so a
+second, era-adjacent lane is building: **`gcc-4.6.4-psp`** (the oldest
+allegrex-capable branch upstream) into `C:\pspdev46`, alongside GCC 15.
+
+Evidence, all checkable from `BOOT.BIN`:
+
+| fingerprint | retail (2007) | gcc 15.2 (-O2) |
+| --- | --- | --- |
+| `func_0002BBA8` predicate | `li`+`bne` branch structure | `xori`+`sltu`, branchless |
+| `func_00000B28` base addresses | `addiu a1,a0,96` hoisted | folded into displacements |
+| `func_00000B28` store scheduling | scale store above the loads | loads hoisted first |
+| whole `.text`: `xori`+`sltu` (branchless setcc) | **0** of 442,442 instrs | emitted for every predicate return |
+| whole `.text`: `li`+conditional branch | 2,077 | — |
+| whole `.text`: `mfc1`+`sw` float stores | 313 (int-typed fields) | reproducible only via int/union typing |
+| whole `.text`: `swc1` | 10,105 (the normal float store) | same |
+
+An explicit `if (…) return 0; return 1;` still compiles branchless under
+GCC 15 (`-fno-if-conversion` does not apply — it is expression expansion),
+and pointer locals fold flat, so these differences are version traits, not
+C-shape problems. Candidates are tried against both lanes; per-function
+matching decides which toolchain is recorded for it.
 
 ## Verification harness
 
@@ -144,12 +171,14 @@ that decides it:
    compiler flags in one place; **`tools/pspelf.py`** is the read-only
    module-image reader everything else shares.
 
-The link stage is already proven against the real toolchain binaries: a smoke
-test assembled with `psp-as` and linked with the flags above resolves
+The link stage is proven against the real toolchain binaries: a smoke test
+assembled with `psp-as` and linked with the flags above resolves
 `%hi/%lo(dword_001BF890)` to the exact retail pair (`lui 0x001C` +
 `addiu -1904`) and `jal func_00000058` to `0x0C000016` — the addresses in
-`symbols.ld` drive the relocations correctly. Only `psp-gcc` itself is still
-building.
+`symbols.ld` drive the relocations correctly. The whole pipeline
+(compile → link → objcopy → compare) now runs end to end with `psp-gcc`
+15.2.0; its first two verdicts were `DIFFERS`, which is what surfaced the
+era difference documented under *Compiler era*.
 
 Import stubs are pinned per *library* only: the image contains no NID→name
 database (individual imports are named in `.rodata.sceNid` as bare NIDs), so a
@@ -226,13 +255,17 @@ labels separately instead of inflating the function count with them.
 2. ✅ Function inventory: every code section split into functions by
    `jal` graph, constructor list and section boundaries
    (`tools/inventory.py` → `config/functions.txt`).
-3. 🔄 Get psp-gcc in place (building from source under MSYS2 into
-   `C:\pspdev`, see *Toolchain status*) — and stand up the
-   compile-and-compare harness: **done** (`tools/linkerscript.py` +
-   `tools/verify_c.py` + `config/pgs-si2.symbols.ld`, waiting only on the
-   compiler to run).
-4. Recover import names: hash candidate names against `.rodata.sceNid` so
+3. ✅ Get psp-gcc in place: **GCC 15.2.0 built from source** under MSYS2
+   into `C:\pspdev` (binutils + gcc×2 + newlib + pthread), and the
+   compile-and-compare harness standing (`tools/linkerscript.py` +
+   `tools/verify_c.py` + `config/pgs-si2.symbols.ld`, link stage proven
+   against the real binaries).
+4. 🔄 Compiler era: the first two candidates proved GCC 15's codegen is
+   not the retail one (see *Compiler era*) — build the `gcc-4.6.4-psp`
+   lane into `C:\pspdev46` (in progress) and get the first byte-exact
+   match recorded, per candidate under whichever lane reproduces it.
+5. Recover import names: hash candidate names against `.rodata.sceNid` so
    `sceKernel…`-style calls resolve to their real stubs during verification.
-5. Assemble the inventory back to a byte-exact image (the asm layer).
-6. Decompile function by function — readable C, human-named structs,
+6. Assemble the inventory back to a byte-exact image (the asm layer).
+7. Decompile function by function — readable C, human-named structs,
    renamed symbols wherever the code shows what it does.

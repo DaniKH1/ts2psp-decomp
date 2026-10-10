@@ -9,6 +9,10 @@ build/
 __pycache__/
 *.pyc
 
+# C candidates stay untracked until tools/verify_c.py proves them byte-exact
+# against BOOT.BIN; verified ones are force-added (git add -f src/<name>.c).
+src/*.c
+
 # Editor / harness state
 .opencode/
 .vscode/
