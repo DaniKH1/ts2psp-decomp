@@ -13,6 +13,7 @@ get_byte_address_at_0x80_000C3004
 get_float_at_0x44_000E2C5C
 get_float_at_0x48_000E2C64
 get_float_at_0x4_0009C52C
+get_global_word_at_0x1D03828_00036D90
 get_low_u16_at_0x4_00054510
 get_u8_at_0x11_000D9CB0
 get_u8_at_0x1_00125B0C
@@ -117,6 +118,7 @@ set_float_at_0x18_000F96B8
 set_float_at_0x34_000F9768
 set_float_at_0x60_000CD788
 set_float_at_0x64_000CD768
+set_global_u8_at_0x1D03624_0002F438
 set_u8_at_0x330_000FCC8C
 set_word
 set_word_and_clear_next_at_0x48_0008ED10
