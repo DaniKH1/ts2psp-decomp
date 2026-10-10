@@ -22,16 +22,17 @@ all of that was removed on purpose and is being rebuilt here, cleaner, with the
 same verification discipline: **nothing is committed as C unless it has been
 proven to compile to the original bytes.**
 
-**Current match count: 10 / 20 candidates in `src/`** (50% byte-exact).
+**Current match count: 11 / 20 candidates in `src/`** (55% byte-exact).
 
 The first exact C matches are now in: `func_00049A90` and `func_00049AA0`
 both reproduce all 16 retail bytes with the GCC 3.3 lane. Eight additional
 trivial leaf functions (`func_000068E8`, `func_000111D8`, `func_00024CFC`,
 `func_000255B8`, `func_000273BC`, `func_0004A914`, `func_0004E5CC`,
-`func_0004E5D4`) match at 8 bytes each. Two candidates (`func_0000F574`,
-`func_0004E5DC`) differ by one delay-slot word; three wrapper functions differ
-only in frame-prologue words (known GCC 3.3 vs. retail frame-layout difference);
-the remaining five need further work.
+`func_0004E5D4`) match at 8 bytes each. The renamed `set_word` function
+(`func_0004E5DC`) stores a value through a one-word struct and matches at 8
+bytes. `func_0000F574` differs by one delay-slot word; three wrapper functions
+differ only in frame-prologue words (known GCC 3.3 vs. retail frame-layout
+difference); the remaining five need further work.
 
 What is proven so far:
 
@@ -252,9 +253,8 @@ documented path:
   "GCC 3.2, 3.3, 3.4 and 4.0 (all versions found in binary strings)".
 * **Lane 3 (`gcc33` → `C:\pspdev33`) is usable**: patched GCC 3.3.6 is built
   natively under MSYS2 (`all-gcc` only) and reuses lane 1's assembler and
-  linker. The harness compiles all ten current candidates in all three lanes.
-  Two candidates now match exactly with GCC 3.3.6; the other eight still
-  differ.
+  linker. The harness compiles all twenty current candidates in all three lanes.
+  Eleven candidates now match exactly with GCC 3.3.6; nine still differ.
 
 ## Verification harness
 
