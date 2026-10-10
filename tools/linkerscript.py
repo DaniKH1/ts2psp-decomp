@@ -91,9 +91,18 @@ def scan_addresses(code: bytes, base: int, mod: pspelf.Module,
         if section is None:
             return
         if section == ".text" or section.startswith(".text."):
-            # Values in the code region are arithmetic constants (lui 0 +
-            # addiu 4 = 4), not addresses; real code pointers name an
-            # inventory function, which `named` already filtered above.
+            # A code-region value is either an arithmetic constant or a
+            # genuine mid-code anchor.  Constants are built from lui 0
+            # (lui 0 + addiu 4 = 4) and can never reach 0x10000+, while a
+            # tracked value in .text at >= 0x10000 required a nonzero
+            # upper half - retail kept such a base separate from its
+            # field offset when a link-time relocation targeted a symbol
+            # at exactly that address (func_00049A90: base 0x743A0 is the
+            # `jr ra` of an epilogue, accessed as *(u32*)(0x743A0 + 4)).
+            # Exact function starts were already filtered above.
+            if value < 0x10000:
+                return
+            hits.setdefault(value, []).append(off)
             return
         hits.setdefault(value, []).append(off)
 
@@ -239,7 +248,9 @@ def main() -> int:
     data_lines = []
     for target in sorted(data_refs):
         section = mod.containing_section(target)
-        if section and section.startswith(".sceStub.text."):
+        if section == ".text" or (section and section.startswith(".text.")):
+            prefix = "code"       # mid-code anchor (relocation target)
+        elif section and section.startswith(".sceStub.text."):
             prefix = "stub"      # an import reached by address, not by name
         elif target % 4 == 0:
             prefix = "dword"

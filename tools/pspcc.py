@@ -57,7 +57,10 @@ OPTFLAGS = ["-O2"]
 
 # Flags a lane's driver does not know (old drivers hard-error on unknown
 # -m options).  Filled empirically per lane; see tools/verify_c.py runs.
-LANE_CFLAGS_DROP: dict[str, tuple[str, ...]] = {}
+LANE_CFLAGS_DROP: dict[str, tuple[str, ...]] = {
+    # GCC 3.3.6's driver does not recognize this later GCC option.
+    "gcc33": ("-mpreferred-stack-boundary=4",),
+}
 
 
 def lane_label(root: Path | None = None) -> str:
@@ -108,7 +111,13 @@ def require_toolchain() -> None:
 
 def env(root: Path | None = None) -> dict:
     base = root if root is not None else LANES[0][0]
-    bins = [str(MSYS_BIN), str(base / "bin")]
+    # GCC 3.3's specs call the assembler as plain `as`; its borrowed psp-as
+    # alias must precede MSYS's host assembler, while MSYS stays on PATH for
+    # the runtime DLLs.  The newer drivers locate their target tools directly.
+    if lane_label(base) == "gcc33":
+        bins = [str(base / "bin"), str(MSYS_BIN)]
+    else:
+        bins = [str(MSYS_BIN), str(base / "bin")]
     if not (base / "bin" / "psp-as.exe").exists():
         # gcc-only lane: the driver must still find an assembler, so put the
         # first lane that has one on PATH after the lane's own bin.

@@ -22,6 +22,9 @@ all of that was removed on purpose and is being rebuilt here, cleaner, with the
 same verification discipline: **nothing is committed as C unless it has been
 proven to compile to the original bytes.**
 
+The first exact C matches are now in: `func_00049A90` and `func_00049AA0`
+both reproduce all 16 retail bytes with the GCC 3.3 lane.
+
 What is proven so far:
 
 * The module image is extracted from the ISO and identified:
@@ -146,6 +149,22 @@ Built from the same `psptoolchain-allegrex` scripts with
 **Status: usable** — `C:\pspdev46\bin\psp-gcc.exe` reports
 `psp-gcc (GCC) 4.6.4`, and `verify_c.py` now tries every installed lane.
 
+#### Third lane: GCC 3.3.6 in `C:\pspdev33`
+
+Built from the 2005 BRS Allegrex patch under MSYS2. GCC 3.3.6's release
+`c-parse.c` must be used with its grammar; a modern Bison-generated parser
+accepted the token numbers but rejected ordinary named parameters. The
+parser enums themselves match the release source. The build fixups also move
+`TI_MAX` after the Allegrex tree indices, preventing the custom tree globals
+from overrunning `global_trees` into the standard integer-type table.
+
+The lane compiles the full nine-case C type probe. GCC 3.3 rejects
+`-mpreferred-stack-boundary=4`, so the harness drops that option for this
+lane. Its driver invokes plain `as`, so the lane borrows the existing PSP
+assembler and linker through plain-name aliases. A clean rebuild attempt
+currently fails during host `libiberty` configure; the installed compiler
+and lane verifier are usable.
+
 ### Compiler era: retail is not GCC 15
 
 The first two candidates proved that modern GCC's codegen differs from the
@@ -153,7 +172,8 @@ The first two candidates proved that modern GCC's codegen differs from the
 second, era-adjacent lane was built: **`gcc-4.6.4-psp`** (the oldest
 allegrex-capable branch upstream) into `C:\pspdev46`, alongside GCC 15.
 `verify_c.py` tries every installed lane per candidate (`--lane` narrows);
-a MATCH under any lane counts.
+a MATCH under any lane counts. The first two matches are the `0x743A0`
+accessor pair, both under GCC 3.3.6.
 
 Evidence, all checkable from `BOOT.BIN`:
 
@@ -170,7 +190,7 @@ Evidence, all checkable from `BOOT.BIN`:
 An explicit `if (…) return 0; return 1;` still compiles branchless under
 GCC 15 (`-fno-if-conversion` does not apply — it is expression expansion),
 and pointer locals fold flat, so these differences are version traits, not
-C-shape problems. Candidates are tried against both lanes; per-function
+C-shape problems. Candidates are tried against all three lanes; per-function
 matching decides which toolchain is recorded for it.
 
 Two further flags are **derived from retail observations** and are now part
@@ -222,13 +242,11 @@ documented path:
   on Debian Sarge i386. Their README: *"GCC 3.3 — the version that Sony
   built the PSP toolchain off of"*, and their priority list targets
   "GCC 3.2, 3.3, 3.4 and 4.0 (all versions found in binary strings)".
-* **Lane 3 plan (gcc33 → `C:\pspdev33`)**: build that patched GCC 3.3
-  *natively* under MSYS2 — `all-gcc` only (the harness links with
-  `psp-ld -T symbols.ld` directly, so no newlib/libgcc is needed) — and
-  **reuse lane 1's binutils**: instruction encoding is ISA-determined, so
-  keeping `psp-as`/`psp-ld` identical across lanes isolates the cc1
-  version as the single variable. Host dialect forced with
-  `-std=gnu89 -fcommon` (the same trick that built GCC 4.6.4).
+* **Lane 3 (`gcc33` → `C:\pspdev33`) is usable**: patched GCC 3.3.6 is built
+  natively under MSYS2 (`all-gcc` only) and reuses lane 1's assembler and
+  linker. The harness compiles all ten current candidates in all three lanes.
+  Two candidates now match exactly with GCC 3.3.6; the other eight still
+  differ.
 
 ## Verification harness
 
@@ -242,8 +260,8 @@ that decides it:
    * **223 named import stubs** (`sceKernelCreateThread = 0x001B0630;`, …)
      from `config/imports.txt` — see *Import names* below;
    * 104 section anchors (`_sec_*_START`/`_SIZE`), 26 import-library anchors
-     (`_stub_sceAudio`, …);
-   * **6,421 data addresses** recovered by scanning the original code for
+     (`_stub_sceAudio`, …), and 1,995 `code_*` mid-code anchors;
+   * **8,416 data addresses** recovered by scanning the original code for
      `lui`+`addiu`/`ori` and load/store pairs that resolve into an allocated
      section — globals, string literals, jump tables — each annotated with
      which functions reach it.
@@ -252,7 +270,7 @@ that decides it:
    pairs and `jal` targets resolve exactly as the retail link did →
    `psp-objcopy -O binary --only-section=.text*` → byte-compare against
    `BOOT.BIN`. Every **installed toolchain lane** is tried per candidate
-   (`gcc15`, `gcc46`; `--lane` restricts), and a MATCH names the lane that
+   (`gcc33`, `gcc15`, `gcc46`; `--lane` restricts), and a MATCH names the lane that
    produced it. `--adopt` writes the passing list to
    `config/matched_c.txt`. Renames live in `config/renames.txt`
    (`<inventory_name> <your_name>`), so readable names never lose the
@@ -369,16 +387,15 @@ labels separately instead of inflating the function count with them.
    compile-and-compare harness standing (`tools/linkerscript.py` +
    `tools/verify_c.py` + `config/pgs-si2.symbols.ld`, link stage proven
    against the real binaries).
-4. 🔄 Compiler era: the `gcc-4.6.4-psp` lane **is built** into
+4. ✅ Compiler era: the `gcc-4.6.4-psp` lane **is built** into
    `C:\pspdev46` and proved retail predates it (version-locked traits,
    see *Compiler era*). The era question is now **researched**: retail
    comes from Sony's official SDK compiler window
    (**psp-gcc 1.x = GCC 3.3.x**, psp-gcc 2.x = GCC 4.0.x), and the
-   original 2005 allegrex port of GCC 3.3 survives as the
-   BRS-PSP-Research-Initiative patch set — lane 3 (`gcc33`) is being
-   built natively from it (`all-gcc`, reusing lane 1's binutils).
-   Landing the first byte-exact match follows whichever lane reproduces
-   retail.
+   original 2005 Allegrex port of GCC 3.3 survives as the
+   BRS-PSP-Research-Initiative patch set — lane 3 (`gcc33`) is usable from
+   it. The first byte-exact matches are `func_00049A90` and
+   `func_00049AA0` under GCC 3.3.6.
 5. ✅ Import names: **223/223 recovered** (`tools/imports.py` →
    `config/imports.txt`, wired into `symbols.ld`) — the pspsdk stub-record
    join, the `SHA-1(name)[:4]` LE scheme, and curated psplibdoc records;
