@@ -110,6 +110,7 @@ return_zero_at_00142A9C
 return_zero_at_001455A0
 return_zero_at_0019C028
 set_float_at_0x10_000F96C0
+set_float_at_0x18C_00170BD4
 set_float_at_0x18_000F96B8
 set_float_at_0x34_000F9768
 set_float_at_0x60_000CD788

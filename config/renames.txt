@@ -128,3 +128,4 @@ func_001455A0 return_zero_at_001455A0
 func_000F698C return_zero_at_000F698C
 func_0019C028 return_zero_at_0019C028
 func_001AA5D8 identity_pointer_at_001AA5D8
+func_00170BD4 set_float_at_0x18C_00170BD4
